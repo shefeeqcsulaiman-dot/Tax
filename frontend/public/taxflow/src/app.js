@@ -1,7 +1,7 @@
-const META={dashboard:{t:'Dashboard',s:'Loading dashboard from database',a:'+ New Invoice',ao:()=>go('sales')},company:{t:'Company Registration',s:'UAE Trade License & FTA Details',a:'Save All',ao:()=>toast('All changes saved','ok')},sales:{t:'Sales & Invoices',s:'Products - Invoices - Customers',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[2],'s-create'),50)}},purchase:{t:'Purchases',s:'Upload - AI Extraction - Validation',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()},bank:{t:'Bank Accounts',s:'Accounts - Transactions - Reconciliation',a:'+ Add Account',ao:()=>showM('m-bank')},inventory:{t:'Inventory',s:'Stock - Items - Movements',a:'+ Add Item',ao:()=>showM('m-inv-item')},expense:{t:'Expenses',s:'List - Create - Approvals',a:'+ New Expense',ao:()=>{go('expense');setTimeout(()=>stab(document.querySelectorAll('#page-expense .tab')[1],'exp-create'),50)}},accounting:{t:'Accounting',s:'Chart - Journal - Ledger',a:'+ New Entry',ao:()=>showM('m-acc')},reports:{t:'Reports',s:'VAT - P&L - Trial Balance',a:'Export PDF',ao:()=>toast('Exporting report...','info')},settings:{t:'Settings',s:'General - Users - Tax',a:'Save All',ao:()=>toast('Settings saved','ok')},mobile:{t:'Mobile App',s:'Preview - Features',a:'Download App',ao:()=>toast('Download link sent to email','ok')},staff:{t:'Staff Management',s:'Attendance - Leave - Corrections - Biometric',a:'+ Add Employee',ao:()=>showM('m-emp')},expert:{t:'Expert Review',s:'Find CA experts - Submit for review',a:'+ New Request',ao:()=>showM('m-newreview')},design:{t:'System Design',s:'Functional Spec - Fields - Validations - API',a:'Export Spec',ao:()=>toast('Exporting FRD to PDF...','info')}};
+const META={dashboard:{t:'Dashboard',s:'Loading dashboard from database',a:'+ New Invoice',ao:()=>go('sales')},company:{t:'Company Registration',s:'UAE Trade License & FTA Details',a:'Save All',ao:()=>toast('All changes saved','ok')},sales:{t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[4],'s-create'),50)}},purchase:{t:'Purchases',s:'Upload - AI Extraction - Validation',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()},bank:{t:'Bank Accounts',s:'Accounts - Transactions - Reconciliation',a:'+ Add Account',ao:()=>showM('m-bank')},inventory:{t:'Inventory',s:'Stock - Items - Movements',a:'+ Add Item',ao:()=>showM('m-inv-item')},expense:{t:'Expenses',s:'List - Create - Approvals',a:'+ New Expense',ao:()=>{go('expense');setTimeout(()=>stab(document.querySelectorAll('#page-expense .tab')[1],'exp-create'),50)}},accounting:{t:'Accounting',s:'Chart - Journal - Ledger',a:'+ New Entry',ao:()=>showM('m-acc')},reports:{t:'Reports',s:'VAT - P&L - Trial Balance',a:'Export PDF',ao:()=>toast('Exporting report...','info')},settings:{t:'Settings',s:'General - Users - Tax',a:'Save All',ao:()=>toast('Settings saved','ok')},mobile:{t:'Mobile App',s:'Preview - Features',a:'Download App',ao:()=>toast('Download link sent to email','ok')},staff:{t:'Staff Management',s:'Attendance - Leave - Corrections - Biometric',a:'+ Add Employee',ao:()=>showM('m-emp')},expert:{t:'Expert Review',s:'Find CA experts - Submit for review',a:'+ New Request',ao:()=>showM('m-newreview')},design:{t:'System Design',s:'Functional Spec - Fields - Validations - API',a:'Export Spec',ao:()=>toast('Exporting FRD to PDF...','info')}};
 META.settings={t:'Settings',s:'Company - Users - Tax - Security - Integrations - Invoice Design',a:'Save All',ao:()=>toast('Settings saved','ok')};
 META.payroll={t:'Payroll',s:'Salary run - WPS/SIF - Payslips - Posting',a:'Run Payroll',ao:()=>{go('payroll');setTimeout(()=>runPayroll(),50)}};
-META.sales={t:'Sales & Invoices',s:'Products - Upload - Invoices - Customers',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[3],'s-create'),50)}};
+META.sales={t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[4],'s-create'),50)}};
 META.purchase={t:'Purchases',s:'Upload - AI Extraction - Validation - Manual - Settings',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()};
 META.ai={t:'AI Assistant',s:'Ask questions about TaxFlow modules and workflows',a:'Ask AI',ao:()=>askSystemAI()};
 META.bills={t:'Bills & Vendors',s:'Vendor bills - Purchase orders - Supplier payments',a:'+ New Bill',ao:()=>showM('m-bill')};
@@ -11,6 +11,7 @@ META.notifications={t:'Notifications',s:'Email - WhatsApp - SMS - Push - In-app 
 META.rota={t:'Rota Planning',s:'Shift setup - Weekly rota - Coverage - Swap requests',a:'Publish Rota',ao:()=>publishRota()};
 META.accounting={t:'Accounting',s:'Chart - Journal - Ledger - Tax - Closing',a:'+ Journal Entry',ao:()=>{go('accounting');setTimeout(()=>stab(document.querySelectorAll('#page-accounting .tab')[1],'acc-journal'),50)}};
 META.reports={t:'Reports',s:'VAT - P&L - Balance Sheet - Trial Balance',a:'Export PDF',ao:()=>exportActiveReportPdf()};
+META.exception={t:'Exception Center',s:'Failed postings - duplicates - VAT/OCR - stock and payroll issues',a:'Refresh',ao:()=>loadExceptionCenter()};
 
 function scheduleIdleTask(fn,timeout=800){
   if('requestIdleCallback' in window){
@@ -109,6 +110,7 @@ function go(page){
   document.getElementById('topaction').onclick=m.ao;
   closeSidebar();
   if(page==='reports')syncReportsFromDatabase();
+  if(page==='exception')loadExceptionCenter();
   runPageWarmup(page);
   updateBackButton();
 }
@@ -948,6 +950,76 @@ function saveServer(collection,record){
   apiRequest('save',{collection,record}).catch(err=>console.warn('Database save failed:',err));
 }
 
+async function moduleApi(path,options={}){
+  const response=await fetch(`${apiBaseUrl()}${path}`,{
+    method:options.method||'GET',
+    headers:backendHeaders(),
+    body:options.body?JSON.stringify(options.body):undefined
+  });
+  if(!response.ok)throw new Error(`FastAPI ${path} returned ${response.status}`);
+  return response.json();
+}
+
+function exceptionBadgeClass(severity){
+  const sev=String(severity||'medium').toLowerCase();
+  if(sev==='high')return 'b-r';
+  if(sev==='low')return 'b-g';
+  return 'b-a';
+}
+
+function exceptionAction(module){
+  const mod=String(module||'').toLowerCase();
+  if(mod.includes('sales'))return "go('sales')";
+  if(mod.includes('purchase'))return "go('purchase')";
+  if(mod.includes('inventory'))return "go('inventory')";
+  if(mod.includes('payroll'))return "go('payroll')";
+  if(mod.includes('account'))return "go('accounting')";
+  if(mod.includes('document'))return "go('documents')";
+  return "toast('Open source module to resolve this exception','info')";
+}
+
+function renderExceptionCenter(data){
+  const summary=data?.summary||{};
+  setText('exc-open',summary.open??0);
+  setText('exc-high',summary.high??0);
+  setText('exc-medium',summary.medium??0);
+  setText('exc-low',summary.low??0);
+  setNavBadge('exception',summary.open||0,(summary.high||0)>0?'red':'warn');
+  const topCount=document.getElementById('exception-top-count');
+  if(topCount){
+    topCount.textContent=Number(summary.open||0).toLocaleString('en-AE');
+    topCount.className=`b ${(summary.high||0)>0?'b-r':(summary.open||0)>0?'b-a':'b-g'}`;
+  }
+  const tbody=document.getElementById('exception-tbody');
+  if(!tbody)return;
+  const rows=Array.isArray(data?.exceptions)?data.exceptions:[];
+  if(rows.length===0){
+    tbody.innerHTML='<tr><td colspan="6" style="color:var(--text3);text-align:center">No open exceptions found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML=rows.map(row=>`
+    <tr>
+      <td>${escapeHtml(row.module||'-')}</td>
+      <td>${escapeHtml(row.category||row.message||'-')}<div class="card-sub">${escapeHtml(row.message||'')}</div></td>
+      <td class="mono">${escapeHtml(row.source_record||'-')}</td>
+      <td><span class="b ${exceptionBadgeClass(row.severity)}">${escapeHtml(row.severity||'medium')}</span></td>
+      <td><span class="b b-b">${escapeHtml(row.status||'open')}</span></td>
+      <td><button class="btn btn-g btn-sm" onclick="${exceptionAction(row.module)}">Open</button></td>
+    </tr>
+  `).join('');
+}
+
+function loadExceptionCenter(){
+  const tbody=document.getElementById('exception-tbody');
+  if(tbody)tbody.innerHTML='<tr><td colspan="6" style="color:var(--text3);text-align:center">Reading exception center...</td></tr>';
+  moduleApi('/exceptions')
+    .then(renderExceptionCenter)
+    .catch(err=>{
+      console.warn('Exception Center unavailable:',err);
+      if(tbody)tbody.innerHTML='<tr><td colspan="6" style="color:var(--red);text-align:center">Exception Center API unavailable.</td></tr>';
+    });
+}
+
 function saveInvoiceLayoutServer(layout){
   apiRequest('invoice-layout',layout).catch(err=>console.warn('Database layout save failed:',err));
 }
@@ -1081,7 +1153,9 @@ function renderPurchaseRecord(purchase){
   row.dataset.purchaseRecord=JSON.stringify({...purchase,ref});
   const status=purchase.status||'Draft';
   const statusClass=status==='Paid'?'b-g':status==='Received'?'b-b':status.includes('Payment')?'b-a':'b-gray';
-  row.innerHTML=`<td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(purchase.supplier||'-')}</td><td>${escapeHtml(purchase.date||'-')}</td><td>${escapeHtml(purchase.location||'-')}</td><td class="mono">${Number(purchase.items||0)}</td><td class="mono">${Number(purchase.net_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.tax_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.shipping||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.total||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.paid||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.due||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b b-gray">${escapeHtml(purchase.source||'Manual')}</span></td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td>`;
+  const source=String(purchase.source||'Manual');
+  const sourceClass=source.toLowerCase().includes('ai')?'b-p':'b-gray';
+  row.innerHTML=`<td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(purchase.supplier||'-')}</td><td>${escapeHtml(purchase.date||'-')}</td><td>${escapeHtml(purchase.location||'-')}</td><td class="mono">${Number(purchase.items||0)}</td><td class="mono">${Number(purchase.net_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.tax_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.shipping||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.total||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.paid||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.due||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td>`;
   tbody.prepend(row);
   refreshEnhancedTable(tbody.closest('table'));
 }
@@ -1100,6 +1174,7 @@ function hydrateFromServer(){
   apiRequest('bootstrap',{}, {method:'GET'}).then(({data})=>{
     if(!data)return;
     if(data.company)applyCompanyToUi(data.company);
+    (data.salesInvoices||[]).forEach(inv=>registerSalesInvoiceKey(inv.invoice_no||inv.invoice_number));
     (data.products||[]).reverse().forEach(renderProductRecord);
     (data.salesCategories||[]).reverse().forEach(renderSalesCategoryRecord);
     (data.salesUnits||[]).reverse().forEach(renderSalesUnitRecord);
@@ -1122,6 +1197,7 @@ function hydrateFromServer(){
     syncProductMasterOptions();
     filterLedger();
     scheduleIdleTask(()=>{
+      revalidateSalesAiRows();
       bindDetailViews();
       bindEditActions();
       refreshActivePageTables();
@@ -1173,6 +1249,16 @@ async function requestInvoiceExtraction(entry){
 
 const salesUploadedFiles = [];
 const salesExtractedInvoices = [];
+const salesInvoiceDbKeys = new Set();
+
+function invoiceKey(value){
+  return String(value||'').trim().toLowerCase();
+}
+
+function registerSalesInvoiceKey(value){
+  const key=invoiceKey(value);
+  if(key)salesInvoiceDbKeys.add(key);
+}
 
 function buildFallbackSalesExtraction(entry){
   const cleanBase=(entry?.name||'INV-UPLOAD').replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/gi,'-').slice(0,16).toUpperCase()||'INV-UPLOAD';
@@ -1263,8 +1349,7 @@ function animateSalesUpload(entry){
         entry.status='Ready';
         renderSalesFileList();
         toast(entry.name+' uploaded ?','ok');
-        const autoEl=document.getElementById('sales-auto');
-        if(!autoEl||autoEl.value==='yes')setTimeout(()=>extractSalesInvoiceFile(entry),500);
+        setTimeout(()=>extractSalesInvoiceFile(entry),500);
       },250);
     }
     fill.style.width=Math.min(p,100)+'%';
@@ -1303,6 +1388,8 @@ async function extractSalesInvoiceFile(entry){
   entry.status='Extracting';
   renderSalesFileList();
   toast('Reading invoice data from '+entry.name+'...','info');
+  const extTab=document.querySelector('#page-sales .tab:nth-child(2)');
+  if(extTab)stab(extTab,'s-extract');
   try{
     const invoices=await requestSalesInvoiceExtraction(entry);
     entry.status='Extracted';
@@ -1310,6 +1397,10 @@ async function extractSalesInvoiceFile(entry){
     salesExtractedInvoices.push(...invoices.map(inv=>({...inv,sourceFile:entry.name,stored:false})));
     renderSalesFileList();
     appendSalesExtractedRows(invoices);
+    if(invoices.some(inv=>!validateSalesAiInvoice(inv).valid)){
+      refreshSalesValidationPanel();
+      toast('Validation issues found - review required','warn');
+    }
     toast('Read '+invoices.length+' invoice(s) from '+entry.name+' ?','ok');
   }catch(err){
     entry.status='Error';
@@ -1324,14 +1415,20 @@ function appendSalesExtractedRows(invoices){
   if(tbody.querySelector('td[colspan]'))tbody.innerHTML='';
   const fmt=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
   invoices.forEach(inv=>{
-    if([...tbody.querySelectorAll('td.mono')].some(td=>td.textContent===inv.invoice_no))return;
+    if([...tbody.querySelectorAll('td.mono')].some(td=>td.textContent===inv.invoice_no)){
+      toast(`Duplicate in current AI upload: ${inv.invoice_no}`,'warn');
+      return;
+    }
+    const validation=validateSalesAiInvoice(inv);
     const confCls=inv.confidence>=90?'b-g':inv.confidence>=70?'b-a':'b-r';
-    const stCls=inv.status==='Ready'||inv.status==='Valid'?'b-g':inv.status==='Review'?'b-a':'b-r';
+    const stCls=validation.valid?'b-g':'b-a';
     const row=document.createElement('tr');
     row.dataset.salesInv=JSON.stringify(inv);
-    row.innerHTML=`<td class="mono">${escapeHtml(inv.invoice_no)}</td><td>${escapeHtml(inv.customer)}</td><td class="mono">${escapeHtml(inv.customer_trn||'')}</td><td>${escapeHtml(inv.date)}</td><td class="mono">${fmt(inv.subtotal)}</td><td class="mono">${fmt(inv.vat_amount)}</td><td class="mono">${fmt(inv.total)}</td><td><span class="b ${confCls}">${Number(inv.confidence||0)}%</span></td><td><span class="b ${stCls}">${escapeHtml(inv.status||'Ready')}</span></td>`;
+    row.dataset.validation=validation.valid?'valid':'review';
+    row.innerHTML=`<td><input type="checkbox" class="sales-ai-select" ${validation.valid?'checked':''} aria-label="Select ${escapeHtml(inv.invoice_no)}"></td><td class="mono">${escapeHtml(inv.invoice_no)}</td><td>${escapeHtml(inv.customer)}</td><td class="mono">${escapeHtml(inv.customer_trn||'')}</td><td>${escapeHtml(inv.date)}</td><td class="mono">${fmt(inv.subtotal)}</td><td class="mono">${fmt(inv.vat_amount)}</td><td class="mono">${fmt(inv.total)}</td><td><span class="b ${confCls}">${Number(inv.confidence||0)}%</span></td><td class="sales-ai-validation"><span class="b ${stCls}">${validation.valid?'Valid':'Review'}</span></td><td class="sales-ai-details" style="color:var(--text3);font-size:12px">${escapeHtml(validation.issues.join('; ')||'Ready to save')}</td><td data-action-col="1">${salesAiUploadActionsHtml()}</td>`;
     tbody.prepend(row);
   });
+  revalidateSalesAiRows();
 }
 
 function runSalesImport(){
@@ -1340,36 +1437,189 @@ function runSalesImport(){
   ready.forEach((f,i)=>setTimeout(()=>extractSalesInvoiceFile(f),i*450));
 }
 
-function storeExtractedSalesInvoices(){
-  const rows=[...document.querySelectorAll('#sales-ext-tbody tr[data-sales-inv]')];
+function storeExtractedSalesInvoices(options={}){
+  const rows=[...document.querySelectorAll('#sales-ext-tbody tr[data-sales-inv]')]
+    .filter(row=>row.dataset.skipped!=='1')
+    .filter(row=>options.auto||row.querySelector('.sales-ai-select')?.checked);
   if(rows.length===0){toast('No extracted sales invoices to store','warn');return;}
   let stored=0;
+  let blocked=0;
   rows.forEach(row=>{
     const inv=JSON.parse(row.dataset.salesInv||'{}');
+    const validation=validateSalesAiInvoice(inv);
+    if(!validation.valid){
+      blocked++;
+      row.querySelector('.sales-ai-validation').innerHTML='<span class="b b-a">Review</span>';
+      row.querySelector('.sales-ai-details').textContent=validation.issues.join('; ');
+      return;
+    }
     if(addSalesInvoiceRow(inv)){
       stored++;
-      row.querySelector('td:last-child').innerHTML='<span class="b b-g">Stored</span>';
+      row.querySelector('.sales-ai-validation').innerHTML='<span class="b b-g">Saved</span>';
+      row.querySelector('.sales-ai-details').textContent='Saved to invoice register';
+      row.querySelector('.sales-ai-select').checked=false;
+      row.dataset.skipped='1';
     }
   });
   if(stored>0){
-    const tab=document.querySelector('#page-sales .tab:nth-child(3)');
-    if(tab)stab(tab,'s-invoices');
+    const tab=document.querySelector('#page-sales .tab:nth-child(4)');
+    if(tab&&!options.auto)stab(tab,'s-invoices');
     audit('Stored imported sales invoices',stored+' invoice(s)','Saved');
   }
-  toast(stored+' invoice(s) stored in system ?','ok');
+  refreshSalesValidationPanel();
+  toast(stored+' invoice(s) saved'+(blocked?`; ${blocked} row(s) need review`:''),'ok');
+}
+
+function validateSalesAiInvoice(inv){
+  const issues=[];
+  const invoiceNo=String(inv.invoice_no||'').trim();
+  const trn=String(inv.customer_trn||'').replace(/\D/g,'');
+  const subtotal=Number(inv.subtotal||0);
+  const vat=Number(inv.vat_amount||0);
+  const total=Number(inv.total||0);
+  if(!invoiceNo)issues.push('Invoice number missing');
+  if(invoiceNo&&salesInvoiceDbKeys.has(invoiceKey(invoiceNo)))issues.push('Duplicate invoice number in database');
+  if(invoiceNo&&countSalesAiInvoiceNo(invoiceNo)>1)issues.push('Duplicate invoice number in AI upload');
+  if(!String(inv.customer||'').trim())issues.push('Customer missing');
+  if(!String(inv.date||'').trim())issues.push('Date missing');
+  if(trn&&trn.length!==15)issues.push('Customer TRN must be 15 digits');
+  if(total&&Math.abs((subtotal+vat)-total)>.05)issues.push('Total does not match subtotal + VAT');
+  if(Number(inv.confidence||0)<70)issues.push('Low confidence extraction');
+  return {valid:issues.length===0,issues};
+}
+
+function countSalesAiInvoiceNo(invoiceNo){
+  const key=invoiceKey(invoiceNo);
+  if(!key)return 0;
+  return [...document.querySelectorAll('#sales-ext-tbody tr[data-sales-inv]')].filter(row=>{
+    try{return invoiceKey(JSON.parse(row.dataset.salesInv||'{}').invoice_no)===key;}catch{return false;}
+  }).length;
+}
+
+function revalidateSalesAiRows(){
+  document.querySelectorAll('#sales-ext-tbody tr[data-sales-inv]').forEach(row=>{
+    if(row.dataset.skipped==='1')return;
+    let inv={};
+    try{inv=JSON.parse(row.dataset.salesInv||'{}');}catch{return;}
+    const validation=validateSalesAiInvoice(inv);
+    row.dataset.validation=validation.valid?'valid':'review';
+    const validationCell=row.querySelector('.sales-ai-validation');
+    const detailsCell=row.querySelector('.sales-ai-details');
+    const checkbox=row.querySelector('.sales-ai-select');
+    if(validationCell)validationCell.innerHTML=`<span class="b ${validation.valid?'b-g':'b-a'}">${validation.valid?'Valid':'Review'}</span>`;
+    if(detailsCell)detailsCell.textContent=validation.issues.join('; ')||'Ready to save';
+    if(checkbox&&!validation.valid)checkbox.checked=false;
+  });
+  refreshSalesValidationPanel();
+}
+
+function refreshSalesValidationPanel(){
+  const target=document.getElementById('sales-validation-list');
+  if(!target)return;
+  const rows=[...document.querySelectorAll('#sales-ext-tbody tr[data-sales-inv]')]
+    .filter(row=>row.dataset.skipped!=='1')
+    .map(row=>{
+      try{
+        const inv=JSON.parse(row.dataset.salesInv||'{}');
+        return {row,inv,validation:validateSalesAiInvoice(inv)};
+      }catch{
+        return null;
+      }
+    })
+    .filter(Boolean)
+    .filter(item=>!item.validation.valid);
+
+  if(rows.length===0){
+    target.innerHTML=`<div style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:10px;padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:18px">OK</span>
+        <div><div style="font-size:13.5px;font-weight:600">All extracted sales invoices passed validation</div><div style="font-size:12px;color:var(--text3)">Selected valid rows can be saved from AI Extraction.</div></div>
+      </div>
+    </div>`;
+    return;
+  }
+
+  target.innerHTML=rows.map(item=>`
+    <div style="background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:10px;padding:14px 16px;margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span style="font-size:18px;flex-shrink:0">!</span>
+        <div style="flex:1">
+          <div style="font-size:13.5px;font-weight:600;margin-bottom:3px">${escapeHtml(item.inv.invoice_no||'Missing invoice')} - ${escapeHtml(item.inv.customer||'Customer missing')}</div>
+          <div style="font-size:12px;color:var(--text3)">${escapeHtml(item.validation.issues.join('; '))}</div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function skipIconSvg(){
+  return `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8"/><path d="M12 4l-8 8"/></svg>`;
+}
+
+function salesAiUploadActionsHtml(){
+  return `<div class="row-actions">
+    <button class="icon-btn skip" type="button" title="Skip" aria-label="Skip AI upload row" onclick="skipSalesAiRow(this)">${skipIconSvg()}</button>
+    <button class="icon-btn danger" type="button" title="Delete" aria-label="Delete AI upload row" onclick="deleteSalesAiRow(this)">${deleteIconSvg()}</button>
+  </div>`;
+}
+
+function toggleSalesAiSelection(checked){
+  document.querySelectorAll('#sales-ext-tbody tr[data-sales-inv]').forEach(row=>{
+    const box=row.querySelector('.sales-ai-select');
+    if(box&&row.dataset.skipped!=='1')box.checked=checked;
+  });
+}
+
+function skipSalesAiRow(btn){
+  const row=btn.closest('tr');
+  if(!row)return;
+  row.dataset.skipped='1';
+  const box=row.querySelector('.sales-ai-select');
+  if(box)box.checked=false;
+  row.querySelector('.sales-ai-validation').innerHTML='<span class="b b-gray">Skipped</span>';
+  row.querySelector('.sales-ai-details').textContent='Skipped by user';
+  refreshSalesValidationPanel();
+  toast('AI upload row skipped','info');
+}
+
+function deleteSalesAiRow(btn){
+  const row=btn.closest('tr');
+  const tbody=row?.parentElement;
+  row?.remove();
+  if(tbody&&tbody.querySelectorAll('tr[data-sales-inv]').length===0){
+    tbody.innerHTML='<tr><td colspan="12" style="color:var(--text3);text-align:center">AI uploaded invoice data will appear here for validation.</td></tr>';
+  }
+  refreshSalesValidationPanel();
+  toast('AI upload row deleted','warn');
+}
+
+function shareIconSvg(){
+  return `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 8.5l3-1.8"/><path d="M6.5 7.5l3 1.8"/><circle cx="4.5" cy="8" r="2"/><circle cx="11.5" cy="5.8" r="2"/><circle cx="11.5" cy="10.2" r="2"/></svg>`;
+}
+
+function salesInvoiceActionsHtml(){
+  return `<div class="row-actions sales-actions">
+    <button class="icon-btn view" type="button" title="View" aria-label="View invoice" onclick="openSalesInvoiceRow(this)">${viewIconSvg()}</button>
+    <button class="icon-btn share" type="button" title="Share" aria-label="Share invoice" onclick="shareSalesInvoiceRow(this)">${shareIconSvg()}</button>
+    <button class="icon-btn edit" type="button" title="Edit" aria-label="Edit invoice" onclick="openGenericEditRow(this,'Edit Sales Invoice','Update selected invoice')">${editIconSvg()}</button>
+    <button class="icon-btn danger row-delete-btn" type="button" title="Delete" aria-label="Delete invoice" onclick="deleteTableRow(this)">${deleteIconSvg()}</button>
+  </div>`;
 }
 
 function addSalesInvoiceRow(inv,options={persist:true}){
   const tbody=document.getElementById('sales-invoice-tbody');
   if(!tbody||!inv.invoice_no)return false;
-  const exists=[...tbody.querySelectorAll('td.mono:first-child')].some(td=>td.textContent===inv.invoice_no);
+  const exists=salesInvoiceDbKeys.has(invoiceKey(inv.invoice_no))||[...tbody.querySelectorAll('td.mono:first-child')].some(td=>td.textContent===inv.invoice_no);
   if(exists)return false;
   const fmt=n=>Number(n||0).toLocaleString('en-AE',{maximumFractionDigits:2});
+  const source=inv.source||((inv.sourceFile||inv.confidence)?'AI Upload':'Manual');
+  const sourceClass=String(source).toLowerCase().includes('ai')?'b-p':'b-gray';
   const row=document.createElement('tr');
-  row.dataset.salesInvoice=JSON.stringify(inv);
-  row.innerHTML=`<td class="mono">${escapeHtml(inv.invoice_no)}</td><td>${escapeHtml(inv.customer)}</td><td>${escapeHtml(inv.date)}</td><td>${escapeHtml(inv.due_date||'30 days')}</td><td class="mono">${fmt(inv.subtotal)}</td><td class="mono">${fmt(inv.vat_amount)}</td><td class="mono">${fmt(inv.total)}</td><td><span class="b b-a">Pending</span></td><td><div class="flx"><button class="btn btn-g btn-sm" onclick="openSalesInvoiceRow(this)">View</button><button class="btn btn-p btn-sm" onclick="shareSalesInvoiceRow(this)">Share</button></div></td>`;
+  row.dataset.salesInvoice=JSON.stringify({...inv,source});
+  row.dataset.rowActionsAdded='1';
+  row.innerHTML=`<td class="mono">${escapeHtml(inv.invoice_no)}</td><td>${escapeHtml(inv.customer)}</td><td>${escapeHtml(inv.date)}</td><td>${escapeHtml(inv.due_date||'30 days')}</td><td class="mono">${fmt(inv.subtotal)}</td><td class="mono">${fmt(inv.vat_amount)}</td><td class="mono">${fmt(inv.total)}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b b-a">Pending</span></td><td data-action-col="1">${salesInvoiceActionsHtml()}</td>`;
   tbody.prepend(row);
-  if(options.persist)persistSalesInvoice(inv);
+  registerSalesInvoiceKey(inv.invoice_no);
+  if(options.persist)persistSalesInvoice({...inv,source});
   return true;
 }
 
@@ -1390,7 +1640,8 @@ function invoiceFromSalesRow(row){
     subtotal:parseAmount(cells[4]?.textContent),
     vat_amount:parseAmount(cells[5]?.textContent),
     total:parseAmount(cells[6]?.textContent),
-    status:cells[7]?.textContent.trim()||'Draft',
+    source:cells[7]?.textContent.trim()||'Manual',
+    status:cells[8]?.textContent.trim()||'Draft',
     lines:[{description:'Sales invoice items',qty:1,price:parseAmount(cells[4]?.textContent),amount:parseAmount(cells[4]?.textContent)}]
   };
 }
@@ -1587,6 +1838,21 @@ function shareSalesInvoiceRow(btn){
   const inv=invoiceFromSalesRow(btn.closest('tr'));
   currentSalesInvoice=inv;
   openInvoiceShareModal(inv);
+}
+
+function normalizeSalesInvoiceActions(){
+  document.querySelectorAll('#sales-invoice-tbody tr').forEach(row=>{
+    if(row.querySelector('td[colspan]'))return;
+    const cells=[...row.children];
+    const actionCell=cells.find(cell=>cell.querySelector('button[onclick*="openSalesInvoiceRow"],button[onclick*="shareSalesInvoiceRow"]'))||cells[cells.length-1];
+    if(!actionCell)return;
+    actionCell.dataset.actionCol='1';
+    actionCell.innerHTML=salesInvoiceActionsHtml();
+    row.dataset.rowActionsAdded='1';
+  });
+  const head=document.querySelector('#sales-invoice-tbody')?.closest('table')?.tHead?.rows?.[0];
+  const last=head?.cells?.[head.cells.length-1];
+  if(last)last.dataset.actionCol='1';
 }
 
 function buildDraftInvoice(){
@@ -1831,13 +2097,8 @@ async function extractSingleFile(entry){
     setTimeout(()=>{ep.style.display='none';ef.style.width='0%';},600);
     toast(`Extracted ${invoices.length} invoice(s) from ${entry.name} ?`,'ok');
 
-    // auto-switch to validation if any errors
-    if(invoices.some(i=>i.status!=='Valid')){
-      setTimeout(()=>{
-        const valTab=document.querySelector('#page-purchase .tab:nth-child(3)');
-        if(valTab){stab(valTab,'p-validate');buildValidationPanel(invoices);}
-        toast('Validation issues found - review required','warn');
-      },800);
+    if(invoices.some(i=>!validatePurchaseAiInvoice(i).valid)){
+      toast('Validation issues found - review required','warn');
     }
 
   }catch(err){
@@ -1852,27 +2113,174 @@ async function extractSingleFile(entry){
 
 function appendExtractedRows(invoices,filename){
   const tbody=document.getElementById('ext-tbody');
+  if(!tbody)return;
+  if(tbody.querySelector('td[colspan]'))tbody.innerHTML='';
   invoices.forEach(inv=>{
     // check if row already exists (by invoice_no)
-    if([...tbody.querySelectorAll('td.mono')].some(td=>td.textContent===inv.invoice_no))return;
+    if([...tbody.querySelectorAll('td.mono')].some(td=>td.textContent===inv.invoice_no)){
+      toast(`Duplicate in current purchase AI upload: ${inv.invoice_no}`,'warn');
+      return;
+    }
+    const validation=validatePurchaseAiInvoice(inv);
     const confCls=inv.confidence>=90?'b-g':inv.confidence>=70?'b-a':'b-r';
-    const stCls={'Valid':'b-g','Review':'b-a','Error':'b-r'}[inv.status]||'b-gray';
+    const stCls=validation.valid?'b-g':'b-a';
     const trnColor=inv.supplier_trn&&inv.supplier_trn.length===15?'':'color:var(--red)';
     const fmt=n=>Number(n).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
     const row=document.createElement('tr');
     row.setAttribute('data-inv',JSON.stringify(inv));
+    row.dataset.validation=validation.valid?'valid':'review';
     row.innerHTML=`
-      <td class="mono">${inv.invoice_no}</td>
+      <td><input type="checkbox" class="purchase-ai-select" ${validation.valid?'checked':''} aria-label="Select ${escapeHtml(inv.invoice_no)}"></td>
+      <td class="mono">${escapeHtml(inv.invoice_no)}</td>
       <td>${inv.date}</td>
-      <td>${inv.supplier}</td>
-      <td class="mono" style="${trnColor}">${inv.supplier_trn}</td>
+      <td>${escapeHtml(inv.supplier)}</td>
+      <td class="mono" style="${trnColor}">${escapeHtml(inv.supplier_trn)}</td>
       <td class="mono">${fmt(inv.subtotal)}</td>
       <td class="mono">${fmt(inv.vat_amount)}</td>
       <td class="mono">${fmt(inv.total)}</td>
       <td><span class="b ${confCls}">${inv.confidence}%</span></td>
-      <td><span class="b ${stCls}">${inv.status}</span></td>
-      <td><button class="btn btn-g btn-sm" onclick="openEditRow(this)">? Edit</button></td>`;
+      <td class="purchase-ai-validation"><span class="b ${stCls}">${validation.valid?'Valid':'Review'}</span></td>
+      <td class="purchase-ai-details" style="color:var(--text3);font-size:12px">${escapeHtml(validation.issues.join('; ')||'Ready to save')}</td>
+      <td data-action-col="1">${purchaseAiUploadActionsHtml()}</td>`;
     tbody.insertBefore(row,tbody.firstChild);
+  });
+  revalidatePurchaseAiRows();
+}
+
+function purchaseRecordFromExtractedInvoice(inv){
+  const total=Number(inv.total||0);
+  const status=String(inv.status||'Review');
+  return {
+    ref:inv.invoice_no,
+    supplier:inv.supplier||'Supplier',
+    date:inv.date||'',
+    location:'Dubai HQ',
+    items:1,
+    net_amount:Number(inv.subtotal||0),
+    tax_amount:Number(inv.vat_amount||0),
+    shipping:0,
+    total,
+    paid:0,
+    due:total,
+    source:'AI Upload',
+    status:status==='Valid'?'Received':status,
+    extraction_status:status,
+    supplier_trn:inv.supplier_trn||'',
+    issues:inv.issues||''
+  };
+}
+
+function storeExtractedPurchaseRecords(){
+  const rows=[...document.querySelectorAll('#ext-tbody tr[data-inv]')]
+    .filter(row=>row.dataset.skipped!=='1')
+    .filter(row=>row.querySelector('.purchase-ai-select')?.checked);
+  if(rows.length===0){toast('No extracted purchase invoices to store','warn');return;}
+  let stored=0;
+  let blocked=0;
+  rows.forEach(row=>{
+    const inv=JSON.parse(row.dataset.inv||'{}');
+    const validation=validatePurchaseAiInvoice(inv);
+    if(!validation.valid){
+      blocked++;
+      row.querySelector('.purchase-ai-validation').innerHTML='<span class="b b-a">Review</span>';
+      row.querySelector('.purchase-ai-details').textContent=validation.issues.join('; ');
+      return;
+    }
+    const record=purchaseRecordFromExtractedInvoice(inv);
+    const before=document.querySelectorAll('#purchase-record-tbody tr').length;
+    renderPurchaseRecord(record);
+    if(document.querySelectorAll('#purchase-record-tbody tr').length>before){
+      saveServer('purchaseRecords',record);
+      stored++;
+      row.querySelector('.purchase-ai-validation').innerHTML='<span class="b b-g">Saved</span>';
+      row.querySelector('.purchase-ai-details').textContent='Saved to purchase records';
+      row.querySelector('.purchase-ai-select').checked=false;
+      row.dataset.skipped='1';
+    }
+  });
+  if(stored>0){
+    audit('Stored extracted purchase invoices',stored+' purchase(s)','Saved');
+    const tab=document.querySelector('#page-purchase .tab:nth-child(5)');
+    if(tab)stab(tab,'p-records');
+  }
+  toast(stored+' purchase record(s) saved'+(blocked?`; ${blocked} row(s) need review`:''),'ok');
+}
+
+function validatePurchaseAiInvoice(inv){
+  const issues=[];
+  const invoiceNo=String(inv.invoice_no||'').trim();
+  const trn=String(inv.supplier_trn||'').replace(/\D/g,'');
+  const subtotal=Number(inv.subtotal||0);
+  const vat=Number(inv.vat_amount||0);
+  const total=Number(inv.total||0);
+  if(!invoiceNo)issues.push('Invoice number missing');
+  if(invoiceNo&&tableHasText('#purchase-record-tbody',invoiceNo))issues.push('Duplicate purchase invoice in records');
+  if(invoiceNo&&countPurchaseAiInvoiceNo(invoiceNo)>1)issues.push('Duplicate invoice number in AI upload');
+  if(!String(inv.supplier||'').trim())issues.push('Supplier missing');
+  if(!String(inv.date||'').trim())issues.push('Date missing');
+  if(trn&&trn.length!==15)issues.push('Supplier TRN must be 15 digits');
+  if(total&&Math.abs((subtotal+vat)-total)>.05)issues.push('Total does not match subtotal + VAT');
+  if(String(inv.status||'').toLowerCase()==='error')issues.push(inv.issues||'Extraction returned error status');
+  if(Number(inv.confidence||0)<70)issues.push('Low confidence extraction');
+  return {valid:issues.length===0,issues};
+}
+
+function countPurchaseAiInvoiceNo(invoiceNo){
+  const key=invoiceKey(invoiceNo);
+  if(!key)return 0;
+  return [...document.querySelectorAll('#ext-tbody tr[data-inv]')].filter(row=>{
+    try{return invoiceKey(JSON.parse(row.dataset.inv||'{}').invoice_no)===key;}catch{return false;}
+  }).length;
+}
+
+function purchaseAiUploadActionsHtml(){
+  return `<div class="row-actions">
+    <button class="icon-btn skip" type="button" title="Skip" aria-label="Skip purchase AI row" onclick="skipPurchaseAiRow(this)">${skipIconSvg()}</button>
+    <button class="icon-btn danger" type="button" title="Delete" aria-label="Delete purchase AI row" onclick="deletePurchaseAiRow(this)">${deleteIconSvg()}</button>
+  </div>`;
+}
+
+function togglePurchaseAiSelection(checked){
+  document.querySelectorAll('#ext-tbody tr[data-inv]').forEach(row=>{
+    const box=row.querySelector('.purchase-ai-select');
+    if(box&&row.dataset.skipped!=='1')box.checked=checked;
+  });
+}
+
+function skipPurchaseAiRow(btn){
+  const row=btn.closest('tr');
+  if(!row)return;
+  row.dataset.skipped='1';
+  const box=row.querySelector('.purchase-ai-select');
+  if(box)box.checked=false;
+  row.querySelector('.purchase-ai-validation').innerHTML='<span class="b b-gray">Skipped</span>';
+  row.querySelector('.purchase-ai-details').textContent='Skipped by user';
+  toast('Purchase AI row skipped','info');
+}
+
+function deletePurchaseAiRow(btn){
+  const row=btn.closest('tr');
+  const tbody=row?.parentElement;
+  row?.remove();
+  if(tbody&&tbody.querySelectorAll('tr[data-inv]').length===0){
+    tbody.innerHTML='<tr><td colspan="12" style="color:var(--text3);text-align:center">AI uploaded purchase data will appear here for validation.</td></tr>';
+  }
+  toast('Purchase AI row deleted','warn');
+}
+
+function revalidatePurchaseAiRows(){
+  document.querySelectorAll('#ext-tbody tr[data-inv]').forEach(row=>{
+    if(row.dataset.skipped==='1')return;
+    let inv={};
+    try{inv=JSON.parse(row.dataset.inv||'{}');}catch{return;}
+    const validation=validatePurchaseAiInvoice(inv);
+    row.dataset.validation=validation.valid?'valid':'review';
+    const validationCell=row.querySelector('.purchase-ai-validation');
+    const detailsCell=row.querySelector('.purchase-ai-details');
+    const checkbox=row.querySelector('.purchase-ai-select');
+    if(validationCell)validationCell.innerHTML=`<span class="b ${validation.valid?'b-g':'b-a'}">${validation.valid?'Valid':'Review'}</span>`;
+    if(detailsCell)detailsCell.textContent=validation.issues.join('; ')||'Ready to save';
+    if(checkbox&&!validation.valid)checkbox.checked=false;
   });
 }
 
@@ -3109,6 +3517,7 @@ function refreshInitializedTables(){
 }
 
 function applyAllTableActions(){
+  normalizeSalesInvoiceActions();
   document.querySelectorAll('table.tbl').forEach(table=>addTableDeleteActions(table));
 }
 
@@ -3176,7 +3585,6 @@ function tableControlsTemplate(){
         </select>
       </label>
       <button class="btn btn-g btn-sm tbl-prev" type="button">Prev</button>
-      <span class="tbl-info mono">0 records</span>
       <button class="btn btn-g btn-sm tbl-next" type="button">Next</button>
       <button class="btn btn-g btn-sm tbl-export" type="button">Export CSV</button>
     </div>
@@ -3310,6 +3718,7 @@ function editIconSvg(){
 
 function tableActionButtonsHtml(table){
   const collection=inferCollectionFromContext(table);
+  if(collection==='salesInvoices')return salesInvoiceActionsHtml();
   const editAction=collection==='purchaseRecords'
     ? 'editPurchaseRecord(this)'
     : "openGenericEditRow(this,'Edit '+(document.getElementById('ptitle')?.textContent||'Record'),'Update selected row')";
@@ -3324,7 +3733,7 @@ function findGenericActionCell(row){
   return [...row.children].find(cell=>
     cell.dataset.actionCol==='1'||
     cell.querySelector('.row-actions')||
-    cell.querySelector('button[onclick*="openRowDetail"],button[onclick*="editPurchaseRecord"],button.row-delete-btn')
+    cell.querySelector('button[onclick*="openRowDetail"],button[onclick*="editPurchaseRecord"],button[onclick*="openSalesInvoiceRow"],button[onclick*="shareSalesInvoiceRow"],button.row-delete-btn')
   );
 }
 
@@ -3505,9 +3914,11 @@ function refreshEnhancedTable(table){
   state.next.classList.toggle('is-muted',state.page>=totalPages);
   state.prev.title=state.page<=1?'Already showing the first rows':'Show previous rows';
   state.next.title=state.page>=totalPages?`${matched.length} records loaded; no more rows`:'Show next rows';
-  state.info.textContent=matched.length
-    ? `Showing ${pageRows.length} rows (${start+1}-${Math.min(end,matched.length)} of ${matched.length})`
-    : 'Showing 0 rows';
+  if(state.info){
+    state.info.textContent=matched.length
+      ? `Showing ${pageRows.length} rows (${start+1}-${Math.min(end,matched.length)} of ${matched.length})`
+      : 'Showing 0 rows';
+  }
   table.dataset.visibleRows=String(pageRows.length);
   table.dataset.totalRows=String(matched.length);
 }

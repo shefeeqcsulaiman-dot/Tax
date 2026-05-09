@@ -268,6 +268,48 @@ class StockMovement(Base, TimestampMixin):
     reference: Mapped[str | None] = mapped_column(String(80))
 
 
+class ItemUnit(Base, TimestampMixin):
+    __tablename__ = "item_units"
+    __table_args__ = (UniqueConstraint("company_id", "item_code", "unit_code", name="uq_item_unit_company_item_unit"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    item_code: Mapped[str] = mapped_column(String(60), nullable=False)
+    unit_code: Mapped[str] = mapped_column(String(30), nullable=False)
+    unit_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    conversion_factor: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=1)
+    is_base_unit: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class InventoryValuationLayer(Base, TimestampMixin):
+    __tablename__ = "inventory_valuation_layers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    item_code: Mapped[str] = mapped_column(String(60), nullable=False)
+    warehouse_id: Mapped[str | None] = mapped_column(ForeignKey("warehouses.id"))
+    source_module: Mapped[str] = mapped_column(String(60), nullable=False)
+    source_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    quantity_in: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    quantity_remaining: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    unit_cost: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=0)
+    valuation_method: Mapped[str] = mapped_column(String(30), default="FIFO")
+
+
+class StockAdjustmentApproval(Base, TimestampMixin):
+    __tablename__ = "stock_adjustment_approvals"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    item_code: Mapped[str] = mapped_column(String(60), nullable=False)
+    warehouse_id: Mapped[str | None] = mapped_column(ForeignKey("warehouses.id"))
+    quantity_delta: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="pending")
+    requested_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    approved_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+
+
 class Employee(Base, TimestampMixin):
     __tablename__ = "employees"
 
@@ -345,3 +387,249 @@ class AuditLog(Base, TimestampMixin):
     action: Mapped[str] = mapped_column(String(80), nullable=False)
     record_id: Mapped[str | None] = mapped_column(String(36))
     detail: Mapped[str | None] = mapped_column(Text)
+
+
+class AuditLogDetail(Base, TimestampMixin):
+    __tablename__ = "audit_log_details"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    audit_log_id: Mapped[str | None] = mapped_column(ForeignKey("audit_logs.id"))
+    old_value: Mapped[str | None] = mapped_column(Text)
+    new_value: Mapped[str | None] = mapped_column(Text)
+    reason: Mapped[str | None] = mapped_column(String(255))
+    ip_address: Mapped[str | None] = mapped_column(String(80))
+    device: Mapped[str | None] = mapped_column(String(160))
+    correlation_id: Mapped[str | None] = mapped_column(String(80), index=True)
+
+
+class ExceptionEvent(Base, TimestampMixin):
+    __tablename__ = "exception_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    module: Mapped[str] = mapped_column(String(60), nullable=False)
+    category: Mapped[str] = mapped_column(String(80), nullable=False)
+    severity: Mapped[str] = mapped_column(String(20), default="medium")
+    source_record: Mapped[str | None] = mapped_column(String(120))
+    message: Mapped[str] = mapped_column(String(500), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="open")
+    assigned_to: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+
+
+class DomainEvent(Base, TimestampMixin):
+    __tablename__ = "domain_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    event_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    source_module: Mapped[str] = mapped_column(String(60), nullable=False)
+    source_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    payload: Mapped[str | None] = mapped_column(Text)
+    correlation_id: Mapped[str | None] = mapped_column(String(80), index=True)
+
+
+class EventOutbox(Base, TimestampMixin):
+    __tablename__ = "event_outbox"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    event_id: Mapped[str | None] = mapped_column(ForeignKey("domain_events.id"))
+    topic: Mapped[str] = mapped_column(String(120), nullable=False)
+    payload: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(30), default="pending")
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text)
+
+
+class EventProcessingLog(Base, TimestampMixin):
+    __tablename__ = "event_processing_logs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    event_id: Mapped[str | None] = mapped_column(ForeignKey("domain_events.id"))
+    consumer: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="processed")
+    detail: Mapped[str | None] = mapped_column(Text)
+
+
+class DailyGlBalance(Base, TimestampMixin):
+    __tablename__ = "daily_gl_balances"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    balance_date: Mapped[str] = mapped_column(String(20), nullable=False)
+    account_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    debit: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    credit: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    closing_balance: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+
+
+class InventoryBalanceSnapshot(Base, TimestampMixin):
+    __tablename__ = "inventory_balance_snapshots"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    snapshot_date: Mapped[str] = mapped_column(String(20), nullable=False)
+    item_code: Mapped[str] = mapped_column(String(60), nullable=False)
+    warehouse_name: Mapped[str | None] = mapped_column(String(120))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    inventory_value: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+
+
+class CustomerAgingSnapshot(Base, TimestampMixin):
+    __tablename__ = "customer_aging_snapshots"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    snapshot_date: Mapped[str] = mapped_column(String(20), nullable=False)
+    customer_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    bucket_current: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    bucket_30: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    bucket_60: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    bucket_90: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+
+
+class VatReturnSnapshot(Base, TimestampMixin):
+    __tablename__ = "vat_return_snapshots"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    period: Mapped[str] = mapped_column(String(20), nullable=False)
+    output_vat: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    input_vat: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    net_vat_payable: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    source_version: Mapped[str | None] = mapped_column(String(80))
+
+
+class CorporateTaxRecord(Base, TimestampMixin):
+    __tablename__ = "corporate_tax_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    period: Mapped[str] = mapped_column(String(20), nullable=False)
+    accounting_profit: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    tax_adjustments: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    taxable_income: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    tax_due: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    status: Mapped[str] = mapped_column(String(30), default="draft")
+
+
+class FixedAssetRecord(Base, TimestampMixin):
+    __tablename__ = "fixed_asset_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    asset_code: Mapped[str] = mapped_column(String(60), nullable=False)
+    asset_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    category: Mapped[str] = mapped_column(String(80), nullable=False)
+    purchase_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    accumulated_depreciation: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    method: Mapped[str] = mapped_column(String(40), default="Straight Line")
+    location: Mapped[str | None] = mapped_column(String(120))
+    custodian: Mapped[str | None] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(String(30), default="active")
+
+
+class AccrualPrepaymentRecord(Base, TimestampMixin):
+    __tablename__ = "accrual_prepayment_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    record_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    reference: Mapped[str] = mapped_column(String(80), nullable=False)
+    description: Mapped[str] = mapped_column(String(255), nullable=False)
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    monthly_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    reversal_day: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(30), default="active")
+
+
+class CostCenterRecord(Base, TimestampMixin):
+    __tablename__ = "cost_center_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(40), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    department: Mapped[str | None] = mapped_column(String(80))
+    branch: Mapped[str | None] = mapped_column(String(80))
+    project: Mapped[str | None] = mapped_column(String(80))
+    location: Mapped[str | None] = mapped_column(String(80))
+    status: Mapped[str] = mapped_column(String(30), default="active")
+
+
+class BudgetRecord(Base, TimestampMixin):
+    __tablename__ = "budget_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    fiscal_year: Mapped[str] = mapped_column(String(20), nullable=False)
+    cost_center: Mapped[str | None] = mapped_column(String(80))
+    account_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    annual_budget: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    actual_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    variance_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    approval_status: Mapped[str] = mapped_column(String(30), default="draft")
+
+
+class CashFlowForecastRecord(Base, TimestampMixin):
+    __tablename__ = "cash_flow_forecast_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    forecast_date: Mapped[str] = mapped_column(String(20), nullable=False)
+    expected_receipts: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    expected_payments: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    net_cash_flow: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    method: Mapped[str] = mapped_column(String(30), default="direct")
+
+
+class CreditControlRecord(Base, TimestampMixin):
+    __tablename__ = "credit_control_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    customer_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    credit_limit: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    outstanding_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    credit_status: Mapped[str] = mapped_column(String(30), default="active")
+    promise_to_pay: Mapped[str | None] = mapped_column(String(20))
+    bad_debt_provision: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+
+
+class MonthEndCloseRecord(Base, TimestampMixin):
+    __tablename__ = "month_end_close_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    period: Mapped[str] = mapped_column(String(20), nullable=False)
+    checklist_item: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="open")
+    owner: Mapped[str | None] = mapped_column(String(120))
+    locked: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class ConsolidationRecord(Base, TimestampMixin):
+    __tablename__ = "consolidation_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    group_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    subsidiary_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), default="AED")
+    translated_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    elimination_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    status: Mapped[str] = mapped_column(String(30), default="draft")
+
+
+class ApprovalMatrixRecord(Base, TimestampMixin):
+    __tablename__ = "approval_matrix_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    module: Mapped[str] = mapped_column(String(60), nullable=False)
+    min_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    max_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    approver_role: Mapped[str] = mapped_column(String(80), nullable=False)
+    department: Mapped[str | None] = mapped_column(String(80))

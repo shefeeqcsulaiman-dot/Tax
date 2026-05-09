@@ -2,22 +2,98 @@
 
 TaxFlow is a UAE business management platform for sales, purchases, accounting, tax, eInvoicing, payroll, HR, rota planning, documents, reporting, approvals, and audit control.
 
-The current repository is a browser prototype with light PHP JSON persistence. The production target should be a modular, tenant-aware business system where source transactions, tax lines, accounting, audit, and reporting are controlled by backend services.
+The current repository is a React + Vite frontend that mounts the TaxFlow UI shell and a FastAPI backend with local SQLite support for development. The live development build now includes module APIs, source transactions, tax lines, Exception Center, domain events, inventory unit/costing tables, audit detail tables, reporting snapshots, and a repeatable 50-record seed dataset. The production target remains a modular, tenant-aware business system where source transactions, tax lines, accounting, audit, and reporting are controlled by backend services.
 
 ## 1. Current Prototype Structure
 
 ```text
-taxflow.html              Main application markup and screen structure
-src/styles.css            Design tokens, layout, components, responsive UI
-src/app.js                Navigation, modal behavior, calculations, API calls
-api.php                   Lightweight prototype JSON API
-index.php                 PHP entrypoint
-data/taxflow-store.json   Prototype JSON data store
-tools/                    Static server, checks, helpers
+frontend/                 React + Vite shell
+frontend/src/main.jsx     Login shell, legacy UI mount, backend bridge
+frontend/public/taxflow/  Main TaxFlow UI markup, styles, and browser logic
+backend/                  FastAPI API, SQLAlchemy models, routers, storage
+backend/app/main.py       API app, router registration, startup seed data
+backend/app/routers/      Auth, invoices, documents, reports, app data, modules, events, exceptions
+backend/scripts/          Local data reset and 50-record seed scripts
+backend/*.db              Local SQLite databases for lightweight development
 docs/                     Architecture and roadmap
 ```
 
-Production must replace JSON storage with a relational database, object storage, queue workers, backend validation, audit logging, and tenant enforcement.
+Local development note:
+
+```text
+backend/.env currently points local SQLite to taxflow-seed50-v2.db.
+backend/scripts/add_seed_50_all.py seeds at least 50 records across all SQLAlchemy tables and key UI collections.
+SQLite journaling is disabled in local dev because this Windows workspace denies rollback-journal deletion.
+Production must use PostgreSQL with normal transactional durability.
+```
+
+Production must harden the current backend with a production relational database, object storage, queue workers, backend validation, stronger audit logging, and tenant enforcement.
+
+## 1.1 Current Implemented Development State
+
+Implemented now:
+
+```text
+Frontend
+|-- React + Vite shell
+|-- TaxFlow UI pages
+|-- Sales AI upload, extraction, validation, Save All
+|-- Purchase AI upload, extraction, validation, Save All
+|-- Invoice source badges: AI Upload / Manual
+|-- Sales invoice action icons: View, Share, Edit, Delete
+|-- Exception Center screen
+`-- Dashboard/report widgets reading backend summaries
+
+Backend
+|-- Auth and current company APIs
+|-- Invoices and invoice lines
+|-- Documents and jobs
+|-- Source transactions, validation, approval, posting jobs
+|-- Accounting accounts and journal entries
+|-- Corporate accounting: tax, fixed assets, accruals, cost centers, budgets, cash flow, credit control, close, consolidation, approvals
+|-- Tax codes, tax lines, VAT return summary
+|-- Inventory warehouses, mappings, item units, valuation layers, adjustment approvals
+|-- Payroll employees, payroll runs, payroll items, WPS batches
+|-- Audit logs and audit detail table
+|-- Exception Center API
+|-- Domain events, event outbox, processing logs
+|-- Reporting snapshot tables
+|-- Module record APIs for purchases, items, units, settings
+`-- Prototype app-data API retained as compatibility bridge
+```
+
+Seeded local data:
+
+```text
+companies >= 50
+users >= 50
+invoices >= 50
+source_transactions >= 50
+posting_jobs >= 50
+tax_lines >= 50
+item_units >= 50
+inventory_valuation_layers >= 50
+stock_adjustment_approvals >= 50
+payroll_runs >= 50
+exception_events >= 50
+domain_events >= 50
+event_outbox >= 50
+corporate_tax_records >= 50
+fixed_asset_records >= 50
+accrual_prepayment_records >= 50
+cost_center_records >= 50
+budget_records >= 50
+cash_flow_forecast_records >= 50
+credit_control_records >= 50
+month_end_close_records >= 50
+consolidation_records >= 50
+approval_matrix_records >= 50
+daily_gl_balances >= 50
+inventory_balance_snapshots >= 50
+customer_aging_snapshots >= 50
+vat_return_snapshots >= 50
+app_data_records >= 500
+```
 
 ## 2. Revised High-Level Architecture
 
@@ -63,6 +139,73 @@ Core rule:
 ```text
 UI never posts directly to ledger.
 Every module creates a source transaction first.
+```
+
+## 2.1 System Build Guidance
+
+The architecture is intentionally broad, but the MVP must stay focused. Do not build all modules first.
+
+MVP scope:
+
+```text
+Auth + Tenant
+Customers / Suppliers / Items
+Sales
+Purchases
+Accounting Posting Engine
+Tax Lines / VAT
+Documents
+Basic Reports
+```
+
+Deferred until core accounting is stable:
+
+```text
+HR
+Payroll
+Rota
+WPS
+eInvoicing
+Advanced mobile app
+Advanced automation
+```
+
+Most important delivery rule:
+
+```text
+Finish accounting + VAT + inventory properly before adding payroll, rota, WPS, and eInvoicing.
+```
+
+Recommended production stack:
+
+```text
+Frontend: React + Vite
+Backend: Python FastAPI
+Database: PostgreSQL
+Queue: Redis + Celery
+Storage: AWS S3
+Mobile: Flutter later
+```
+
+Production API rule:
+
+```text
+Do not use prototype catch-all APIs such as /api/v1/app-data?action=save as the final production write path.
+The live dev app keeps app-data as a compatibility bridge while proper module APIs are added module by module.
+```
+
+Current module APIs already added:
+
+```text
+/api/v1/purchases
+/api/v1/items
+/api/v1/units
+/api/v1/settings
+/api/v1/exceptions
+/api/v1/events
+/api/v1/item-units
+/api/v1/inventory/valuation-layers
+/api/v1/inventory/adjustment-approvals
 ```
 
 ## 3. Main Modules
@@ -378,10 +521,14 @@ Structured eInvoice = machine-readable regulated invoice data
 
 Responsibilities:
 
-- Products and services
 - Customers
 - Invoice creation
-- Invoice import
+- Sales invoice upload
+- AI extraction
+- AI extraction validation
+- Duplicate detection against saved database invoices
+- Duplicate detection inside the current AI upload batch
+- Selective save from AI extraction into the invoice register
 - PDF preview/export
 - Email and WhatsApp sharing
 - eInvoice generation handoff
@@ -407,6 +554,66 @@ invoice_share_logs
 source_transactions
 ```
 
+Current UI flow:
+
+```text
+Upload Invoices
+        |
+        v
+AI Extraction
+        |
+        v
+Validation
+        |
+        v
+Invoices
+        |
+        v
+Create Invoice / Share / Edit / Delete
+```
+
+Sales AI upload table behavior:
+
+```text
+Extracted row
+        |
+        v
+Client validation
+        |
+        v
+Valid / Review
+        |
+        v
+Selected valid rows -> Save All -> sales invoice register + backend app data
+```
+
+Sales AI validation checks:
+
+- Invoice number is required.
+- Invoice number must not already exist in the database-backed invoice index.
+- Invoice number must not be duplicated in the current AI upload batch.
+- Customer is required.
+- Date is required.
+- Customer TRN must be 15 digits when present.
+- Total must match subtotal plus VAT.
+- Low-confidence extraction is held for review.
+
+Sales invoice rows must show source:
+
+```text
+AI Upload
+Manual
+```
+
+Sales invoice row actions:
+
+```text
+View
+Share
+Edit
+Delete with dependency checks
+```
+
 ## 10. Purchases, Bills, and Vendors
 
 Responsibilities:
@@ -424,9 +631,36 @@ Responsibilities:
 Purchase capture paths:
 
 ```text
-Document upload -> AI extraction -> validation -> purchase record
-Manual entry    -> item lines + tax + payment -> purchase record
+Upload Documents -> AI Extraction -> Validation -> Purchase Records
+Manual entry     -> item lines + tax + payment -> Purchase Records
 ```
+
+Purchase AI upload table behavior mirrors Sales:
+
+```text
+Extracted row
+        |
+        v
+Client validation
+        |
+        v
+Valid / Review
+        |
+        v
+Selected valid rows -> Save All -> purchase records + backend source transaction sync
+```
+
+Purchase AI validation checks:
+
+- Invoice number is required.
+- Invoice number must not already exist in Purchase Records.
+- Invoice number must not be duplicated in the current AI upload batch.
+- Supplier is required.
+- Date is required.
+- Supplier TRN must be 15 digits when present.
+- Total must match subtotal plus VAT.
+- Backend extraction error rows are held for review.
+- Low-confidence extraction is held for review.
 
 Manual purchase entry stores:
 
@@ -754,7 +988,47 @@ source_module
 source_id
 reserved_qty
 status
+
+item_units
+id
+company_id
+item_id
+unit_id
+conversion_factor
+is_base_unit
+purchase_default
+sales_default
+status
+
+inventory_valuation_layers
+id
+company_id
+item_id
+warehouse_id
+source_module
+source_id
+receipt_date
+qty_received
+qty_remaining
+unit_cost
+total_cost
+valuation_method
+status
+
+stock_adjustment_approvals
+id
+company_id
+stock_adjustment_id
+requested_by
+approved_by
+reason
+old_qty
+new_qty
+status
+approved_at
 ```
+
+`item_units` is required for box, packet, carton, and piece conversions. `inventory_valuation_layers` supports FIFO and weighted average costing. `stock_adjustment_approvals` controls manual stock changes before they affect inventory value.
 
 Stock mapping screen behavior:
 
@@ -1134,6 +1408,17 @@ Core reports:
 - Daily Attendance
 - Audit Trail
 
+Reporting snapshots:
+
+```text
+daily_gl_balances
+inventory_balance_snapshots
+customer_aging_snapshots
+vat_return_snapshots
+```
+
+Use snapshots for expensive recurring reports and period-end views. Do not calculate every report live from raw transaction tables when the same summary is repeatedly requested. Snapshots must keep source period, generated time, source version, and tenant scope so users can trace back to the authoritative records.
+
 ## 19. Audit Architecture
 
 Audit logs must be deep enough to reconstruct who changed what, when, why, and from where.
@@ -1173,6 +1458,19 @@ High-risk actions:
 - Period lock/reopen
 - eInvoice retry/cancellation
 
+Sensitive actions must record:
+
+```text
+old value
+new value
+reason
+user
+IP address
+device
+time
+correlation ID
+```
+
 ## 20. Period Locking
 
 Use separate period locks because different business areas close at different times.
@@ -1200,6 +1498,87 @@ Rules:
 - Locked payroll period cannot change payroll items.
 - Locked inventory period cannot change stock movements.
 - Reopening requires admin approval, reason, and audit log.
+
+## 20.1 Exception Center
+
+TaxFlow should have one screen for operational and accounting exceptions.
+
+Exception Center sources:
+
+```text
+Failed postings
+Duplicate invoices
+Unmapped stock items
+VAT mismatches
+OCR failures
+Bank unmatched transactions
+Payroll errors
+eInvoice failures
+```
+
+Exception Center behavior:
+
+```text
+Exception raised
+        |
+        v
+Classify by module, severity, tenant, and source record
+        |
+        v
+Assign owner / suggested fix
+        |
+        v
+Resolve, retry, skip, or escalate
+        |
+        v
+Audit resolution
+```
+
+Recommended tables:
+
+```text
+exceptions
+exception_events
+exception_assignments
+exception_resolution_logs
+```
+
+This gives users and admins a single place to fix blocked postings, duplicate uploads, OCR mistakes, VAT issues, stock mapping gaps, and integration failures.
+
+## 20.2 Event System
+
+Use domain events to decouple business actions from side effects.
+
+Example events:
+
+```text
+InvoiceApproved
+PurchasePosted
+PaymentReceived
+PayrollApproved
+RotaPublished
+```
+
+Event consumers trigger:
+
+```text
+Accounting posting
+Tax line creation
+Notifications
+Audit logs
+Reports refresh
+```
+
+Recommended tables:
+
+```text
+domain_events
+event_outbox
+event_consumers
+event_processing_logs
+```
+
+Use the outbox pattern so database changes and emitted events stay consistent. Queue workers should process events idempotently using event IDs and tenant scope.
 
 ## 21. Tenant Isolation
 
@@ -1301,11 +1680,22 @@ HR / Rota / Payroll / WPS
 
 System
 |-- notifications
+|-- exception_events
+|-- domain_events
+|-- event_outbox
+|-- event_processing_logs
 |-- approval_workflows
 |-- approval_actions
 |-- audit_logs
+|-- audit_log_details
 `-- integration_logs
 ```
+
+Reporting Snapshots
+|-- daily_gl_balances
+|-- inventory_balance_snapshots
+|-- customer_aging_snapshots
+`-- vat_return_snapshots
 
 ## 23. API Architecture
 
@@ -1319,7 +1709,8 @@ Recommended API areas:
 /api/v1/sales
 /api/v1/einvoicing
 /api/v1/purchases
-/api/v1/app-data?action=save (manual purchase records and UI master data)
+/api/v1/items
+/api/v1/units
 /api/v1/payments
 /api/v1/accounting
 /api/v1/tax
@@ -1332,6 +1723,46 @@ Recommended API areas:
 /api/v1/reports
 /api/v1/documents
 /api/v1/audit
+/api/v1/exceptions
+/api/v1/events
+```
+
+Production must remove:
+
+```text
+/api/v1/app-data?action=save
+```
+
+Current development status:
+
+```text
+The compatibility /api/v1/app-data bridge still exists for legacy UI tables and demo extraction.
+The following proper module APIs are now live and should become the preferred write paths.
+```
+
+Live module APIs:
+
+```text
+GET/POST /api/v1/purchases
+GET/POST /api/v1/items
+GET/POST /api/v1/units
+GET/POST /api/v1/settings
+GET/POST /api/v1/events
+GET/POST /api/v1/exceptions
+GET      /api/v1/corporate-accounting/summary
+GET      /api/v1/corporate-accounting/corporate-tax
+GET      /api/v1/corporate-accounting/fixed-assets
+GET      /api/v1/corporate-accounting/accruals-prepayments
+GET      /api/v1/corporate-accounting/cost-centers
+GET      /api/v1/corporate-accounting/budgets
+GET      /api/v1/corporate-accounting/cash-flow
+GET      /api/v1/corporate-accounting/credit-control
+GET      /api/v1/corporate-accounting/month-end
+GET      /api/v1/corporate-accounting/consolidation
+GET      /api/v1/corporate-accounting/approval-matrix
+GET/POST /api/v1/item-units
+GET      /api/v1/inventory/valuation-layers
+GET/POST /api/v1/inventory/adjustment-approvals
 ```
 
 Important endpoints:
@@ -1385,16 +1816,18 @@ Required controls:
 
 | Priority | Improvement |
 | --- | --- |
-| 1 | General Ledger + posting engine |
-| 2 | Source transaction layer |
-| 3 | Tax lines + VAT engine |
-| 4 | Approval workflow |
-| 5 | Audit logging |
-| 6 | Period locking |
-| 7 | Payroll WPS/SIF |
-| 8 | eInvoicing readiness |
-| 9 | Document evidence |
-| 10 | Reporting engine |
+| 1 | Auth + tenant foundation |
+| 2 | Customers, suppliers, and items |
+| 3 | Sales and purchases |
+| 4 | Source transaction layer |
+| 5 | General Ledger + posting engine |
+| 6 | Tax lines + VAT engine |
+| 7 | Inventory mapping, unit conversion, and valuation |
+| 8 | Documents and evidence |
+| 9 | Exception Center |
+| 10 | Basic reports and reporting snapshots |
+| 11 | Audit logging and event outbox |
+| 12 | Payroll, Rota, WPS, and eInvoicing after accounting/VAT/inventory are stable |
 
 ## 26. Implementation Phases
 
@@ -1407,11 +1840,12 @@ Required controls:
 
 ### Phase 2: Backend Foundation
 
-- Add relational database.
+- Add PostgreSQL.
 - Add tenant/auth middleware.
 - Add role and permission model.
 - Add document storage.
 - Add audit logging.
+- Replace prototype app-data writes with module APIs.
 
 ### Phase 3: Source Transactions and Accounting
 
@@ -1430,6 +1864,8 @@ Required controls:
 - Add VAT period locks.
 
 ### Phase 5: HR, Rota, Payroll, WPS
+
+Start this only after accounting, VAT, documents, and inventory are stable.
 
 - Persist employees, attendance, leave, overtime.
 - Persist rota periods and assignments.
@@ -1478,6 +1914,26 @@ Reports
         |
         v
 Audit + Documents + Notifications
+```
+
+Use this implementation stack:
+
+```text
+Frontend: React + Vite
+Backend: Python FastAPI
+Database: PostgreSQL
+Queue: Redis + Celery
+Storage: AWS S3
+Mobile: Flutter later
+```
+
+Build order:
+
+```text
+Accounting + VAT + inventory first
+        |
+        v
+Payroll, rota, WPS, and eInvoicing after the financial core is stable
 ```
 
 This makes TaxFlow production-ready for ledger-centered accounting, tax-line VAT, UAE eInvoicing readiness, WPS payroll support, strong audit controls, period locking, and evidence-backed compliance.

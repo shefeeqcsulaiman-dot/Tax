@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import Base, SessionLocal, engine
 from app.models import Account, AuditLog, Company, Employee, StockProductMapping, TaxCode, User, Warehouse
-from app.routers import accounting, app_data, audit, auth, companies, documents, inventory, invoices, jobs, payroll, reports, source_transactions, tax
+from app.routers import accounting, app_data, audit, auth, companies, corporate_accounting, documents, events, exception_center, inventory, invoices, jobs, module_records, payroll, reports, source_transactions, tax
 from app.security import hash_password
 
 
@@ -38,11 +38,15 @@ def create_app() -> FastAPI:
     app.include_router(jobs.router, prefix="/api/v1")
     app.include_router(source_transactions.router, prefix="/api/v1")
     app.include_router(accounting.router, prefix="/api/v1")
+    app.include_router(corporate_accounting.router, prefix="/api/v1")
     app.include_router(tax.router, prefix="/api/v1")
     app.include_router(inventory.router, prefix="/api/v1")
     app.include_router(payroll.router, prefix="/api/v1")
     app.include_router(reports.router, prefix="/api/v1")
     app.include_router(audit.router, prefix="/api/v1")
+    app.include_router(exception_center.router, prefix="/api/v1")
+    app.include_router(events.router, prefix="/api/v1")
+    app.include_router(module_records.router, prefix="/api/v1")
     app.include_router(app_data.router, prefix="/api/v1")
     return app
 

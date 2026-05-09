@@ -172,8 +172,8 @@ async def app_data_action(
         file = payload.get("file", {})
         base = clean_base(file.get("name") or "INV-UPLOAD")
         invoices = [
-            {"invoice_no": f"{base}-001", "customer": "Dubai Steel Co.", "customer_trn": "100348712600001", "date": "22 Jun 2024", "due_date": "22 Jul 2024", "subtotal": 42000, "vat_amount": 2100, "total": 44100, "confidence": 96, "status": "Ready", "issues": ""},
-            {"invoice_no": f"{base}-002", "customer": "Gulf Logistics Ltd", "customer_trn": "100874321500002", "date": "23 Jun 2024", "due_date": "23 Jul 2024", "subtotal": 18500, "vat_amount": 925, "total": 19425, "confidence": 91, "status": "Ready", "issues": ""},
+            {"invoice_no": f"{base}-001", "customer": "Dubai Steel Co.", "customer_trn": "100348712600001", "date": "22 Jun 2024", "due_date": "22 Jul 2024", "subtotal": 42000, "vat_amount": 2100, "total": 44100, "confidence": 96, "status": "Ready", "source": "AI Upload", "issues": ""},
+            {"invoice_no": f"{base}-002", "customer": "Gulf Logistics Ltd", "customer_trn": "100874321500002", "date": "23 Jun 2024", "due_date": "23 Jul 2024", "subtotal": 18500, "vat_amount": 925, "total": 19425, "confidence": 91, "status": "Ready", "source": "AI Upload", "issues": ""},
         ]
         for invoice in invoices:
             save_app_record(db, current_user, "salesInvoices", invoice)
@@ -256,6 +256,19 @@ def sync_domain_model(db: Session, current_user: User, collection: str, record: 
             party_name=str(record.get("vendor") or ""),
             subtotal=decimal_value(record.get("subtotal")),
             vat=decimal_value(record.get("vat")),
+            total=decimal_value(record.get("total")),
+            status=str(record.get("status") or "draft"),
+        )
+
+    elif collection == "purchaseRecords":
+        sync_source_transaction(
+            db,
+            current_user,
+            module="purchase",
+            reference=str(record.get("ref") or record.get("invoice_no") or "PURCHASE"),
+            party_name=str(record.get("supplier") or ""),
+            subtotal=decimal_value(record.get("net_amount") or record.get("subtotal")),
+            vat=decimal_value(record.get("tax_amount") or record.get("vat_amount")),
             total=decimal_value(record.get("total")),
             status=str(record.get("status") or "draft"),
         )

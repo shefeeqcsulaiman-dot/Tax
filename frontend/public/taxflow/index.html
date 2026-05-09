@@ -108,6 +108,10 @@
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="7"/><path d="M8 4v5l3 2"/></svg>
       Expert Review
     </div>
+    <div class="nav" onclick="go('exception')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2l6 11H2L8 2z"/><path d="M8 6v3"/><path d="M8 12h.01"/></svg>
+      Exception Center
+    </div>
   </div>
 
   <div class="sb-section">
@@ -145,6 +149,7 @@
       <div id="psub" class="tb-sub">Loading dashboard from database</div>
     </div>
     <div class="tb-right">
+      <button class="btn btn-g" id="exception-top-badge" onclick="go('exception')" title="Open Exception Center">Exceptions <span class="b b-g" id="exception-top-count">0</span></button>
       <button class="btn btn-g" id="theme-menu-toggle" onclick="toggleNightMode(document.body.classList.contains('theme-light'))">☾ Dark Mode</button>
       <button class="btn btn-g" onclick="go('ai')">AI Assistant</button>
       <button class="btn btn-g" onclick="toast('Refreshing...','info')">↻ Sync</button>
@@ -280,31 +285,16 @@
 <!-- ═══════════════════ SALES & INVOICES ═══════════════════ -->
 <div class="page" id="page-sales">
   <div class="tabs">
-    <div class="tab on" onclick="stab(this,'s-products')">Products / Services</div>
-    <div class="tab" onclick="stab(this,'s-upload')">Upload Invoices</div>
+    <div class="tab on" onclick="stab(this,'s-upload')">Upload Invoices</div>
+    <div class="tab" onclick="stab(this,'s-extract')">AI Extraction</div>
+    <div class="tab" onclick="stab(this,'s-validate')">Validation</div>
     <div class="tab" onclick="stab(this,'s-invoices')">Invoices</div>
     <div class="tab" onclick="stab(this,'s-create')">Create Invoice</div>
     <div class="tab" onclick="stab(this,'s-customers')">Customers</div>
   </div>
 
-  <!-- Products -->
-  <div class="tab-body on" id="s-products">
-    <div class="card mb16">
-      <div class="card-hd"><div class="card-title">Product & Service Catalogue</div><button class="btn btn-p" onclick="showM('m-product')">+ Add Product</button></div>
-      <table class="tbl">
-        <thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Unit</th><th>Unit Price (AED)</th><th>VAT</th><th>Status</th><th></th></tr></thead>
-        <tbody id="prod-tbody">
-          <tr><td class="mono">PRD-001</td><td>Steel Rods 12mm</td><td><span class="b b-gray">Materials</span></td><td>Ton</td><td class="mono">4,200.00</td><td><span class="b b-b">5%</span></td><td><span class="b b-g">Active</span></td><td><button class="btn btn-g btn-sm" onclick="editProd('PRD-001')">Edit</button></td></tr>
-          <tr><td class="mono">PRD-002</td><td>Logistics Service</td><td><span class="b b-gray">Services</span></td><td>Trip</td><td class="mono">850.00</td><td><span class="b b-b">5%</span></td><td><span class="b b-g">Active</span></td><td><button class="btn btn-g btn-sm">Edit</button></td></tr>
-          <tr><td class="mono">PRD-003</td><td>Packaging Material</td><td><span class="b b-gray">Supplies</span></td><td>Box</td><td class="mono">45.00</td><td><span class="b b-b">5%</span></td><td><span class="b b-g">Active</span></td><td><button class="btn btn-g btn-sm">Edit</button></td></tr>
-          <tr><td class="mono">PRD-004</td><td>Export Consulting</td><td><span class="b b-gray">Services</span></td><td>Hour</td><td class="mono">350.00</td><td><span class="b b-t">0% Zero</span></td><td><span class="b b-g">Active</span></td><td><button class="btn btn-g btn-sm">Edit</button></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
   <!-- Upload Sales Invoices -->
-  <div class="tab-body" id="s-upload">
+  <div class="tab-body on" id="s-upload">
     <div class="g2 mb16">
       <div>
         <div class="drop-zone mb16" id="sales-zone" onclick="document.getElementById('sales-file').click()" ondragover="salesDzOver(event)" ondragleave="salesDzLeave()" ondrop="salesDzDrop(event)">
@@ -315,17 +305,6 @@
             <span class="b b-r">PDF</span><span class="b b-b">XLSX</span><span class="b b-g">CSV</span><span class="b b-a">JPEG</span><span class="b b-p">PNG</span>
           </div>
           <input type="file" id="sales-file" style="display:none" multiple accept=".pdf,.csv,.xlsx,.xls,.jpg,.jpeg,.png" onchange="salesUpload(this)">
-        </div>
-        <div class="card">
-          <div class="card-hd"><div class="card-title">Import Settings</div></div>
-          <div class="fr2">
-            <div class="fg"><label class="fl">Invoice Type</label><select class="fi" id="sales-import-type"><option>Sales Tax Invoices</option><option>Proforma Invoices</option><option>Credit Notes</option><option>Debit Notes</option></select></div>
-            <div class="fg"><label class="fl">Tax Period</label><select class="fi" id="sales-import-period"><option>June 2024</option><option>May 2024</option><option>April 2024</option></select></div>
-          </div>
-          <div class="fr2">
-            <div class="fg"><label class="fl">Duplicate Handling</label><select class="fi" id="sales-dup-mode"><option>Skip existing invoice numbers</option><option>Import as draft copy</option><option>Replace existing draft</option></select></div>
-            <div class="fg"><label class="fl">Auto Store</label><select class="fi" id="sales-auto"><option value="yes">Yes — extract and store automatically</option><option value="no">No — review first</option></select></div>
-          </div>
         </div>
       </div>
       <div class="card">
@@ -339,18 +318,37 @@
         </div>
       </div>
     </div>
+  </div>
 
+  <div class="tab-body" id="s-extract">
     <div class="card">
       <div class="card-hd">
-        <div><div class="card-title">Extracted Invoice Data</div><div class="card-sub">Review extracted fields before posting or storing as sales invoices</div></div>
-        <div class="flx"><button class="btn btn-g btn-sm" onclick="runSalesImport()">Extract Pending</button><button class="btn btn-p btn-sm" onclick="storeExtractedSalesInvoices()">Store in System</button></div>
+        <div><div class="card-title">AI Upload Validation</div><div class="card-sub">Review updated invoice details, fix validation issues, then save selected rows</div></div>
+        <div class="flx"><button class="btn btn-g btn-sm" onclick="toggleSalesAiSelection(true)">Select All</button><button class="btn btn-g btn-sm" onclick="runSalesImport()">Extract Pending</button><button class="btn btn-p btn-sm" onclick="storeExtractedSalesInvoices()">Save All</button></div>
       </div>
-      <table class="tbl">
-        <thead><tr><th>Invoice No.</th><th>Customer</th><th>TRN</th><th>Date</th><th>Subtotal</th><th>VAT</th><th>Total</th><th>Confidence</th><th>Status</th></tr></thead>
+      <table class="tbl" data-delete-actions-bound="skip">
+        <thead><tr><th style="width:42px"><input type="checkbox" aria-label="Select all AI invoices" onchange="toggleSalesAiSelection(this.checked)"></th><th>Invoice No.</th><th>Customer</th><th>TRN</th><th>Date</th><th>Subtotal</th><th>VAT</th><th>Total</th><th>Confidence</th><th>Validation</th><th>Details</th><th>Actions</th></tr></thead>
         <tbody id="sales-ext-tbody">
-          <tr><td colspan="9" style="color:var(--text3);text-align:center">Uploaded invoice data will appear here.</td></tr>
+          <tr><td colspan="12" style="color:var(--text3);text-align:center">AI uploaded invoice data will appear here for validation.</td></tr>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <div class="tab-body" id="s-validate">
+    <div class="card mb12">
+      <div class="card-hd">
+        <div><div class="card-title">Validation Issues</div><div class="card-sub">Rows needing correction before save</div></div>
+        <button class="btn btn-g btn-sm" onclick="refreshSalesValidationPanel()">Refresh</button>
+      </div>
+      <div id="sales-validation-list">
+        <div style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:10px;padding:14px 16px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:18px">OK</span>
+            <div><div style="font-size:13.5px;font-weight:600">No validation issues yet</div><div style="font-size:12px;color:var(--text3)">Upload and extract invoices to validate AI data.</div></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -363,14 +361,14 @@
       <div class="stat"><div class="stat-lbl">Overdue</div><div class="stat-val" style="color:var(--red);font-size:20px">AED 21,000</div></div>
     </div>
     <div class="card">
-      <div class="card-hd"><div class="card-title">All Invoices</div><div class="flx"><input class="fi" style="width:200px" placeholder="Search..."><button class="btn btn-g" onclick="stab(document.querySelector('#page-sales .tab:nth-child(2)'),'s-upload')">Upload</button><button class="btn btn-p" onclick="stab(document.querySelector('#page-sales .tab:nth-child(4)'),'s-create')">+ New</button></div></div>
+      <div class="card-hd"><div class="card-title">All Invoices</div><div class="flx"><input class="fi" style="width:200px" placeholder="Search..."><button class="btn btn-g" onclick="stab(document.querySelector('#page-sales .tab:nth-child(1)'),'s-upload')">Upload</button><button class="btn btn-p" onclick="stab(document.querySelector('#page-sales .tab:nth-child(5)'),'s-create')">+ New</button></div></div>
       <table class="tbl">
-        <thead><tr><th>Invoice No.</th><th>Customer</th><th>Date</th><th>Due Date</th><th>Amount</th><th>VAT</th><th>Total</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Invoice No.</th><th>Customer</th><th>Date</th><th>Due Date</th><th>Amount</th><th>VAT</th><th>Total</th><th>Source</th><th>Status</th><th></th></tr></thead>
         <tbody id="sales-invoice-tbody">
-          <tr><td class="mono">INV-2024-0848</td><td>Dubai Steel Co.</td><td>20 Jun 2024</td><td>20 Jul 2024</td><td class="mono">42,000</td><td class="mono">2,100</td><td class="mono">44,100</td><td><span class="b b-a">Pending</span></td><td><div class="flx"><button class="btn btn-g btn-sm" onclick="openSalesInvoiceRow(this)">View</button><button class="btn btn-p btn-sm" onclick="shareSalesInvoiceRow(this)">Share</button></div></td></tr>
-          <tr><td class="mono">INV-2024-0847</td><td>Gulf Logistics Ltd</td><td>18 Jun 2024</td><td>18 Jul 2024</td><td class="mono">18,500</td><td class="mono">925</td><td class="mono">19,425</td><td><span class="b b-g">Paid</span></td><td><div class="flx"><button class="btn btn-g btn-sm" onclick="openSalesInvoiceRow(this)">View</button><button class="btn btn-p btn-sm" onclick="shareSalesInvoiceRow(this)">Share</button></div></td></tr>
-          <tr><td class="mono">INV-2024-0846</td><td>Emirates Supplies</td><td>15 Jun 2024</td><td>15 Jul 2024</td><td class="mono">31,000</td><td class="mono">1,550</td><td class="mono">32,550</td><td><span class="b b-r">Overdue</span></td><td><div class="flx"><button class="btn btn-g btn-sm" onclick="openSalesInvoiceRow(this)">View</button><button class="btn btn-p btn-sm" onclick="shareSalesInvoiceRow(this)">Share</button></div></td></tr>
-          <tr><td class="mono">INV-2024-0845</td><td>Al Baraka Trading</td><td>10 Jun 2024</td><td>10 Jul 2024</td><td class="mono">7,200</td><td class="mono">360</td><td class="mono">7,560</td><td><span class="b b-g">Paid</span></td><td><div class="flx"><button class="btn btn-g btn-sm" onclick="openSalesInvoiceRow(this)">View</button><button class="btn btn-p btn-sm" onclick="shareSalesInvoiceRow(this)">Share</button></div></td></tr>
+          <tr><td class="mono">INV-2024-0848</td><td>Dubai Steel Co.</td><td>20 Jun 2024</td><td>20 Jul 2024</td><td class="mono">42,000</td><td class="mono">2,100</td><td class="mono">44,100</td><td><span class="b b-gray">Manual</span></td><td><span class="b b-a">Pending</span></td><td data-action-col="1"><div class="row-actions sales-actions"><button class="icon-btn view" type="button" title="View" aria-label="View invoice" onclick="openSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.8 8s2.2-4 6.2-4 6.2 4 6.2 4-2.2 4-6.2 4-6.2-4-6.2-4z"/><circle cx="8" cy="8" r="1.8"/></svg></button><button class="icon-btn share" type="button" title="Share" aria-label="Share invoice" onclick="shareSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 8.5l3-1.8"/><path d="M6.5 7.5l3 1.8"/><circle cx="4.5" cy="8" r="2"/><circle cx="11.5" cy="5.8" r="2"/><circle cx="11.5" cy="10.2" r="2"/></svg></button></div></td></tr>
+          <tr><td class="mono">INV-2024-0847</td><td>Gulf Logistics Ltd</td><td>18 Jun 2024</td><td>18 Jul 2024</td><td class="mono">18,500</td><td class="mono">925</td><td class="mono">19,425</td><td><span class="b b-gray">Manual</span></td><td><span class="b b-g">Paid</span></td><td data-action-col="1"><div class="row-actions sales-actions"><button class="icon-btn view" type="button" title="View" aria-label="View invoice" onclick="openSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.8 8s2.2-4 6.2-4 6.2 4 6.2 4-2.2 4-6.2 4-6.2-4-6.2-4z"/><circle cx="8" cy="8" r="1.8"/></svg></button><button class="icon-btn share" type="button" title="Share" aria-label="Share invoice" onclick="shareSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 8.5l3-1.8"/><path d="M6.5 7.5l3 1.8"/><circle cx="4.5" cy="8" r="2"/><circle cx="11.5" cy="5.8" r="2"/><circle cx="11.5" cy="10.2" r="2"/></svg></button></div></td></tr>
+          <tr><td class="mono">INV-2024-0846</td><td>Emirates Supplies</td><td>15 Jun 2024</td><td>15 Jul 2024</td><td class="mono">31,000</td><td class="mono">1,550</td><td class="mono">32,550</td><td><span class="b b-gray">Manual</span></td><td><span class="b b-r">Overdue</span></td><td data-action-col="1"><div class="row-actions sales-actions"><button class="icon-btn view" type="button" title="View" aria-label="View invoice" onclick="openSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.8 8s2.2-4 6.2-4 6.2 4 6.2 4-2.2 4-6.2 4-6.2-4-6.2-4z"/><circle cx="8" cy="8" r="1.8"/></svg></button><button class="icon-btn share" type="button" title="Share" aria-label="Share invoice" onclick="shareSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 8.5l3-1.8"/><path d="M6.5 7.5l3 1.8"/><circle cx="4.5" cy="8" r="2"/><circle cx="11.5" cy="5.8" r="2"/><circle cx="11.5" cy="10.2" r="2"/></svg></button></div></td></tr>
+          <tr><td class="mono">INV-2024-0845</td><td>Al Baraka Trading</td><td>10 Jun 2024</td><td>10 Jul 2024</td><td class="mono">7,200</td><td class="mono">360</td><td class="mono">7,560</td><td><span class="b b-gray">Manual</span></td><td><span class="b b-g">Paid</span></td><td data-action-col="1"><div class="row-actions sales-actions"><button class="icon-btn view" type="button" title="View" aria-label="View invoice" onclick="openSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.8 8s2.2-4 6.2-4 6.2 4 6.2 4-2.2 4-6.2 4-6.2-4-6.2-4z"/><circle cx="8" cy="8" r="1.8"/></svg></button><button class="icon-btn share" type="button" title="Share" aria-label="Share invoice" onclick="shareSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 8.5l3-1.8"/><path d="M6.5 7.5l3 1.8"/><circle cx="4.5" cy="8" r="2"/><circle cx="11.5" cy="5.8" r="2"/><circle cx="11.5" cy="10.2" r="2"/></svg></button></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -507,16 +505,13 @@
   <div class="tab-body" id="p-extract">
     <div class="card mb16">
       <div class="card-hd">
-        <div><div class="card-title">AI Extraction Engine</div><div class="card-sub">AWS Textract OCR + LLM Cleaning → Structured JSON</div></div>
-        <div class="flx"><span class="b b-g">● OCR Active</span><button class="btn btn-p" onclick="runOCR()">▶ Run Extraction</button></div>
+        <div><div class="card-title">AI Upload Validation</div><div class="card-sub">Review updated purchase details, fix validation issues, then save selected rows</div></div>
+        <div class="flx"><button class="btn btn-g btn-sm" onclick="togglePurchaseAiSelection(true)">Select All</button><button class="btn btn-g btn-sm" onclick="runOCR()">Run Extraction</button><button class="btn btn-p btn-sm" onclick="storeExtractedPurchaseRecords()">Save All</button></div>
       </div>
-      <table class="tbl">
-        <thead><tr><th>Invoice No.</th><th>Date</th><th>Supplier</th><th>Supplier TRN</th><th>Subtotal</th><th>VAT 5%</th><th>Total</th><th>Confidence</th><th>Status</th><th style="width:60px"></th></tr></thead>
+      <table class="tbl" data-delete-actions-bound="skip">
+        <thead><tr><th style="width:42px"><input type="checkbox" aria-label="Select all purchase AI invoices" onchange="togglePurchaseAiSelection(this.checked)"></th><th>Invoice No.</th><th>Date</th><th>Supplier</th><th>Supplier TRN</th><th>Subtotal</th><th>VAT 5%</th><th>Total</th><th>Confidence</th><th>Validation</th><th>Details</th><th>Actions</th></tr></thead>
         <tbody id="ext-tbody">
-          <tr data-inv='{"invoice_no":"PUR-2024-0221","date":"15 Jun 2024","supplier":"Al Hamad Steel","supplier_trn":"100348712600001","subtotal":28000,"vat_amount":1400,"total":29400,"confidence":99,"status":"Valid","issues":""}'><td class="mono">PUR-2024-0221</td><td>15 Jun 2024</td><td>Al Hamad Steel</td><td class="mono">100348712600001</td><td class="mono">28,000.00</td><td class="mono">1,400.00</td><td class="mono">29,400.00</td><td><span class="b b-g">99%</span></td><td><span class="b b-g">Valid</span></td><td><button class="btn btn-g btn-sm" onclick="openEditRow(this)">✏ Edit</button></td></tr>
-          <tr data-inv='{"invoice_no":"PUR-2024-0220","date":"14 Jun 2024","supplier":"UAE Paints Co.","supplier_trn":"100987654300001","subtotal":5600,"vat_amount":280,"total":5880,"confidence":72,"status":"Review","issues":"VAT mismatch"}'><td class="mono">PUR-2024-0220</td><td>14 Jun 2024</td><td>UAE Paints Co.</td><td class="mono">100987654300001</td><td class="mono">5,600.00</td><td class="mono">280.00</td><td class="mono">5,880.00</td><td><span class="b b-a">72%</span></td><td><span class="b b-a">Review</span></td><td><button class="btn btn-g btn-sm" onclick="openEditRow(this)">✏ Edit</button></td></tr>
-          <tr data-inv='{"invoice_no":"PUR-2024-0219","date":"10 Jun 2024","supplier":"Gulf Freight","supplier_trn":"100512378900003","subtotal":12000,"vat_amount":600,"total":12600,"confidence":95,"status":"Valid","issues":""}'><td class="mono">PUR-2024-0219</td><td>10 Jun 2024</td><td>Gulf Freight</td><td class="mono">100512378900003</td><td class="mono">12,000.00</td><td class="mono">600.00</td><td class="mono">12,600.00</td><td><span class="b b-g">95%</span></td><td><span class="b b-g">Valid</span></td><td><button class="btn btn-g btn-sm" onclick="openEditRow(this)">✏ Edit</button></td></tr>
-          <tr data-inv='{"invoice_no":"PUR-2024-0218","date":"08 Jun 2024","supplier":"AD Paints LLC","supplier_trn":"1009876543","subtotal":3200,"vat_amount":160,"total":3360,"confidence":48,"status":"Error","issues":"TRN has 10 digits, must be 15"}'><td class="mono">PUR-2024-0218</td><td>08 Jun 2024</td><td>AD Paints LLC</td><td class="mono" style="color:var(--red)">1009876543</td><td class="mono">3,200.00</td><td class="mono">160.00</td><td class="mono">3,360.00</td><td><span class="b b-r">48%</span></td><td><span class="b b-r">Error</span></td><td><button class="btn btn-g btn-sm" onclick="openEditRow(this)">✏ Edit</button></td></tr>
+          <tr><td colspan="12" style="color:var(--text3);text-align:center">AI uploaded purchase data will appear here for validation.</td></tr>
         </tbody>
       </table>
       <div id="ext-prog" style="display:none;margin-top:14px">
@@ -647,8 +642,8 @@
       <table class="tbl">
         <thead><tr><th>Ref No.</th><th>Supplier</th><th>Date</th><th>Location</th><th>Items</th><th>Net Amount</th><th>Tax</th><th>Shipping</th><th>Total</th><th>Paid</th><th>Due</th><th>Source</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="purchase-record-tbody">
-          <tr><td class="mono">PUR-2024-0221</td><td>Al Hamad Steel</td><td>15 Jun 2024</td><td>Dubai HQ</td><td class="mono">1</td><td class="mono">28,000</td><td class="mono">1,400</td><td class="mono">0</td><td class="mono">29,400</td><td class="mono">0</td><td class="mono">29,400</td><td><span class="b b-p">AI</span></td><td><span class="b b-g">Valid</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td></tr>
-          <tr><td class="mono">PUR-2024-0219</td><td>Gulf Freight</td><td>10 Jun 2024</td><td>Main Warehouse</td><td class="mono">1</td><td class="mono">12,000</td><td class="mono">600</td><td class="mono">0</td><td class="mono">12,600</td><td class="mono">0</td><td class="mono">12,600</td><td><span class="b b-p">AI</span></td><td><span class="b b-g">Valid</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td></tr>
+          <tr><td class="mono">PUR-2024-0221</td><td>Al Hamad Steel</td><td>15 Jun 2024</td><td>Dubai HQ</td><td class="mono">1</td><td class="mono">28,000</td><td class="mono">1,400</td><td class="mono">0</td><td class="mono">29,400</td><td class="mono">0</td><td class="mono">29,400</td><td><span class="b b-p">AI Upload</span></td><td><span class="b b-g">Valid</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td></tr>
+          <tr><td class="mono">PUR-2024-0219</td><td>Gulf Freight</td><td>10 Jun 2024</td><td>Main Warehouse</td><td class="mono">1</td><td class="mono">12,000</td><td class="mono">600</td><td class="mono">0</td><td class="mono">12,600</td><td class="mono">0</td><td class="mono">12,600</td><td><span class="b b-p">AI Upload</span></td><td><span class="b b-g">Valid</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td></tr>
           <tr><td class="mono">PUR-2024-0215</td><td>Office Depot UAE</td><td>03 Jun 2024</td><td>Nuevo (BL0001)</td><td class="mono">1</td><td class="mono">2,400</td><td class="mono">120</td><td class="mono">0</td><td class="mono">2,520</td><td class="mono">2,520</td><td class="mono">0</td><td><span class="b b-gray">Manual</span></td><td><span class="b b-g">Paid</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td></tr>
         </tbody>
       </table>
@@ -1987,6 +1982,15 @@
     <div class="tab" onclick="stab(this,'acc-payrec')">Payments / Receipts</div>
     <div class="tab" onclick="stab(this,'acc-bankrec')">Bank Reconciliation</div>
     <div class="tab" onclick="stab(this,'acc-tax')">VAT / Tax</div>
+    <div class="tab" onclick="stab(this,'acc-corp-tax')">Corporate Tax</div>
+    <div class="tab" onclick="stab(this,'acc-assets')">Fixed Assets</div>
+    <div class="tab" onclick="stab(this,'acc-accruals')">Accruals</div>
+    <div class="tab" onclick="stab(this,'acc-cost-centers')">Cost Centers</div>
+    <div class="tab" onclick="stab(this,'acc-budget')">Budgeting</div>
+    <div class="tab" onclick="stab(this,'acc-cashflow')">Cash Flow</div>
+    <div class="tab" onclick="stab(this,'acc-credit')">Credit Control</div>
+    <div class="tab" onclick="stab(this,'acc-consolidation')">Consolidation</div>
+    <div class="tab" onclick="stab(this,'acc-approval')">Approvals</div>
     <div class="tab" onclick="stab(this,'acc-closing')">Closing Period</div>
   </div>
 
@@ -2182,6 +2186,133 @@
         <div class="toggle-row"><div><div>Admin approval to reopen period</div><div class="toggle-copy">Every reopen is logged with reason.</div></div><input type="checkbox" checked></div>
         <div class="toggle-row"><div><div>Opening balances must balance</div><div class="toggle-copy">Assets equal liabilities plus equity.</div></div><input type="checkbox" checked></div>
       </div>
+    </div>
+  </div>
+
+  <div class="tab-body" id="acc-corp-tax">
+    <div class="g4 mb16">
+      <div class="stat"><div class="stat-lbl">Accounting Profit</div><div class="stat-val" style="color:var(--accent)">AED 1.24M</div><div class="stat-delta">before CT adjustments</div></div>
+      <div class="stat"><div class="stat-lbl">Adjustments</div><div class="stat-val" style="color:var(--amber)">AED 82K</div><div class="stat-delta">add backs / deductions</div></div>
+      <div class="stat"><div class="stat-lbl">Taxable Income</div><div class="stat-val" style="color:var(--purple)">AED 1.32M</div><div class="stat-delta">after losses</div></div>
+      <div class="stat"><div class="stat-lbl">Corporate Tax</div><div class="stat-val" style="color:var(--green)">AED 84.6K</div><div class="stat-delta">draft return</div></div>
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Corporate Tax Calculation</div><div class="card-sub">Accounting profit to taxable income</div></div><button class="btn btn-g btn-sm" onclick="toast('Corporate tax report exported','ok')">Export</button></div>
+        <table class="tbl"><thead><tr><th>Step</th><th>Amount</th><th>Status</th></tr></thead><tbody>
+          <tr><td>Accounting Profit</td><td class="mono">1,240,000</td><td><span class="b b-g">Ready</span></td></tr>
+          <tr><td>Add: Non-deductible Expenses</td><td class="mono">96,000</td><td><span class="b b-a">Review</span></td></tr>
+          <tr><td>Less: Tax Loss Carry Forward</td><td class="mono">(14,000)</td><td><span class="b b-g">Applied</span></td></tr>
+          <tr><td>Taxable Income</td><td class="mono">1,322,000</td><td><span class="b b-b">Calculated</span></td></tr>
+          <tr><td>Corporate Tax Due</td><td class="mono">84,645</td><td><span class="b b-a">Draft</span></td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Related Party Transactions</div><div class="card-sub">Transfer pricing notes and review markers</div></div></div>
+        <table class="tbl"><thead><tr><th>Party</th><th>Type</th><th>Amount</th><th>Review</th></tr></thead><tbody>
+          <tr><td>Group Logistics LLC</td><td>Recharge</td><td class="mono">145,000</td><td><span class="b b-a">TP note</span></td></tr>
+          <tr><td>Director Loan</td><td>Loan</td><td class="mono">80,000</td><td><span class="b b-g">Documented</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-body" id="acc-assets">
+    <div class="g2 mb16">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Fixed Asset Register</div><div class="card-sub">Purchase, location, custodian, depreciation, disposal</div></div><button class="btn btn-p btn-sm" onclick="toast('Asset form opened','info')">+ Asset</button></div>
+        <table class="tbl"><thead><tr><th>Asset</th><th>Category</th><th>Cost</th><th>Accum. Dep.</th><th>Book Value</th><th>Custodian</th></tr></thead><tbody>
+          <tr><td>Delivery Van</td><td>Vehicle</td><td class="mono">95,000</td><td class="mono">18,000</td><td class="mono">77,000</td><td>Operations</td></tr>
+          <tr><td>Warehouse Racking</td><td>Equipment</td><td class="mono">42,000</td><td class="mono">6,500</td><td class="mono">35,500</td><td>Warehouse</td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Depreciation Posting</div><div class="card-sub">Monthly depreciation journal</div></div></div>
+        <div class="tline-item"><div class="tline-dot" style="background:var(--red-bg);color:var(--red)">Dr</div><div><div>Depreciation Expense</div><div class="card-sub">AED 4,250 monthly charge</div></div></div>
+        <div class="tline-item" style="padding-bottom:0"><div class="tline-dot" style="background:var(--green-bg);color:var(--green)">Cr</div><div><div>Accumulated Depreciation</div><div class="card-sub">Posted after approval</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-body" id="acc-accruals">
+    <div class="g2">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Accruals & Prepayments</div><div class="card-sub">Accrued expenses, income, prepaid expenses, deferred income</div></div><button class="btn btn-p btn-sm" onclick="toast('Accrual form opened','info')">+ Schedule</button></div>
+        <table class="tbl"><thead><tr><th>Type</th><th>Reference</th><th>Total</th><th>Monthly</th><th>Auto Reverse</th></tr></thead><tbody>
+          <tr><td>Prepaid Expense</td><td>Annual Rent</td><td class="mono">240,000</td><td class="mono">20,000</td><td><span class="b b-g">Yes</span></td></tr>
+          <tr><td>Accrued Expense</td><td>Utilities</td><td class="mono">8,400</td><td class="mono">8,400</td><td><span class="b b-a">Next month</span></td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Recognition Example</div></div>
+        <div class="tline-item"><div class="tline-dot" style="background:var(--accent-glow);color:var(--accent)">1</div><div><div>Rent paid yearly</div><div class="card-sub">Dr Prepayment Asset, Cr Bank</div></div></div>
+        <div class="tline-item" style="padding-bottom:0"><div class="tline-dot" style="background:var(--purple-bg);color:var(--purple)">2</div><div><div>Monthly expense recognition</div><div class="card-sub">Dr Rent Expense, Cr Prepayment Asset</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-body" id="acc-cost-centers">
+    <div class="card">
+      <div class="card-hd"><div><div class="card-title">Cost Centers / Departments</div><div class="card-sub">Journal lines carry Account + Cost Center + Branch + Project</div></div><button class="btn btn-p btn-sm" onclick="toast('Cost center form opened','info')">+ Cost Center</button></div>
+      <table class="tbl"><thead><tr><th>Code</th><th>Name</th><th>Department</th><th>Branch</th><th>Project</th><th>Status</th></tr></thead><tbody>
+        <tr><td class="mono">CC-OPS</td><td>Operations</td><td>Operations</td><td>Dubai HQ</td><td>Warehouse Expansion</td><td><span class="b b-g">Active</span></td></tr>
+        <tr><td class="mono">CC-SALES</td><td>Sales Team</td><td>Sales</td><td>Abu Dhabi</td><td>Corporate Accounts</td><td><span class="b b-g">Active</span></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div class="tab-body" id="acc-budget">
+    <div class="g2">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Budget vs Actual</div><div class="card-sub">Annual, monthly, department budget, variance</div></div><button class="btn btn-g btn-sm" onclick="toast('Budget report exported','ok')">Export</button></div>
+        <table class="tbl"><thead><tr><th>Department</th><th>Budget</th><th>Actual</th><th>Variance</th><th>Approval</th></tr></thead><tbody>
+          <tr><td>Operations</td><td class="mono">600,000</td><td class="mono">548,000</td><td><span class="b b-g">52,000 under</span></td><td><span class="b b-g">Approved</span></td></tr>
+          <tr><td>Sales</td><td class="mono">420,000</td><td class="mono">456,000</td><td><span class="b b-a">36,000 over</span></td><td><span class="b b-a">Review</span></td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Variance Analysis</div></div>
+        <div style="font-size:13px;line-height:1.9"><div><span style="color:var(--amber)">•</span> Sales travel is 18% over budget.</div><div><span style="color:var(--green)">•</span> Warehouse utilities are 9% under budget.</div><div><span style="color:var(--accent)">•</span> Director approval required above AED 10,000 variance.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-body" id="acc-cashflow">
+    <div class="g3 mb16">
+      <div class="stat"><div class="stat-lbl">Expected Receipts</div><div class="stat-val" style="color:var(--green)">AED 310K</div></div>
+      <div class="stat"><div class="stat-lbl">Expected Payments</div><div class="stat-val" style="color:var(--red)">AED 246K</div></div>
+      <div class="stat"><div class="stat-lbl">Net Cash Flow</div><div class="stat-val" style="color:var(--accent)">AED 64K</div></div>
+    </div>
+    <div class="card"><div class="card-hd"><div><div class="card-title">Cash Flow Management</div><div class="card-sub">Direct, indirect, forecast, receipts, payments</div></div></div><table class="tbl"><thead><tr><th>Date</th><th>Receipts</th><th>Payments</th><th>Net</th><th>Method</th></tr></thead><tbody><tr><td>Week 1</td><td class="mono">92,000</td><td class="mono">64,000</td><td class="mono">28,000</td><td>Direct</td></tr><tr><td>Week 2</td><td class="mono">118,000</td><td class="mono">96,000</td><td class="mono">22,000</td><td>Direct</td></tr></tbody></table></div>
+  </div>
+
+  <div class="tab-body" id="acc-credit">
+    <div class="card">
+      <div class="card-hd"><div><div class="card-title">Credit Control</div><div class="card-sub">Credit limit, hold, aging alerts, collections, bad debt</div></div></div>
+      <table class="tbl"><thead><tr><th>Customer</th><th>Limit</th><th>Outstanding</th><th>Status</th><th>Promise</th><th>Provision</th></tr></thead><tbody>
+        <tr><td>Dubai Steel Co.</td><td class="mono">100,000</td><td class="mono">84,000</td><td><span class="b b-a">Watch</span></td><td>15 Jul</td><td class="mono">0</td></tr>
+        <tr><td>Emirates Supplies</td><td class="mono">50,000</td><td class="mono">62,000</td><td><span class="b b-r">Credit Hold</span></td><td>Missing</td><td class="mono">6,200</td></tr>
+      </tbody></table>
+      <div class="divider"></div>
+      <div class="card-sub">Bad debt posting: Dr Bad Debt Expense, Cr Accounts Receivable. Write-off requires approval.</div>
+    </div>
+  </div>
+
+  <div class="tab-body" id="acc-consolidation">
+    <div class="g2">
+      <div class="card"><div class="card-hd"><div><div class="card-title">Intercompany / Related Party</div><div class="card-sub">Receivables, payables, loans, recharges, transfer pricing notes</div></div></div><table class="tbl"><thead><tr><th>Company</th><th>Type</th><th>Amount</th><th>Elimination</th></tr></thead><tbody><tr><td>TaxFlow Trading LLC</td><td>Receivable</td><td class="mono">120,000</td><td><span class="b b-a">Pending</span></td></tr><tr><td>TaxFlow Services LLC</td><td>Recharge</td><td class="mono">48,000</td><td><span class="b b-g">Matched</span></td></tr></tbody></table></div>
+      <div class="card"><div class="card-hd"><div><div class="card-title">Group Consolidation</div><div class="card-sub">Currency translation, intercompany elimination, group P&L and balance sheet</div></div></div><table class="tbl"><thead><tr><th>Subsidiary</th><th>Currency</th><th>Translated</th><th>Status</th></tr></thead><tbody><tr><td>Dubai Branch</td><td>AED</td><td class="mono">1,420,000</td><td><span class="b b-g">Ready</span></td></tr><tr><td>Oman Branch</td><td>OMR</td><td class="mono">384,000</td><td><span class="b b-a">FX Review</span></td></tr></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="tab-body" id="acc-approval">
+    <div class="card">
+      <div class="card-hd"><div><div class="card-title">Approval Matrix by Amount</div><div class="card-sub">Journal, payment, purchase, expense approvals by amount and department</div></div><button class="btn btn-p btn-sm" onclick="toast('Approval rule form opened','info')">+ Rule</button></div>
+      <table class="tbl"><thead><tr><th>Module</th><th>Amount Range</th><th>Department</th><th>Approver</th><th>Status</th></tr></thead><tbody>
+        <tr><td>Expense</td><td class="mono">&lt; 1,000</td><td>All</td><td>Supervisor</td><td><span class="b b-g">Active</span></td></tr>
+        <tr><td>Expense</td><td class="mono">1,000 - 10,000</td><td>All</td><td>Manager</td><td><span class="b b-g">Active</span></td></tr>
+        <tr><td>Expense</td><td class="mono">10,000+</td><td>All</td><td>Director</td><td><span class="b b-g">Active</span></td></tr>
+      </tbody></table>
     </div>
   </div>
 
@@ -2418,16 +2549,71 @@
 <!-- ═══════════════════ REPORTS MODULE ═══════════════════ -->
 <div class="page" id="page-reports">
   <div class="tabs">
-    <div class="tab on" onclick="stab(this,'rep-dash')">Dashboard</div>
+    <div class="tab on" onclick="stab(this,'rep-library')">Report Library</div>
+    <div class="tab" onclick="stab(this,'rep-dash')">Dashboard</div>
     <div class="tab" onclick="stab(this,'rep-vat')">VAT Report</div>
     <div class="tab" onclick="stab(this,'rep-pl')">Profit & Loss</div>
     <div class="tab" onclick="stab(this,'rep-bs')">Balance Sheet</div>
     <div class="tab" onclick="stab(this,'rep-tb')">Trial Balance</div>
     <div class="tab" onclick="stab(this,'rep-ar')">Aging Report</div>
+    <div class="tab" onclick="stab(this,'rep-corp')">Corporate Reports</div>
+    <div class="tab" onclick="stab(this,'rep-assets')">Assets & Accruals</div>
+    <div class="tab" onclick="stab(this,'rep-budget')">Budget & Cash</div>
+    <div class="tab" onclick="stab(this,'rep-control')">Control Reports</div>
     <div class="tab" onclick="stab(this,'rep-ai')">AI Insights</div>
   </div>
 
-  <div class="tab-body on" id="rep-dash">
+  <div class="card mb16">
+    <div class="fr4">
+      <div class="fg" style="margin:0"><label class="fl">Period</label><select class="fi"><option>June 2024</option><option>May 2024</option><option>Q2 2024</option><option>FY 2024</option></select></div>
+      <div class="fg" style="margin:0"><label class="fl">Company</label><select class="fi"><option>All Companies</option><option>TaxFlow UAE LLC</option><option>Dubai Branch</option></select></div>
+      <div class="fg" style="margin:0"><label class="fl">Cost Center</label><select class="fi"><option>All Cost Centers</option><option>Operations</option><option>Sales</option><option>Finance</option></select></div>
+      <div class="fg" style="margin:0"><label class="fl">Project / Branch</label><select class="fi"><option>All Projects</option><option>Warehouse Expansion</option><option>Corporate Accounts</option><option>Dubai HQ</option></select></div>
+    </div>
+  </div>
+
+  <div class="tab-body on" id="rep-library">
+    <div class="g3 mb16">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Financial Statements</div><div class="card-sub">Core accounting reports</div></div></div>
+        <table class="tbl"><tbody>
+          <tr><td>Profit & Loss</td><td><button class="btn btn-g btn-sm" onclick="stab(document.querySelector('#page-reports .tab[onclick*=\\'rep-pl\\']'),'rep-pl')">Open</button></td></tr>
+          <tr><td>Balance Sheet</td><td><button class="btn btn-g btn-sm" onclick="stab(document.querySelector('#page-reports .tab[onclick*=\\'rep-bs\\']'),'rep-bs')">Open</button></td></tr>
+          <tr><td>Trial Balance</td><td><button class="btn btn-g btn-sm" onclick="stab(document.querySelector('#page-reports .tab[onclick*=\\'rep-tb\\']'),'rep-tb')">Open</button></td></tr>
+          <tr><td>Cash Flow Statement</td><td><button class="btn btn-g btn-sm" onclick="stab(document.querySelector('#page-reports .tab[onclick*=\\'rep-budget\\']'),'rep-budget')">Open</button></td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Corporate Accounting</div><div class="card-sub">Tax, assets, accruals, budgets</div></div></div>
+        <table class="tbl"><tbody>
+          <tr><td>Corporate Tax Report</td><td><button class="btn btn-g btn-sm" onclick="stab(document.querySelector('#page-reports .tab[onclick*=\\'rep-corp\\']'),'rep-corp')">Open</button></td></tr>
+          <tr><td>Fixed Asset Register</td><td><button class="btn btn-g btn-sm" onclick="stab(document.querySelector('#page-reports .tab[onclick*=\\'rep-assets\\']'),'rep-assets')">Open</button></td></tr>
+          <tr><td>Accruals / Prepayments</td><td><button class="btn btn-g btn-sm" onclick="stab(document.querySelector('#page-reports .tab[onclick*=\\'rep-assets\\']'),'rep-assets')">Open</button></td></tr>
+          <tr><td>Budget vs Actual</td><td><button class="btn btn-g btn-sm" onclick="stab(document.querySelector('#page-reports .tab[onclick*=\\'rep-budget\\']'),'rep-budget')">Open</button></td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Control & Audit</div><div class="card-sub">Review, close, evidence</div></div></div>
+        <table class="tbl"><tbody>
+          <tr><td>Aging Report</td><td><button class="btn btn-g btn-sm" onclick="stab(document.querySelector('#page-reports .tab[onclick*=\\'rep-ar\\']'),'rep-ar')">Open</button></td></tr>
+          <tr><td>Cost Center P&L</td><td><button class="btn btn-g btn-sm" onclick="stab(document.querySelector('#page-reports .tab[onclick*=\\'rep-control\\']'),'rep-control')">Open</button></td></tr>
+          <tr><td>Month-End Checklist</td><td><button class="btn btn-g btn-sm" onclick="stab(document.querySelector('#page-reports .tab[onclick*=\\'rep-control\\']'),'rep-control')">Open</button></td></tr>
+          <tr><td>Audit Trail Report</td><td><button class="btn btn-g btn-sm" onclick="stab(document.querySelector('#page-reports .tab[onclick*=\\'rep-control\\']'),'rep-control')">Open</button></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div><div class="card-title">Report Drill-Down Rules</div><div class="card-sub">Every amount should open its source records before export</div></div><span class="b b-b">Design Standard</span></div>
+      <div class="g4">
+        <div class="setting-tile"><strong>Tax</strong><p>Corporate Tax and VAT lines drill into source journals, invoices, and adjustments.</p></div>
+        <div class="setting-tile"><strong>Assets</strong><p>Book value opens asset cost, depreciation schedule, disposal, and custodian history.</p></div>
+        <div class="setting-tile"><strong>Budgets</strong><p>Variance opens budget approval, actual journals, cost center, and project records.</p></div>
+        <div class="setting-tile"><strong>Audit</strong><p>Audit trail opens old/new values, reason, user, IP, device, and correlation ID.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-body" id="rep-dash">
     <div class="g4 mb16">
       <div class="stat"><div class="stat-lbl">Revenue</div><div class="stat-val" style="color:var(--accent)">AED 965K</div><div class="stat-delta up">+14.2% vs May</div><div class="spark"><span style="height:42%"></span><span style="height:54%"></span><span style="height:47%"></span><span style="height:65%"></span><span style="height:88%"></span></div></div>
       <div class="stat"><div class="stat-lbl">Gross Margin</div><div class="stat-val" style="color:var(--green)">34.0%</div><div class="stat-delta up">+1.8 pts</div><div class="spark"><span style="height:35%;background:var(--green-bg)"></span><span style="height:40%;background:var(--green-bg)"></span><span style="height:51%;background:var(--green-bg)"></span><span style="height:49%;background:var(--green-bg)"></span><span style="height:62%;background:var(--green-bg)"></span></div></div>
@@ -2649,6 +2835,139 @@
     </div>
   </div>
 
+  <div class="tab-body" id="rep-corp">
+    <div class="g4 mb16">
+      <div class="stat"><div class="stat-lbl">Corporate Tax</div><div class="stat-val" style="color:var(--green)">AED 84.6K</div><div class="stat-delta">draft payable</div></div>
+      <div class="stat"><div class="stat-lbl">Taxable Income</div><div class="stat-val" style="color:var(--accent)">AED 1.32M</div><div class="stat-delta">after adjustments</div></div>
+      <div class="stat"><div class="stat-lbl">Related Party</div><div class="stat-val" style="color:var(--amber)">2</div><div class="stat-delta">need notes</div></div>
+      <div class="stat"><div class="stat-lbl">Group Entities</div><div class="stat-val" style="color:var(--purple)">3</div><div class="stat-delta">consolidation pack</div></div>
+    </div>
+    <div class="g2 mb16">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Corporate Tax Report</div><div class="card-sub">Accounting profit, tax adjustments, taxable income, corporate tax</div></div><button class="btn btn-g btn-sm" onclick="toast('Corporate tax report exported','ok')">Export</button></div>
+        <table class="tbl"><thead><tr><th>Line</th><th>Amount</th><th>Status</th></tr></thead><tbody>
+          <tr><td>Accounting Profit</td><td class="mono">1,240,000</td><td><span class="b b-g">Ready</span></td></tr>
+          <tr><td>Non-deductible Expenses</td><td class="mono">96,000</td><td><span class="b b-a">Review</span></td></tr>
+          <tr><td>Tax Loss Carry Forward</td><td class="mono">(14,000)</td><td><span class="b b-g">Applied</span></td></tr>
+          <tr><td>Taxable Profit</td><td class="mono">1,322,000</td><td><span class="b b-b">Calculated</span></td></tr>
+          <tr><td>Corporate Tax Payable</td><td class="mono">84,645</td><td><span class="b b-a">Draft</span></td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Related Party Report</div><div class="card-sub">Loans, recharges, transfer pricing notes</div></div></div>
+        <table class="tbl"><thead><tr><th>Party</th><th>Type</th><th>Amount</th><th>Evidence</th></tr></thead><tbody>
+          <tr><td>Group Logistics LLC</td><td>Intercompany Recharge</td><td class="mono">145,000</td><td><span class="b b-a">TP note</span></td></tr>
+          <tr><td>Director Loan</td><td>Related Party Loan</td><td class="mono">80,000</td><td><span class="b b-g">Attached</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div><div class="card-title">Consolidation Reports</div><div class="card-sub">Group P&L, group balance sheet, currency translation, intercompany elimination</div></div><button class="btn btn-g btn-sm" onclick="toast('Consolidation pack exported','ok')">Export Pack</button></div>
+      <table class="tbl"><thead><tr><th>Entity</th><th>Currency</th><th>Translated Amount</th><th>Elimination</th><th>Status</th></tr></thead><tbody>
+        <tr><td>Dubai Branch</td><td>AED</td><td class="mono">1,420,000</td><td class="mono">0</td><td><span class="b b-g">Ready</span></td></tr>
+        <tr><td>Oman Branch</td><td>OMR</td><td class="mono">384,000</td><td class="mono">48,000</td><td><span class="b b-a">FX Review</span></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div class="tab-body" id="rep-assets">
+    <div class="g2 mb16">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Fixed Asset Register Report</div><div class="card-sub">Asset cost, depreciation, book value, location, custodian</div></div><button class="btn btn-g btn-sm" onclick="toast('Fixed asset report exported','ok')">Export</button></div>
+        <table class="tbl"><thead><tr><th>Asset</th><th>Category</th><th>Cost</th><th>Depreciation</th><th>Book Value</th><th>Location</th></tr></thead><tbody>
+          <tr><td>Delivery Van</td><td>Vehicle</td><td class="mono">95,000</td><td class="mono">18,000</td><td class="mono">77,000</td><td>Dubai HQ</td></tr>
+          <tr><td>Warehouse Racking</td><td>Equipment</td><td class="mono">42,000</td><td class="mono">6,500</td><td class="mono">35,500</td><td>Main Store</td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Depreciation Report</div><div class="card-sub">Monthly depreciation and accumulated depreciation</div></div></div>
+        <table class="tbl"><thead><tr><th>Month</th><th>Expense</th><th>Accumulated</th><th>Posting</th></tr></thead><tbody>
+          <tr><td>June 2024</td><td class="mono">4,250</td><td class="mono">24,500</td><td><span class="b b-g">Posted</span></td></tr>
+          <tr><td>July 2024</td><td class="mono">4,250</td><td class="mono">28,750</td><td><span class="b b-a">Scheduled</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Accruals Report</div><div class="card-sub">Accrued expenses, accrued income, auto reversals</div></div></div>
+        <table class="tbl"><thead><tr><th>Reference</th><th>Type</th><th>Amount</th><th>Reversal</th><th>Status</th></tr></thead><tbody>
+          <tr><td>UTIL-JUN</td><td>Accrued Expense</td><td class="mono">8,400</td><td>01 Jul</td><td><span class="b b-a">Open</span></td></tr>
+          <tr><td>REBATE-Q2</td><td>Accrued Income</td><td class="mono">12,000</td><td>15 Jul</td><td><span class="b b-g">Approved</span></td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Prepayment Schedule</div><div class="card-sub">Prepaid expenses and monthly recognition</div></div></div>
+        <table class="tbl"><thead><tr><th>Item</th><th>Total</th><th>Monthly</th><th>Remaining</th><th>Status</th></tr></thead><tbody>
+          <tr><td>Annual Rent</td><td class="mono">240,000</td><td class="mono">20,000</td><td class="mono">180,000</td><td><span class="b b-g">Active</span></td></tr>
+          <tr><td>Insurance</td><td class="mono">36,000</td><td class="mono">3,000</td><td class="mono">21,000</td><td><span class="b b-g">Active</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-body" id="rep-budget">
+    <div class="g2 mb16">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Budget vs Actual Report</div><div class="card-sub">Annual, monthly, department budget and variance</div></div><button class="btn btn-g btn-sm" onclick="toast('Budget report exported','ok')">Export</button></div>
+        <table class="tbl"><thead><tr><th>Department</th><th>Budget</th><th>Actual</th><th>Variance</th><th>Analysis</th></tr></thead><tbody>
+          <tr><td>Operations</td><td class="mono">600,000</td><td class="mono">548,000</td><td><span class="b b-g">52,000 under</span></td><td>Utilities lower</td></tr>
+          <tr><td>Sales</td><td class="mono">420,000</td><td class="mono">456,000</td><td><span class="b b-a">36,000 over</span></td><td>Travel spike</td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Cash Flow Statement</div><div class="card-sub">Direct and indirect cash flow view</div></div></div>
+        <table class="tbl"><thead><tr><th>Section</th><th>Direct</th><th>Indirect</th><th>Status</th></tr></thead><tbody>
+          <tr><td>Operating Cash Flow</td><td class="mono">64,000</td><td class="mono">58,500</td><td><span class="b b-g">Ready</span></td></tr>
+          <tr><td>Investing Cash Flow</td><td class="mono">(18,000)</td><td class="mono">(18,000)</td><td><span class="b b-g">Ready</span></td></tr>
+          <tr><td>Financing Cash Flow</td><td class="mono">0</td><td class="mono">0</td><td><span class="b b-gray">None</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div><div class="card-title">Cash Forecast</div><div class="card-sub">Expected receipts, expected payments, net cash movement</div></div></div>
+      <table class="tbl"><thead><tr><th>Period</th><th>Receipts</th><th>Payments</th><th>Net</th><th>Risk</th></tr></thead><tbody>
+        <tr><td>30 Days</td><td class="mono">310,000</td><td class="mono">246,000</td><td class="mono">64,000</td><td><span class="b b-g">Low</span></td></tr>
+        <tr><td>60 Days</td><td class="mono">225,000</td><td class="mono">198,000</td><td class="mono">27,000</td><td><span class="b b-a">Medium</span></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div class="tab-body" id="rep-control">
+    <div class="g2 mb16">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Cost Center P&L</div><div class="card-sub">Department, branch, and project profitability</div></div></div>
+        <table class="tbl"><thead><tr><th>Center</th><th>Revenue</th><th>Cost</th><th>Profit</th><th>Margin</th></tr></thead><tbody>
+          <tr><td>Operations</td><td class="mono">420,000</td><td class="mono">318,000</td><td class="mono">102,000</td><td><span class="b b-g">24%</span></td></tr>
+          <tr><td>Sales</td><td class="mono">545,000</td><td class="mono">284,000</td><td class="mono">261,000</td><td><span class="b b-g">48%</span></td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Project Profitability</div><div class="card-sub">Revenue, direct cost, overhead, margin</div></div></div>
+        <table class="tbl"><thead><tr><th>Project</th><th>Revenue</th><th>Cost</th><th>Profit</th><th>Status</th></tr></thead><tbody>
+          <tr><td>Warehouse Expansion</td><td class="mono">240,000</td><td class="mono">162,000</td><td class="mono">78,000</td><td><span class="b b-g">On track</span></td></tr>
+          <tr><td>Corporate Accounts</td><td class="mono">305,000</td><td class="mono">122,000</td><td class="mono">183,000</td><td><span class="b b-g">Strong</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Month-End Closing Checklist</div><div class="card-sub">Bank, AR, AP, VAT, payroll, depreciation, accruals, stock, trial balance, lock</div></div></div>
+        <table class="tbl"><thead><tr><th>Checklist</th><th>Owner</th><th>Status</th><th>Evidence</th></tr></thead><tbody>
+          <tr><td>Bank Reconciled</td><td>Finance</td><td><span class="b b-g">Done</span></td><td>Attached</td></tr>
+          <tr><td>Depreciation Posted</td><td>Accounting</td><td><span class="b b-a">Pending</span></td><td>Schedule ready</td></tr>
+          <tr><td>Period Locked</td><td>Controller</td><td><span class="b b-r">Open</span></td><td>Waiting review</td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Audit Trail Report</div><div class="card-sub">Sensitive actions with old/new value, reason, user, IP, device, correlation ID</div></div><button class="btn btn-g btn-sm" onclick="toast('Audit trail report exported','ok')">Export</button></div>
+        <table class="tbl"><thead><tr><th>Action</th><th>User</th><th>Reason</th><th>Correlation</th><th>Status</th></tr></thead><tbody>
+          <tr><td>Journal Approved</td><td>Sara</td><td>Month close</td><td class="mono">CORR-0091</td><td><span class="b b-g">Logged</span></td></tr>
+          <tr><td>Credit Hold</td><td>Rania</td><td>Limit exceeded</td><td class="mono">CORR-0092</td><td><span class="b b-g">Logged</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
   <div class="tab-body" id="rep-ai">
     <div class="g4 mb16">
       <div class="stat"><div class="stat-lbl">Forecast Confidence</div><div class="stat-val" style="color:var(--green)">87%</div><div class="stat-delta">based on 6-month trend</div></div>
@@ -2703,6 +3022,52 @@
         <button class="btn btn-p btn-sm" onclick="askReportAI()">Ask</button>
         <div id="report-ai-answer" style="margin-top:14px;font-size:12.5px;line-height:1.75;color:var(--text2)">AI answer will appear here.</div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ EXCEPTION CENTER ═══════════════════ -->
+<div class="page" id="page-exception">
+  <div class="g4 mb16">
+    <div class="stat"><div class="stat-lbl">Open Exceptions</div><div class="stat-val" id="exc-open" style="color:var(--red)">0</div><div class="stat-delta">system issues</div></div>
+    <div class="stat"><div class="stat-lbl">High Severity</div><div class="stat-val" id="exc-high" style="color:var(--amber)">0</div><div class="stat-delta">fix first</div></div>
+    <div class="stat"><div class="stat-lbl">Medium</div><div class="stat-val" id="exc-medium" style="color:var(--purple)">0</div><div class="stat-delta">needs review</div></div>
+    <div class="stat"><div class="stat-lbl">Low</div><div class="stat-val" id="exc-low" style="color:var(--green)">0</div><div class="stat-delta">monitor</div></div>
+  </div>
+  <div class="g2 mb16">
+    <div class="card">
+      <div class="card-hd">
+        <div><div class="card-title">System Problems</div><div class="card-sub">Failed postings, duplicates, stock gaps, VAT/OCR/payroll issues</div></div>
+        <button class="btn btn-g btn-sm" onclick="loadExceptionCenter()">Refresh</button>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Module</th><th>Issue</th><th>Source</th><th>Severity</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody id="exception-tbody">
+          <tr><td colspan="6" style="color:var(--text3);text-align:center">Reading exception center...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div><div class="card-title">Production Readiness</div><div class="card-sub">Architecture items now tracked in the live app</div></div><span class="b b-b">MVP</span></div>
+      <table class="tbl">
+        <tbody>
+          <tr><td>Module APIs</td><td><span class="b b-g">Added</span></td><td class="mono">/purchases /items /units /settings</td></tr>
+          <tr><td>Exception Center</td><td><span class="b b-g">Added</span></td><td>DB-backed problem queue</td></tr>
+          <tr><td>Stock Tables</td><td><span class="b b-g">Added</span></td><td>Units, valuation layers, approvals</td></tr>
+          <tr><td>Event System</td><td><span class="b b-g">Added</span></td><td>Domain events + outbox</td></tr>
+          <tr><td>Audit Detail</td><td><span class="b b-g">Added</span></td><td>Old/new/reason/IP/device/correlation</td></tr>
+          <tr><td>Report Snapshots</td><td><span class="b b-g">Added</span></td><td>GL, inventory, aging, VAT snapshots</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><div><div class="card-title">Exception Types</div><div class="card-sub">One place for admins to fix operational blockers</div></div></div>
+    <div class="g4">
+      <div class="stat"><div class="stat-lbl">Accounting</div><div class="stat-val" style="font-size:18px;color:var(--accent)">Postings</div><div class="stat-delta">failed or blocked jobs</div></div>
+      <div class="stat"><div class="stat-lbl">Invoices</div><div class="stat-val" style="font-size:18px;color:var(--amber)">Duplicates</div><div class="stat-delta">sales and purchase refs</div></div>
+      <div class="stat"><div class="stat-lbl">Inventory</div><div class="stat-val" style="font-size:18px;color:var(--purple)">Mappings</div><div class="stat-delta">unmapped stock items</div></div>
+      <div class="stat"><div class="stat-lbl">Compliance</div><div class="stat-val" style="font-size:18px;color:var(--green)">VAT/OCR</div><div class="stat-delta">validation failures</div></div>
     </div>
   </div>
 </div>

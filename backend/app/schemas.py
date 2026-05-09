@@ -242,6 +242,50 @@ class StockMappingOut(StockMappingIn):
     model_config = {"from_attributes": True}
 
 
+class ItemUnitIn(BaseModel):
+    item_code: str
+    unit_code: str
+    unit_name: str
+    conversion_factor: Decimal = Field(default=1, ge=0)
+    is_base_unit: bool = False
+
+
+class ItemUnitOut(ItemUnitIn):
+    id: str
+
+    model_config = {"from_attributes": True}
+
+
+class InventoryValuationLayerOut(BaseModel):
+    id: str
+    item_code: str
+    warehouse_id: str | None
+    source_module: str
+    source_id: str | None
+    quantity_in: Decimal
+    quantity_remaining: Decimal
+    unit_cost: Decimal
+    valuation_method: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class StockAdjustmentApprovalIn(BaseModel):
+    item_code: str
+    warehouse_id: str | None = None
+    quantity_delta: Decimal
+    reason: str
+
+
+class StockAdjustmentApprovalOut(StockAdjustmentApprovalIn):
+    id: str
+    status: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class EmployeeOut(BaseModel):
     id: str
     employee_no: str
@@ -302,6 +346,55 @@ class AuditLogOut(BaseModel):
     action: str
     record_id: str | None
     detail: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AppRecordIn(BaseModel):
+    record_key: str | None = None
+    payload: dict
+
+
+class AppRecordOut(BaseModel):
+    id: str
+    record_key: str | None
+    payload: dict
+    created_at: datetime
+    updated_at: datetime
+
+
+class ExceptionEventIn(BaseModel):
+    module: str
+    category: str
+    severity: str = "medium"
+    source_record: str | None = None
+    message: str
+    status: str = "open"
+
+
+class ExceptionEventOut(ExceptionEventIn):
+    id: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DomainEventIn(BaseModel):
+    event_name: str
+    source_module: str
+    source_id: str | None = None
+    payload: dict | None = None
+    correlation_id: str | None = None
+
+
+class DomainEventOut(BaseModel):
+    id: str
+    event_name: str
+    source_module: str
+    source_id: str | None
+    payload: str | None
+    correlation_id: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}
