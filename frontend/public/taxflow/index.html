@@ -32,6 +32,10 @@
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12l-1 8H3L2 4z"/><path d="M5 4V3a3 3 0 016 0v1"/></svg>
       Sales & Invoices
     </div>
+    <div class="nav" onclick="go('quotations')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h8l2 2v10H3z"/><path d="M10.5 2v3H13"/><path d="M5 7h6M5 10h5"/></svg>
+      Quotations
+    </div>
   </div>
 
   <div class="sb-section">
@@ -40,13 +44,13 @@
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2h2l2 8h8"/><circle cx="7" cy="13" r="1"/><circle cx="13" cy="13" r="1"/></svg>
       Purchases
     </div>
+    <div class="nav" onclick="go('inventory')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12"/><path d="M4 4v10"/><path d="M12 4v10"/><path d="M4 8h8"/></svg>
+      Inventory
+    </div>
     <div class="nav" onclick="go('expense')">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
       Expenses
-    </div>
-    <div class="nav" onclick="go('bills')">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 1.5h10v13l-2-1-2 1-2-1-2 1-2-1v-12z"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
-      Bills & Vendors
     </div>
   </div>
 
@@ -64,6 +68,10 @@
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
       Accounting
     </div>
+    <div class="nav" onclick="go('corporate')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 14V3h10v11"/><path d="M5 5h2M9 5h2M5 8h2M9 8h2M5 11h2M9 11h2"/></svg>
+      Corporate Accounting
+    </div>
     <div class="nav" onclick="go('reports')">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14V6l6-4 6 4v8"/><path d="M6 14v-4h4v4"/></svg>
       Reports
@@ -72,14 +80,6 @@
 
   <div class="sb-section">
     <div class="sb-lbl">Operations</div>
-    <div class="nav" onclick="go('inventory')">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12"/><path d="M4 4v10"/><path d="M12 4v10"/><path d="M4 8h8"/></svg>
-      Inventory
-    </div>
-    <div class="nav" onclick="go('documents')">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 1.5h6l3 3v10H4z"/><path d="M10 1.5v3h3"/><path d="M6 8h5M6 11h5"/></svg>
-      Documents
-    </div>
   </div>
 
   <div class="sb-section">
@@ -116,10 +116,6 @@
 
   <div class="sb-section">
     <div class="sb-lbl">Channels</div>
-    <div class="nav" onclick="go('mobile')">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="2" width="8" height="12" rx="1"/><path d="M6 15h4"/></svg>
-      Mobile App
-    </div>
     <div class="nav hidden" onclick="go('design')" aria-hidden="true">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2h5l2 2h5v10H2V2z"/></svg>
       System Design
@@ -385,7 +381,7 @@
           <div class="fg" style="margin:0"><label class="fl">Due Date</label><input class="fi" type="date" id="inv-due"></div>
         </div>
         <div class="fr2">
-          <div class="fg"><div class="flx-b"><label class="fl">Customer Name</label><button class="btn btn-g btn-sm" type="button" onclick="openAddCustomerFromInvoice()">+ Add new customer</button></div><input class="fi" id="inv-cust" placeholder="Select or type customer"></div>
+          <div class="fg"><label class="fl">Customer Name</label><div class="field-action-row"><input class="fi" id="inv-cust" placeholder="Select or type customer"><button class="btn btn-g btn-sm" type="button" onclick="openAddCustomerFromInvoice()">+ Add</button></div></div>
           <div class="fg"><label class="fl">Customer TRN</label><input class="fi mono" id="inv-ctrn" placeholder="15-digit TRN"></div>
         </div>
         <div class="fg"><label class="fl">Customer Address</label><input class="fi" placeholder="Billing address"></div>
@@ -399,15 +395,17 @@
     </div>
     <div class="card mb16">
       <div class="card-hd"><div class="card-title">Line Items</div><div class="flx"><button class="btn btn-g btn-sm" onclick="openAddProductFromInvoice()">+ Add new product</button><button class="btn btn-g btn-sm" onclick="addLine()">+ Add Line</button></div></div>
-      <div style="display:grid;grid-template-columns:3fr 1fr 1fr 1fr 28px;gap:8px;margin-bottom:8px">
+      <datalist id="invoice-product-options"></datalist>
+      <div class="sales-inv-line sales-inv-head">
         <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Product / Description</div>
+        <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Unit</div>
         <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Qty</div>
         <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Unit Price</div>
         <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Amount</div>
         <div></div>
       </div>
       <div id="inv-lines">
-        <div class="inv-item"><input class="fi" placeholder="Description or product" style="font-size:12.5px"><input class="fi" value="10" style="font-size:12.5px" oninput="calcLine(this)"><input class="fi" value="4200.00" style="font-size:12.5px" oninput="calcLine(this)"><input class="fi mono" value="42,000.00" readonly style="background:var(--bg)"><button class="btn btn-g" style="padding:4px 8px" onclick="remLine(this)">✕</button></div>
+        <div class="inv-item sales-inv-line"><input class="fi inv-product" list="invoice-product-options" placeholder="Description or product" style="font-size:12.5px" onfocus="refreshInvoiceProductSuggestions()" onchange="applyInvoiceProductSuggestion(this)"><input class="fi inv-unit" value="PCS" readonly style="font-size:12.5px;background:var(--bg)"><input class="fi inv-qty" value="10" style="font-size:12.5px" oninput="calcLine(this)"><input class="fi inv-price" value="4200.00" style="font-size:12.5px" oninput="calcLine(this)"><input class="fi mono inv-amount" value="42,000.00" readonly style="background:var(--bg)"><button class="btn btn-g" style="padding:4px 8px" onclick="remLine(this)">✕</button></div>
       </div>
       <div class="inv-total-row">
         <div class="inv-total-box">
@@ -443,6 +441,60 @@
   </div>
 </div>
 
+<!-- ═══════════════════ QUOTATIONS ═══════════════════ -->
+<div class="page" id="page-quotations">
+  <div class="tabs">
+    <div class="tab on" onclick="stab(this,'q-list')">Quotation List</div>
+    <div class="tab" onclick="stab(this,'q-create')">New Quotation</div>
+  </div>
+
+  <div class="tab-body on" id="q-list">
+    <div class="card">
+      <div class="card-hd"><div class="card-title">Quotations</div><button class="btn btn-p btn-sm" onclick="stab(document.querySelectorAll('#page-quotations .tab')[1],'q-create')">+ New Quotation</button></div>
+      <table class="tbl">
+        <thead><tr><th>Quotation No.</th><th>Customer</th><th>Date</th><th>Valid Until</th><th>Amount</th><th>VAT</th><th>Total</th><th>Status</th><th>Owner</th><th></th></tr></thead>
+        <tbody id="quotation-tbody">
+          <tr data-empty-state="1"><td colspan="10" style="color:var(--text3);font-size:13px">No quotations in database yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tab-body" id="q-create">
+    <div class="g2 mb16">
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Quotation Details</div></div>
+        <div class="fr2">
+          <div class="fg"><label class="fl">Quotation No.</label><input class="fi mono" id="quote-no" value="QTN-2024-0063"></div>
+          <div class="fg"><label class="fl">Customer</label><input class="fi" id="quote-customer" placeholder="Customer name"></div>
+          <div class="fg"><label class="fl">Date</label><input class="fi" id="quote-date" type="date"></div>
+          <div class="fg"><label class="fl">Valid Until</label><input class="fi" id="quote-valid" type="date"></div>
+        </div>
+        <div class="fg"><label class="fl">Subject</label><input class="fi" id="quote-subject" placeholder="Quotation subject"></div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title">Totals</div></div>
+        <div class="tot-row"><span>Subtotal</span><span class="mono" id="quote-subtotal">AED 0.00</span></div>
+        <div class="tot-row"><span>VAT 5%</span><span class="mono" id="quote-vat">AED 0.00</span></div>
+        <div class="tot-final"><span>Total</span><span class="mono" id="quote-total">AED 0.00</span></div>
+      </div>
+    </div>
+    <div class="card mb16">
+      <div class="card-hd"><div class="card-title">Line Items</div><button class="btn btn-g btn-sm" onclick="addQuotationLine()">+ Add Line</button></div>
+      <div style="display:grid;grid-template-columns:3fr 1fr 1fr 1fr 28px;gap:8px;margin-bottom:8px">
+        <div class="card-sub">Description</div><div class="card-sub">Qty</div><div class="card-sub">Unit Price</div><div class="card-sub">Amount</div><div></div>
+      </div>
+      <div id="quote-lines">
+        <div class="inv-item quote-line"><input class="fi" placeholder="Description"><input class="fi quote-qty" value="1" oninput="calcQuotationLine(this)"><input class="fi quote-price" value="0.00" oninput="calcQuotationLine(this)"><input class="fi mono quote-amount" value="0.00" readonly style="background:var(--bg)"><button class="btn btn-g" style="padding:4px 8px" onclick="removeQuotationLine(this)">x</button></div>
+      </div>
+    </div>
+    <div class="flx-b">
+      <button class="btn btn-g" onclick="saveQuotationDraft()">Save Draft</button>
+      <div class="flx"><button class="btn btn-g" onclick="previewDraftQuotation()">Preview</button><button class="btn btn-g" onclick="shareDraftQuotation()">Share</button><button class="btn btn-p" onclick="sendDraftQuotation()">Send Quotation</button></div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════ PURCHASES ═══════════════════ -->
 <div class="page" id="page-purchase">
   <div class="tabs">
@@ -451,6 +503,7 @@
     <div class="tab" onclick="stab(this,'p-validate')">Validation</div>
     <div class="tab" onclick="stab(this,'p-manual')">Add Purchase</div>
     <div class="tab" onclick="stab(this,'p-records')">Purchase Records</div>
+    <div class="tab" onclick="stab(this,'p-vendors')">Vendors</div>
     <div class="tab" onclick="stab(this,'p-master')">Purchase Settings</div>
   </div>
 
@@ -566,15 +619,13 @@
   <div class="tab-body" id="p-manual">
     <div class="card mb16">
       <div class="card-hd"><div><div class="card-title" id="mp-form-title">Add Purchase</div><div class="card-sub" id="mp-form-sub">Manual supplier purchase entry with items, discounts, tax, shipping, and payment</div></div><button class="btn btn-g btn-sm" onclick="resetManualPurchase()">Clear</button></div>
-      <div class="fr4">
-        <div class="fg"><label class="fl">Supplier *</label><select class="fi" id="mp-supplier"><option value="">Please Select</option><option>Al Hamad Steel</option><option>Gulf Freight</option><option>Office Depot UAE</option><option>UAE Paints Co.</option></select></div>
+      <div class="fr3">
+        <div class="fg"><label class="fl">Supplier *</label><div class="field-action-row"><select class="fi" id="mp-supplier"><option value="">Please Select</option><option>Al Hamad Steel</option><option>Gulf Freight</option><option>Office Depot UAE</option><option>UAE Paints Co.</option></select><button class="btn btn-g btn-sm" type="button" onclick="openSupplierPopup()">+ Add</button></div></div>
         <div class="fg"><label class="fl">Reference No.</label><input class="fi mono" id="mp-ref" placeholder="PUR-2026-0001"></div>
         <div class="fg"><label class="fl">Purchase Date *</label><input class="fi" id="mp-date" type="datetime-local"></div>
-        <div class="fg"><label class="fl">Purchase Status *</label><select class="fi" id="mp-status"><option value="">Please Select</option><option>Draft</option><option>Received</option><option>Pending Payment</option><option>Paid</option></select></div>
       </div>
-      <div class="fr4">
+      <div class="fr3">
         <div class="fg"><label class="fl">Address</label><input class="fi" id="mp-address" placeholder="Supplier address"></div>
-        <div class="fg"><label class="fl">Business Location *</label><select class="fi" id="mp-location"><option>Nuevo (BL0001)</option><option>Dubai HQ</option><option>Main Warehouse</option></select></div>
         <div class="fg"><label class="fl">Pay Term</label><select class="fi" id="mp-term"><option value="">Please Select</option><option>Due on receipt</option><option>Net 15</option><option>Net 30</option><option>Net 45</option></select></div>
         <div class="fg"><label class="fl">Attach Document</label><input class="fi" id="mp-file" type="file" accept=".pdf,.csv,.zip,.doc,.docx,.jpeg,.jpg,.png"></div>
       </div>
@@ -585,9 +636,8 @@
         <div><div class="card-title">Purchase Products</div><div class="card-sub">Add product lines and TaxFlow will calculate item totals automatically</div></div>
         <div class="flx"><button class="btn btn-g btn-sm" onclick="toast('Product import ready','info')">Import Products</button><button class="btn btn-p btn-sm" onclick="addManualPurchaseLine()">+ Add Product</button></div>
       </div>
-      <div class="fg mb12"><input class="fi" id="mp-search" placeholder="Enter product name / SKU / scan barcode"></div>
-      <table class="tbl" data-delete-actions-bound="skip">
-        <thead><tr><th>#</th><th>Product Name</th><th>Purchase Quantity</th><th>Unit Cost Before Discount</th><th>Discount %</th><th>Unit Cost Before Tax</th><th>Line Total</th><th>Profit Margin %</th><th>Unit Selling Price Inc. Tax</th><th></th></tr></thead>
+      <table class="tbl" data-delete-actions-bound="skip" data-no-table-tools="1">
+        <thead><tr><th class="line-no-head">#</th><th>Product Name</th><th>Purchase Quantity</th><th>Unit of Measure</th><th>Units/Outer</th><th>Unit Cost Before Discount</th><th>Discount %</th><th>Unit Cost Before Tax</th><th>Line Total</th><th>Profit Margin %</th><th>Unit Selling Price Inc. Tax</th><th></th></tr></thead>
         <tbody id="mp-lines"></tbody>
       </table>
       <div class="flx-b" style="justify-content:flex-end;gap:26px;margin-top:14px">
@@ -645,6 +695,20 @@
           <tr><td class="mono">PUR-2024-0221</td><td>Al Hamad Steel</td><td>15 Jun 2024</td><td>Dubai HQ</td><td class="mono">1</td><td class="mono">28,000</td><td class="mono">1,400</td><td class="mono">0</td><td class="mono">29,400</td><td class="mono">0</td><td class="mono">29,400</td><td><span class="b b-p">AI Upload</span></td><td><span class="b b-g">Valid</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td></tr>
           <tr><td class="mono">PUR-2024-0219</td><td>Gulf Freight</td><td>10 Jun 2024</td><td>Main Warehouse</td><td class="mono">1</td><td class="mono">12,000</td><td class="mono">600</td><td class="mono">0</td><td class="mono">12,600</td><td class="mono">0</td><td class="mono">12,600</td><td><span class="b b-p">AI Upload</span></td><td><span class="b b-g">Valid</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td></tr>
           <tr><td class="mono">PUR-2024-0215</td><td>Office Depot UAE</td><td>03 Jun 2024</td><td>Nuevo (BL0001)</td><td class="mono">1</td><td class="mono">2,400</td><td class="mono">120</td><td class="mono">0</td><td class="mono">2,520</td><td class="mono">2,520</td><td class="mono">0</td><td><span class="b b-gray">Manual</span></td><td><span class="b b-g">Paid</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tab-body" id="p-vendors">
+    <div class="card">
+      <div class="card-hd"><div class="card-title">Vendor Directory</div><button class="btn btn-p btn-sm" onclick="showM('m-vendor')">+ Add Vendor</button></div>
+      <table class="tbl">
+        <thead><tr><th>Vendor</th><th>TRN</th><th>Category</th><th>Email</th><th>Open Balance</th><th>Status</th></tr></thead>
+        <tbody id="vendor-tbody">
+          <tr><td>Al Hamad Steel</td><td class="mono">100224455600003</td><td>Materials</td><td>accounts@alhamadsteel.ae</td><td class="mono">AED 29,400</td><td><span class="b b-g">Active</span></td></tr>
+          <tr><td>Gulf Freight</td><td class="mono">100445566700004</td><td>Logistics</td><td>ap@gulffreight.ae</td><td class="mono">AED 12,600</td><td><span class="b b-g">Active</span></td></tr>
+          <tr><td>Office Depot UAE</td><td class="mono">100998877600002</td><td>Office Supplies</td><td>billing@officedepot.ae</td><td class="mono">AED 0</td><td><span class="b b-g">Active</span></td></tr>
         </tbody>
       </table>
     </div>
@@ -1687,7 +1751,7 @@
       <div class="card-hd"><div class="card-title">Item Master</div><button class="btn btn-p" onclick="showM('m-inv-item')">+ New Item</button></div>
       <table class="tbl">
         <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Category</th><th>Unit</th><th>Default Warehouse</th><th>Tracking</th><th>VAT</th><th>Status</th></tr></thead>
-        <tbody>
+        <tbody id="prod-tbody">
           <tr><td class="mono">ITM-001</td><td>Steel Rods 12mm</td><td>Raw Material</td><td>Materials</td><td>Ton</td><td>Main Store</td><td><span class="b b-g">Yes</span></td><td><span class="b b-b">5%</span></td><td><span class="b b-g">Active</span></td></tr>
           <tr><td class="mono">ITM-002</td><td>Packaging Box A</td><td>Consumable</td><td>Supplies</td><td>Pcs</td><td>Main Store</td><td><span class="b b-a">Optional</span></td><td><span class="b b-b">5%</span></td><td><span class="b b-g">Active</span></td></tr>
           <tr><td class="mono">ITM-003</td><td>Industrial Oil 5L</td><td>Stock Item</td><td>Supplies</td><td>Unit</td><td>Van Stock</td><td><span class="b b-g">Yes</span></td><td><span class="b b-b">5%</span></td><td><span class="b b-g">Active</span></td></tr>
@@ -1719,176 +1783,35 @@
   <div class="tab-body" id="inv-mapping">
     <div class="g2 mb16">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">Complete Stock Mapping List</div><div class="card-sub">Map each supplier or document product name to the generated stock item name</div></div><button class="btn btn-p btn-sm" onclick="toast('Stock mapping saved','ok')">Save Mapping</button></div>
-        <div class="fr2 mb12">
-          <div class="fg" style="margin:0"><label class="fl">Search</label><input class="fi" id="stock-map-search" placeholder="Search product or generated name" oninput="filterStockMapList()"></div>
-          <div class="fg" style="margin:0"><label class="fl">Sort</label><select class="fi" id="stock-map-sort" onchange="sortStockMapList()"><option value="product-asc">Product Name A-Z</option><option value="product-desc">Product Name Z-A</option><option value="generated-asc">Generated Name A-Z</option></select></div>
-        </div>
-        <table class="tbl">
-          <thead><tr><th>Product Name</th><th>Generated Name</th><th>Warehouse</th><th>Unit</th><th>Status</th><th></th></tr></thead>
+        <div class="card-hd"><div><div class="card-title">Stock Mapping</div><div class="card-sub">Item Master list with TaxFlow mapping status</div></div></div>
+        <table class="tbl" data-delete-actions-bound="skip">
+          <thead><tr><th>Name</th><th>Supplier Name</th><th>TaxFlow Name</th><th>Units/Outer</th><th>Mapping Status</th><th>Actions</th></tr></thead>
           <tbody id="stock-map-tbody">
-            <tr><td>Steel Rods 12mm</td><td>Steel Rods 12mm</td><td>Main Store</td><td>Ton</td><td><span class="b b-g">Mapped</span></td><td><button class="btn btn-p btn-sm" onclick="openStockMap(this)">Map</button></td></tr>
-            <tr><td>Packaging Box A</td><td>Packaging Box A</td><td>Main Store</td><td>Pcs</td><td><span class="b b-g">Mapped</span></td><td><button class="btn btn-p btn-sm" onclick="openStockMap(this)">Map</button></td></tr>
-            <tr><td>Safety Gloves L</td><td>Safety Gloves</td><td>Main Store</td><td>Pairs</td><td><span class="b b-a">Review</span></td><td><button class="btn btn-p btn-sm" onclick="openStockMap(this)">Map</button></td></tr>
-            <tr><td>Industrial Oil 5 Litre</td><td>Industrial Oil 5L</td><td>Van Stock</td><td>Unit</td><td><span class="b b-g">Mapped</span></td><td><button class="btn btn-p btn-sm" onclick="openStockMap(this)">Map</button></td></tr>
-            <tr><td>Perfume Bottle</td><td>Perfume Bottle</td><td>Main Store</td><td>Pcs</td><td><span class="b b-r">Unmapped</span></td><td><button class="btn btn-p btn-sm" onclick="openStockMap(this)">Map</button></td></tr>
-            <tr><td>Carton Small 24pcs</td><td>Carton Small 24pcs</td><td>Main Store</td><td>Carton</td><td><span class="b b-r">Unmapped</span></td><td><button class="btn btn-p btn-sm" onclick="openStockMap(this)">Map</button></td></tr>
-            <tr><td>Machine Spare Kit</td><td>Machine Spare Kit</td><td>Damaged Stock</td><td>Set</td><td><span class="b b-r">Unmapped</span></td><td><button class="btn btn-p btn-sm" onclick="openStockMap(this)">Map</button></td></tr>
-            <tr><td>Delivery Service Charge</td><td>Delivery Service</td><td>No Stock</td><td>Service</td><td><span class="b b-g">Mapped</span></td><td><button class="btn btn-p btn-sm" onclick="openStockMap(this)">Map</button></td></tr>
-            <tr><td>Raw Fragrance Oil</td><td>Raw Fragrance Oil</td><td>Main Store</td><td>Litre</td><td><span class="b b-r">Unmapped</span></td><td><button class="btn btn-p btn-sm" onclick="openStockMap(this)">Map</button></td></tr>
-            <tr><td>Finished Gift Pack</td><td>Finished Gift Pack</td><td>Main Store</td><td>Pcs</td><td><span class="b b-r">Unmapped</span></td><td><button class="btn btn-p btn-sm" onclick="openStockMap(this)">Map</button></td></tr>
+            <tr data-empty-state="1"><td colspan="6" style="color:var(--text3);font-size:13px">Open Item Master or sync database to load stock mappings.</td></tr>
           </tbody>
         </table>
       </div>
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">Map Stock Product</div><div class="card-sub">Click Map on a row, edit names here, then save</div></div></div>
-        <div id="stock-map-empty" style="color:var(--text3);font-size:13px;line-height:1.6">Select a row from the stock mapping list to update the product mapping.</div>
+        <div class="card-hd"><div><div class="card-title">Edit Mapping</div><div class="card-sub">Update supplier and TaxFlow name for the selected item</div></div></div>
+        <div id="stock-map-empty" style="color:var(--text3);font-size:13px;line-height:1.6">Select an item from the mapping list to edit.</div>
         <div id="stock-map-panel" class="hidden">
-          <div class="fg"><label class="fl">Product Name</label><input class="fi" id="stock-map-product" placeholder="Supplier or document product name"></div>
-          <div class="fg"><label class="fl">Generated Name</label><div class="flx"><input class="fi" id="stock-map-generated" placeholder="Clean generated product name"><button class="btn btn-g" type="button" onclick="generateStockMapField()">Generate</button></div></div>
-          <div class="section-hd">Pricing (Per Unit)</div>
-          <div class="fr3">
-            <div class="fg"><label class="fl">Cost</label><input class="fi mono" id="stock-map-cost" value="25.00" oninput="updateStockMapPricing()"></div>
-            <div class="fg"><label class="fl">Markup (%)</label><input class="fi mono" id="stock-map-markup" value="56" oninput="updateStockMapPricing()"></div>
-            <div class="fg"><label class="fl">Fixed</label><div class="flx" style="height:34px"><input type="checkbox" id="stock-map-fixed" onchange="updateStockMapPricing()"></div></div>
+          <div class="fg"><label class="fl">Name</label><input class="fi" id="stock-map-product" placeholder="Item master name"></div>
+          <div class="fg"><label class="fl">Supplier Name</label><input class="fi" id="stock-map-supplier" placeholder="Supplier name"></div>
+          <div class="fg"><label class="fl">TaxFlow Name</label><div class="flx"><input class="fi" id="stock-map-generated" placeholder="TaxFlow mapped name"><button class="btn btn-g" type="button" onclick="generateStockMapField()">Generate</button></div></div>
+          <div class="fg"><label class="fl">Units/Outer</label><input class="fi mono" id="stock-map-units-outer" value="1" placeholder="1"></div>
+          <div class="section-hd">Pricing</div>
+          <div class="pricing-line">
+            <div class="fg"><label class="fl">Cost</label><input class="fi mono" id="stock-map-cost" value="0.00" oninput="updateStockMapPricing()"></div>
+            <div class="fg"><label class="fl">Markup (%)</label><input class="fi mono" id="stock-map-markup" value="0" oninput="updateStockMapPricing()"></div>
+            <div class="fg"><label class="fl">Tax Rate</label><select class="fi" id="stock-map-tax-rate" onchange="updateStockMapPricing()"><option value="5">VAT 5%</option><option value="0">VAT 0%</option><option value="0">Exempt</option></select></div>
+            <div class="fg"><label class="fl">Exclude VAT</label><input class="fi mono" id="stock-map-inc-vat" value="0.00" readonly></div>
+            <div class="fg"><label class="fl">Price/Outer</label><input class="fi mono" id="stock-map-price-outer" value="0.00" readonly></div>
           </div>
-          <div class="fr3">
-            <div class="fg"><label class="fl">Price</label><input class="fi mono" id="stock-map-price" value="39.00" oninput="updateStockMapPricing()"></div>
-            <div class="fg"><label class="fl">Tax Rate</label><select class="fi" id="stock-map-tax-rate" onchange="updateStockMapPricing()"><option value="5">VAT (5%)</option><option value="0">VAT (0%)</option><option value="0">Exempt</option></select></div>
-            <div class="fg"><label class="fl">Inc. VAT</label><input class="fi mono" id="stock-map-inc-vat" value="40.95" readonly style="background:var(--bg)"></div>
-          </div>
-          <div class="fg"><label class="fl">Service Fees</label><div class="flx"><label class="flx" style="gap:5px"><input type="radio" name="stock-map-service-fees" value="yes"> Yes</label><label class="flx" style="gap:5px"><input type="radio" name="stock-map-service-fees" value="no" checked> No</label></div></div>
           <div class="flx" style="justify-content:flex-end"><button class="btn btn-g" onclick="clearStockMapPanel()">Cancel</button><button class="btn btn-p" onclick="saveStockMap()">Save Mapping</button></div>
         </div>
       </div>
     </div>
 
-    <div class="g2">
-      <div class="card">
-        <div class="card-hd"><div><div class="card-title">Unit Conversion Mapping</div><div class="card-sub">Convert supplier units into stock units</div></div><button class="btn btn-g btn-sm" onclick="toast('Conversion row added','info')">+ Add Rule</button></div>
-        <table class="tbl">
-          <thead><tr><th>Supplier Unit</th><th>Stock Unit</th><th>Factor</th><th>Applies To</th></tr></thead>
-          <tbody>
-            <tr><td>Kg</td><td>Ton</td><td class="mono">0.001</td><td>Materials</td></tr>
-            <tr><td>Carton</td><td>Pcs</td><td class="mono">24</td><td>Packaging Box A</td></tr>
-            <tr><td>Litre</td><td>Unit</td><td class="mono">0.2</td><td>Industrial Oil 5L</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div><div class="card-title">Unmapped Stock Lines</div><div class="card-sub">Lines that need manual confirmation before posting</div></div></div>
-        <div class="tline-item"><div class="tline-dot" style="background:var(--amber-bg);color:var(--amber)">!</div><div><div style="font-size:13px;font-weight:500">Supplier code ADP-GLV-L</div><div class="card-sub">Suggested: Safety Gloves · confidence 76%</div><div style="margin-top:8px"><button class="btn btn-p btn-sm" onclick="toast('Line mapped to Safety Gloves','ok')">Accept</button><button class="btn btn-g btn-sm" onclick="showM('m-inv-item')">Create Item</button></div></div></div>
-        <div class="tline-item" style="padding-bottom:0"><div class="tline-dot" style="background:var(--accent-glow);color:var(--accent)">?</div><div><div style="font-size:13px;font-weight:500">New supplier description: Machine Spare Kit</div><div class="card-sub">No catalogue match found</div><div style="margin-top:8px"><button class="btn btn-g btn-sm" onclick="showM('m-inv-item')">Create Item</button></div></div></div>
-      </div>
-    </div>
-
-    <div class="g2 mb16" style="margin-top:16px">
-      <div class="card">
-        <div class="card-hd"><div><div class="card-title">Item Type Mapping</div><div class="card-sub">Defines stock and accounting impact by item type</div></div></div>
-        <table class="tbl">
-          <thead><tr><th>Item Type</th><th>Stock Impact</th><th>Accounting Impact</th></tr></thead>
-          <tbody>
-            <tr><td>Stock Item</td><td><span class="b b-g">Yes</span></td><td>Inventory + COGS</td></tr>
-            <tr><td>Service Item</td><td><span class="b b-gray">No</span></td><td>Income / Expense only</td></tr>
-            <tr><td>Consumable</td><td><span class="b b-a">Optional</span></td><td>Expense or Inventory</td></tr>
-            <tr><td>Fixed Asset</td><td><span class="b b-gray">No stock</span></td><td>Fixed Asset Account</td></tr>
-            <tr><td>Raw Material</td><td><span class="b b-g">Yes</span></td><td>Inventory</td></tr>
-            <tr><td>Finished Goods</td><td><span class="b b-g">Yes</span></td><td>Inventory + COGS</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div><div class="card-title">Warehouse Mapping</div><div class="card-sub">Branch stock locations and linked inventory accounts</div></div><button class="btn btn-g btn-sm" onclick="toast('Warehouse row added','info')">+ Warehouse</button></div>
-        <table class="tbl">
-          <thead><tr><th>Warehouse</th><th>Branch</th><th>Stock Account</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr><td>Main Store</td><td>Dubai</td><td>1200 - Inventory Main</td><td><span class="b b-g">Active</span></td></tr>
-            <tr><td>Van Stock</td><td>Sales Van</td><td>1210 - Inventory Van</td><td><span class="b b-g">Active</span></td></tr>
-            <tr><td>Damaged Stock</td><td>Dubai</td><td>1220 - Inventory Damaged</td><td><span class="b b-a">Controlled</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="g2 mb16">
-      <div class="card">
-        <div class="card-hd"><div><div class="card-title">Item Account Mappings</div><div class="card-sub">Required accounts before purchase, sale, valuation, and posting</div></div></div>
-        <table class="tbl">
-          <thead><tr><th>Item</th><th>Sales</th><th>Purchase</th><th>Inventory</th><th>COGS</th><th>Valuation</th></tr></thead>
-          <tbody>
-            <tr><td>Steel Rods 12mm</td><td>Sales Income</td><td>Purchase Account</td><td>Inventory Main</td><td>COGS</td><td>Weighted Average</td></tr>
-            <tr><td>Packaging Box A</td><td>Sales Income</td><td>Supplies Purchase</td><td>Inventory Main</td><td>COGS</td><td>Weighted Average</td></tr>
-            <tr><td>Safety Gloves</td><td>Sales Income</td><td>PPE Purchase</td><td>Inventory Main</td><td>COGS</td><td>FIFO</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div><div class="card-title">Stock Valuation & Reservations</div><div class="card-sub">Availability, costing, and committed sales stock</div></div></div>
-        <div class="fr2">
-          <div class="setting-tile"><strong>Available Stock</strong><p>On hand stock minus reserved stock from confirmed sales orders not yet delivered.</p></div>
-          <div class="setting-tile"><strong>MVP Valuation</strong><p>Weighted Average is the default costing method. FIFO remains available per item.</p></div>
-        </div>
-        <div class="divider"></div>
-        <table class="tbl">
-          <thead><tr><th>Reservation</th><th>Item</th><th>Warehouse</th><th>Qty</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr><td class="mono">SO-2024-0188</td><td>Steel Rods 12mm</td><td>Main Store</td><td class="mono">100</td><td><span class="b b-a">Reserved</span></td></tr>
-            <tr><td class="mono">SO-2024-0191</td><td>Packaging Box A</td><td>Main Store</td><td class="mono">5</td><td><span class="b b-a">Reserved</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="g2 mb16">
-      <div class="card">
-        <div class="card-hd"><div><div class="card-title">Purchase and Sales Posting Flow</div><div class="card-sub">Stock movements and accounting entries generated from mapped documents</div></div></div>
-        <div class="tline-item"><div class="tline-dot" style="background:var(--green-bg);color:var(--green)">P</div><div><div style="font-weight:500">Purchase stock item</div><div class="card-sub">Dr Inventory, Dr VAT Input, Cr Accounts Payable. Movement creates Qty In and inventory value.</div></div></div>
-        <div class="tline-item"><div class="tline-dot" style="background:var(--red-bg);color:var(--red)">S</div><div><div style="font-weight:500">Sell stock item</div><div class="card-sub">Dr Accounts Receivable, Cr Sales Income, Cr VAT Payable. COGS posts Dr COGS, Cr Inventory.</div></div></div>
-        <div class="tline-item" style="padding-bottom:0"><div class="tline-dot" style="background:var(--accent-glow);color:var(--accent)">T</div><div><div style="font-weight:500">Warehouse transfer</div><div class="card-sub">Transfer Out from source and Transfer In to destination. Post accounting only when stock accounts differ.</div></div></div>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div><div class="card-title">Movement Types</div><div class="card-sub">Every stock change must create an immutable movement</div></div></div>
-        <table class="tbl">
-          <thead><tr><th>Type</th><th>Source</th><th>Qty Impact</th></tr></thead>
-          <tbody>
-            <tr><td>Purchase Receipt</td><td>Purchase</td><td><span class="b b-g">Qty In</span></td></tr>
-            <tr><td>Sales Delivery</td><td>Sales</td><td><span class="b b-r">Qty Out</span></td></tr>
-            <tr><td>Sales Return</td><td>Sales Return</td><td><span class="b b-g">Qty In</span></td></tr>
-            <tr><td>Purchase Return</td><td>Purchase Return</td><td><span class="b b-r">Qty Out</span></td></tr>
-            <tr><td>Adjustment In / Out</td><td>Manual</td><td>Approval required</td></tr>
-            <tr><td>Opening Stock</td><td>Setup</td><td><span class="b b-g">Qty In</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="g2">
-      <div class="card">
-        <div class="card-hd"><div><div class="card-title">Critical Validation Rules</div><div class="card-sub">Controls applied before stock and accounting posting</div></div></div>
-        <div style="font-size:13px;line-height:1.9">
-          <div><span style="color:var(--green)">✓</span> Cannot sell more than available stock unless negative stock is enabled.</div>
-          <div><span style="color:var(--green)">✓</span> Cannot post stock invoice without item and warehouse mapping.</div>
-          <div><span style="color:var(--green)">✓</span> Stock tracked items require inventory and COGS accounts.</div>
-          <div><span style="color:var(--green)">✓</span> Unit conversion is required before stock update.</div>
-          <div><span style="color:var(--green)">✓</span> Stock adjustment requires approval.</div>
-          <div><span style="color:var(--green)">✓</span> Posted movements cannot be deleted; corrections use reverse movements.</div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div><div class="card-title">Inventory Reports Mapping</div><div class="card-sub">Report outputs and their source data</div></div></div>
-        <table class="tbl">
-          <thead><tr><th>Report</th><th>Data Source</th></tr></thead>
-          <tbody>
-            <tr><td>Stock Summary / Ledger</td><td>stock_movements</td></tr>
-            <tr><td>Inventory Valuation</td><td>inventory_valuations</td></tr>
-            <tr><td>Low Stock Report</td><td>item reorder levels</td></tr>
-            <tr><td>Warehouse Stock</td><td>stock_movements by warehouse</td></tr>
-            <tr><td>COGS Report</td><td>COGS journal entries</td></tr>
-            <tr><td>Dead Stock Report</td><td>last movement date</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -2318,6 +2241,35 @@
 
 </div>
 
+<!-- ═══════════════════ CORPORATE ACCOUNTING ═══════════════════ -->
+<div class="page" id="page-corporate">
+  <div class="tabs">
+    <div class="tab on" onclick="stab(this,'corp-tax')">Corporate Tax</div>
+    <div class="tab" onclick="stab(this,'corp-assets')">Fixed Assets</div>
+    <div class="tab" onclick="stab(this,'corp-accruals')">Accruals</div>
+    <div class="tab" onclick="stab(this,'corp-cost')">Cost Centers</div>
+    <div class="tab" onclick="stab(this,'corp-budget')">Budgets</div>
+  </div>
+  <div class="tab-body on" id="corp-tax">
+    <div class="card">
+      <div class="card-hd"><div><div class="card-title">Corporate Tax Summary</div><div class="card-sub">Accounting profit, tax adjustments, taxable income, and filing status</div></div></div>
+      <table class="tbl"><thead><tr><th>Area</th><th>Current Value</th><th>Status</th></tr></thead><tbody><tr><td>Taxable Profit Calculation</td><td class="mono">AED 412,500</td><td><span class="b b-a">Review</span></td></tr><tr><td>Non-deductible Expenses</td><td class="mono">AED 18,200</td><td><span class="b b-g">Mapped</span></td></tr><tr><td>Tax Loss Carry Forward</td><td class="mono">AED 0</td><td><span class="b b-g">Clear</span></td></tr></tbody></table>
+    </div>
+  </div>
+  <div class="tab-body" id="corp-assets">
+    <div class="card"><div class="card-hd"><div class="card-title">Fixed Asset Register</div></div><table class="tbl"><thead><tr><th>Asset</th><th>Category</th><th>Cost</th><th>Depreciation</th><th>Book Value</th></tr></thead><tbody><tr><td>Delivery Van</td><td>Vehicle</td><td class="mono">AED 95,000</td><td class="mono">AED 18,000</td><td class="mono">AED 77,000</td></tr></tbody></table></div>
+  </div>
+  <div class="tab-body" id="corp-accruals">
+    <div class="card"><div class="card-hd"><div class="card-title">Accruals & Prepayments</div></div><table class="tbl"><thead><tr><th>Type</th><th>Description</th><th>Monthly Amount</th><th>Auto Reversal</th></tr></thead><tbody><tr><td>Prepaid Expense</td><td>Annual rent</td><td class="mono">AED 8,000</td><td><span class="b b-g">Enabled</span></td></tr></tbody></table></div>
+  </div>
+  <div class="tab-body" id="corp-cost">
+    <div class="card"><div class="card-hd"><div class="card-title">Cost Centers</div></div><table class="tbl"><thead><tr><th>Cost Center</th><th>Branch</th><th>Project</th><th>Status</th></tr></thead><tbody><tr><td>Operations</td><td>Dubai HQ</td><td>Warehouse</td><td><span class="b b-g">Active</span></td></tr></tbody></table></div>
+  </div>
+  <div class="tab-body" id="corp-budget">
+    <div class="card"><div class="card-hd"><div class="card-title">Budget vs Actual</div></div><table class="tbl"><thead><tr><th>Department</th><th>Budget</th><th>Actual</th><th>Variance</th></tr></thead><tbody><tr><td>Sales</td><td class="mono">AED 250,000</td><td class="mono">AED 236,000</td><td><span class="b b-g">5.6% under</span></td></tr></tbody></table></div>
+  </div>
+</div>
+
 <!-- ═══════════════════ BILLS & VENDORS MODULE ═══════════════════ -->
 <div class="page" id="page-bills">
   <div class="tabs">
@@ -2350,7 +2302,7 @@
       <div class="card-hd"><div class="card-title">Vendor Directory</div><button class="btn btn-p btn-sm" onclick="showM('m-vendor')">+ Add Vendor</button></div>
       <table class="tbl">
         <thead><tr><th>Vendor</th><th>TRN</th><th>Category</th><th>Email</th><th>Open Balance</th><th>Status</th></tr></thead>
-        <tbody id="vendor-tbody">
+        <tbody id="bill-vendor-tbody">
           <tr><td>Al Hamad Steel</td><td class="mono">100234567800003</td><td>Materials</td><td>accounts@alhamad.ae</td><td class="mono">29,400</td><td><span class="b b-g">Active</span></td></tr>
           <tr><td>Gulf Freight Services</td><td class="mono">100512378900003</td><td>Logistics</td><td>billing@gulffreight.ae</td><td class="mono">12,600</td><td><span class="b b-g">Active</span></td></tr>
           <tr><td>UAE Paints Co.</td><td class="mono">100987654300003</td><td>Supplies</td><td>finance@uaepaints.ae</td><td class="mono">5,880</td><td><span class="b b-g">Active</span></td></tr>
@@ -4646,18 +4598,14 @@ period_locks ─< audit_logs
 
 <div class="overlay" id="m-inv-item" onclick="closeOvBg(event,'m-inv-item')">
   <div class="modal modal-lg"><div class="modal-title">Add Inventory Item</div><div class="modal-sub">Add item, stock settings, warehouse, and accounting mappings</div>
-    <div class="fr3"><div class="fg"><label class="fl">Item Code</label><input class="fi mono" placeholder="ITM-005"></div><div class="fg"><label class="fl">Item Type</label><select class="fi"><option>Stock Item</option><option>Service Item</option><option>Consumable</option><option>Fixed Asset</option><option>Raw Material</option><option>Finished Goods</option></select></div><div class="fg"><label class="fl">Category</label><select class="fi"><option>Materials</option><option>Supplies</option><option>PPE</option><option>Tools</option></select></div></div>
+    <div class="fr2"><div class="fg"><label class="fl">Item Code</label><input class="fi mono" placeholder="ITM-005"></div><div class="fg"><label class="fl">Category</label><select class="fi"><option>Materials</option><option>Supplies</option><option>PPE</option><option>Tools</option></select></div></div>
     <div class="fg"><label class="fl">Item Name</label><input class="fi" placeholder="Full item name"></div>
-    <div class="fr3"><div class="fg"><label class="fl">Unit of Measure</label><select class="fi"><option>Pcs</option><option>Ton</option><option>Kg</option><option>Liter</option><option>Box</option></select></div><div class="fg"><label class="fl">Cost Price</label><input class="fi mono" placeholder="0.00"></div><div class="fg"><label class="fl">Sales Price</label><input class="fi mono" placeholder="0.00"></div></div>
+    <div class="fr3"><div class="fg"><label class="fl">Unit of Measure</label><select class="fi" id="inv-item-unit"><option>Pcs</option><option>Ton</option><option>Kg</option><option>Liter</option><option>Box</option></select></div><div class="fg"><label class="fl">Cost Price</label><input class="fi mono" placeholder="0.00"></div><div class="fg"><label class="fl">Sales Price</label><input class="fi mono" placeholder="0.00"></div></div>
     <div class="section-hd">Stock Settings</div>
-    <div class="fr3"><div class="fg"><label class="fl">Stock Tracking</label><select class="fi"><option>Yes</option><option>No</option><option>Optional</option></select></div><div class="fg"><label class="fl">Default Warehouse</label><select class="fi"><option>Main Store</option><option>Van Stock</option><option>Damaged Stock</option></select></div><div class="fg"><label class="fl">Valuation Method</label><select class="fi"><option>Weighted Average</option><option>FIFO</option><option>Standard Cost</option></select></div></div>
-    <div class="fr3"><div class="fg"><label class="fl">Opening Stock</label><input class="fi mono" placeholder="0"></div><div class="fg"><label class="fl">Opening Value</label><input class="fi mono" placeholder="0.00"></div><div class="fg"><label class="fl">Opening Date</label><input class="fi" type="date"></div></div>
+    <div class="fr2"><div class="fg"><label class="fl">Stock Tracking</label><select class="fi"><option>Yes</option><option>No</option><option>Optional</option></select></div><div class="fg"><label class="fl">Opening Date</label><input class="fi" type="date"></div></div>
     <div class="fr3"><div class="fg"><label class="fl">Reorder Level</label><input class="fi mono" placeholder="50"></div><div class="fg"><label class="fl">Minimum Stock</label><input class="fi mono" placeholder="25"></div><div class="fg"><label class="fl">Maximum Stock</label><input class="fi mono" placeholder="500"></div></div>
-    <div class="fr2"><div class="fg"><label class="fl">Preferred Supplier</label><input class="fi" placeholder="Supplier name"></div><div class="fg"><label class="fl">Lead Time Days</label><input class="fi mono" placeholder="7"></div></div>
-    <div class="section-hd">Accounting Mapping</div>
-    <div class="fr2"><div class="fg"><label class="fl">Sales Account</label><select class="fi"><option>3000 - Sales Income</option><option>3100 - Service Income</option></select></div><div class="fg"><label class="fl">Purchase Account</label><select class="fi"><option>4000 - Purchase Account</option><option>5200 - Supplies Expense</option></select></div></div>
-    <div class="fr2"><div class="fg"><label class="fl">Inventory Account</label><select class="fi"><option>1200 - Inventory Main</option><option>1210 - Inventory Van</option><option>1220 - Inventory Damaged</option></select></div><div class="fg"><label class="fl">COGS Account</label><select class="fi"><option>5000 - Cost of Goods Sold</option><option>5100 - Stock Variance</option></select></div></div>
-    <div class="fr2"><div class="fg"><label class="fl">VAT Code</label><select class="fi"><option>VAT 5%</option><option>VAT 0%</option><option>Exempt</option></select></div><div class="fg"><label class="fl">Status</label><select class="fi"><option>Active</option><option>Inactive</option><option>Draft</option></select></div></div>
+    <div class="fg"><label class="fl">Preferred Supplier</label><input class="fi" placeholder="Supplier name"></div>
+    <div class="fr2"><div class="fg"><label class="fl">Status</label><select class="fi"><option>Active</option><option>Inactive</option><option>Draft</option></select></div></div>
     <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-inv-item')">Cancel</button><button class="btn btn-p" onclick="saveM('m-inv-item','Item added to inventory ✓')">Add Item</button></div>
   </div>
 </div>

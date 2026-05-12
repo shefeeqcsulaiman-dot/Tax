@@ -229,11 +229,20 @@ class WarehouseOut(WarehouseIn):
 class StockMappingIn(BaseModel):
     sku: str
     name: str
+    supplier_name: str | None = None
+    taxflow_name: str | None = None
     sales_account_code: str = "3000"
     purchase_account_code: str = "4000"
     inventory_account_code: str = "1200"
     tax_code: str = "VAT5"
     reorder_level: Decimal = Field(default=0, ge=0)
+    units_per_outer: Decimal = Field(default=1, gt=0)
+    cost: Decimal = Field(default=0, ge=0)
+    markup_percent: Decimal = Field(default=0, ge=0)
+    tax_rate: Decimal = Field(default=5, ge=0)
+    vat_amount: Decimal = Field(default=0, ge=0)
+    inc_vat: Decimal = Field(default=0, ge=0)
+    price_outer: Decimal = Field(default=0, ge=0)
 
 
 class StockMappingOut(StockMappingIn):
@@ -248,9 +257,26 @@ class ItemUnitIn(BaseModel):
     unit_name: str
     conversion_factor: Decimal = Field(default=1, ge=0)
     is_base_unit: bool = False
+    purchase_default: bool = False
+    sales_default: bool = False
+    status: str = "active"
 
 
 class ItemUnitOut(ItemUnitIn):
+    id: str
+
+    model_config = {"from_attributes": True}
+
+
+class ItemUnitConversionIn(BaseModel):
+    item_code: str
+    from_unit_code: str
+    to_unit_code: str
+    conversion_factor: Decimal = Field(default=1, gt=0)
+    status: str = "active"
+
+
+class ItemUnitConversionOut(ItemUnitConversionIn):
     id: str
 
     model_config = {"from_attributes": True}

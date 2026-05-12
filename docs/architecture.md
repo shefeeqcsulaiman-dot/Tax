@@ -204,6 +204,7 @@ Current module APIs already added:
 /api/v1/exceptions
 /api/v1/events
 /api/v1/item-units
+/api/v1/item-unit-conversions
 /api/v1/inventory/valuation-layers
 /api/v1/inventory/adjustment-approvals
 ```
@@ -1000,6 +1001,22 @@ purchase_default
 sales_default
 status
 
+item_unit_conversions
+id
+company_id
+item_id
+from_unit_id
+to_unit_id
+conversion_factor
+status
+
+purchase_invoice_lines
+qty
+unit_id
+conversion_factor
+base_qty
+base_unit_id
+
 inventory_valuation_layers
 id
 company_id
@@ -1028,7 +1045,62 @@ status
 approved_at
 ```
 
-`item_units` is required for box, packet, carton, and piece conversions. `inventory_valuation_layers` supports FIFO and weighted average costing. `stock_adjustment_approvals` controls manual stock changes before they affect inventory value.
+`item_units` is required for box, packet, carton, and piece conversions. `item_unit_conversions` stores explicit conversions such as BOX to PCS = 12 and PACK to PCS = 6. `inventory_valuation_layers` supports FIFO and weighted average costing. `stock_adjustment_approvals` controls manual stock changes before they affect inventory value.
+
+Multi-unit inventory rule:
+
+```text
+Purchase unit
+        ↓
+Convert to base stock unit
+        ↓
+Store stock movement in base unit only
+        ↓
+Sell in any allowed unit
+        ↓
+Convert again internally before costing/posting
+```
+
+Every item must have one base stock unit. Example:
+
+```text
+Item: Coca Cola Can
+Base Unit: PCS
+
+Allowed units:
+PCS  = 1 PCS
+PACK = 6 PCS
+BOX  = 12 PCS
+```
+
+Purchase example:
+
+```text
+Purchase line: 1 BOX @ AED 120
+Conversion: 1 BOX × 12 = 12 PCS
+Stock movement: qty_in = 12 PCS
+Unit cost: AED 10 per PCS
+
+Dr Inventory 120
+    Cr Accounts Payable 120
+```
+
+Sales example:
+
+```text
+Sell 2 PCS
+Stock deduction: 2 PCS
+Remaining from 12 PCS = 10 PCS
+COGS: 2 × AED 10 = AED 20
+
+Dr Accounts Receivable
+    Cr Sales
+
+Dr Cost of Goods Sold 20
+    Cr Inventory 20
+```
+
+Stock should never store mixed units. Purchase and sales lines may display BOX, PACK, PCS, litre, ml, kg, or gram, but `stock_movements`, valuation layers, and COGS calculations must store and cost the base unit.
 
 Stock mapping screen behavior:
 
@@ -1761,6 +1833,7 @@ GET      /api/v1/corporate-accounting/month-end
 GET      /api/v1/corporate-accounting/consolidation
 GET      /api/v1/corporate-accounting/approval-matrix
 GET/POST /api/v1/item-units
+GET/POST /api/v1/item-unit-conversions
 GET      /api/v1/inventory/valuation-layers
 GET/POST /api/v1/inventory/adjustment-approvals
 ```

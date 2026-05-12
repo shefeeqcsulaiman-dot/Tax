@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import Base, SessionLocal, engine
-from app.models import Account, AuditLog, Company, Employee, StockProductMapping, TaxCode, User, Warehouse
+from app.models import Account, AuditLog, Company, Employee, ItemUnit, ItemUnitConversion, StockProductMapping, TaxCode, User, Warehouse
 from app.routers import accounting, app_data, audit, auth, companies, corporate_accounting, documents, events, exception_center, inventory, invoices, jobs, module_records, payroll, reports, source_transactions, tax
 from app.security import hash_password
 
@@ -25,6 +26,7 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def startup() -> None:
         Base.metadata.create_all(bind=engine)
+        ensure_schema_updates()
         seed_initial_data()
 
     @app.get("/health")
@@ -49,6 +51,38 @@ def create_app() -> FastAPI:
     app.include_router(module_records.router, prefix="/api/v1")
     app.include_router(app_data.router, prefix="/api/v1")
     return app
+
+
+def ensure_schema_updates() -> None:
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    with engine.begin() as connection:
+        if "stock_product_mappings" in table_names:
+            existing_columns = {column["name"] for column in inspector.get_columns("stock_product_mappings")}
+            required_columns = {
+                "supplier_name": "VARCHAR(160)",
+                "taxflow_name": "VARCHAR(160)",
+                "units_per_outer": "NUMERIC(12, 4) DEFAULT 1",
+                "cost": "NUMERIC(12, 2) DEFAULT 0",
+                "markup_percent": "NUMERIC(8, 2) DEFAULT 0",
+                "tax_rate": "NUMERIC(5, 2) DEFAULT 5",
+                "vat_amount": "NUMERIC(12, 2) DEFAULT 0",
+                "inc_vat": "NUMERIC(12, 2) DEFAULT 0",
+                "price_outer": "NUMERIC(12, 2) DEFAULT 0",
+            }
+            for column_name, column_type in required_columns.items():
+                if column_name not in existing_columns:
+                    connection.execute(text(f"ALTER TABLE stock_product_mappings ADD COLUMN {column_name} {column_type}"))
+        if "item_units" in table_names:
+            existing_columns = {column["name"] for column in inspector.get_columns("item_units")}
+            required_columns = {
+                "purchase_default": "BOOLEAN DEFAULT 0",
+                "sales_default": "BOOLEAN DEFAULT 0",
+                "status": "VARCHAR(30) DEFAULT 'active'",
+            }
+            for column_name, column_type in required_columns.items():
+                if column_name not in existing_columns:
+                    connection.execute(text(f"ALTER TABLE item_units ADD COLUMN {column_name} {column_type}"))
 
 
 def seed_initial_data() -> None:
@@ -138,6 +172,49 @@ def seed_inventory(db: Session, company_id: str) -> None:
                 inventory_account_code="1200",
                 tax_code="VAT5",
                 reorder_level=50,
+            )
+        )
+    item_units = [
+        ("PRD-001", "PCS", "Pieces", "1.0000", True, False, True),
+        ("PRD-001", "BOX", "Box", "12.0000", False, True, False),
+    ]
+    for item_code, unit_code, unit_name, factor, is_base, purchase_default, sales_default in item_units:
+        unit = (
+            db.query(ItemUnit)
+            .filter(ItemUnit.company_id == company_id, ItemUnit.item_code == item_code, ItemUnit.unit_code == unit_code)
+            .first()
+        )
+        if not unit:
+            db.add(
+                ItemUnit(
+                    company_id=company_id,
+                    item_code=item_code,
+                    unit_code=unit_code,
+                    unit_name=unit_name,
+                    conversion_factor=factor,
+                    is_base_unit=is_base,
+                    purchase_default=purchase_default,
+                    sales_default=sales_default,
+                )
+            )
+    conversion = (
+        db.query(ItemUnitConversion)
+        .filter(
+            ItemUnitConversion.company_id == company_id,
+            ItemUnitConversion.item_code == "PRD-001",
+            ItemUnitConversion.from_unit_code == "BOX",
+            ItemUnitConversion.to_unit_code == "PCS",
+        )
+        .first()
+    )
+    if not conversion:
+        db.add(
+            ItemUnitConversion(
+                company_id=company_id,
+                item_code="PRD-001",
+                from_unit_code="BOX",
+                to_unit_code="PCS",
+                conversion_factor="12.0000",
             )
         )
 

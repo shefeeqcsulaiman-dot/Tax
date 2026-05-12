@@ -31,6 +31,7 @@ def dashboard(db: Session = Depends(get_db), current_user: User = Depends(get_cu
         "invoice_count": invoice_count,
         "product_count": app_counts.get("products", 0),
         "customer_count": app_counts.get("customers", 0),
+        "quotation_count": app_counts.get("quotations", 0),
         "purchase_record_count": app_counts.get("purchaseRecords", 0),
         "sales_category_count": app_counts.get("salesCategories", 0),
         "sales_unit_count": app_counts.get("salesUnits", 0),

@@ -248,11 +248,20 @@ class StockProductMapping(Base, TimestampMixin):
     company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
     sku: Mapped[str] = mapped_column(String(60), nullable=False)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
+    supplier_name: Mapped[str | None] = mapped_column(String(160))
+    taxflow_name: Mapped[str | None] = mapped_column(String(160))
     sales_account_code: Mapped[str] = mapped_column(String(20), default="3000")
     purchase_account_code: Mapped[str] = mapped_column(String(20), default="4000")
     inventory_account_code: Mapped[str] = mapped_column(String(20), default="1200")
     tax_code: Mapped[str] = mapped_column(String(30), default="VAT5")
     reorder_level: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    units_per_outer: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=1)
+    cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    markup_percent: Mapped[Decimal] = mapped_column(Numeric(8, 2), default=0)
+    tax_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=5)
+    vat_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    inc_vat: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    price_outer: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
 
 
 class StockMovement(Base, TimestampMixin):
@@ -279,6 +288,24 @@ class ItemUnit(Base, TimestampMixin):
     unit_name: Mapped[str] = mapped_column(String(80), nullable=False)
     conversion_factor: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=1)
     is_base_unit: Mapped[bool] = mapped_column(Boolean, default=False)
+    purchase_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    sales_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(30), default="active")
+
+
+class ItemUnitConversion(Base, TimestampMixin):
+    __tablename__ = "item_unit_conversions"
+    __table_args__ = (
+        UniqueConstraint("company_id", "item_code", "from_unit_code", "to_unit_code", name="uq_item_unit_conversion"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
+    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
+    item_code: Mapped[str] = mapped_column(String(60), nullable=False)
+    from_unit_code: Mapped[str] = mapped_column(String(30), nullable=False)
+    to_unit_code: Mapped[str] = mapped_column(String(30), nullable=False)
+    conversion_factor: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=1)
+    status: Mapped[str] = mapped_column(String(30), default="active")
 
 
 class InventoryValuationLayer(Base, TimestampMixin):

@@ -35,6 +35,7 @@ def record_key(collection: str, record: dict[str, Any]) -> str | None:
         "products": "code",
         "customers": "name",
         "salesInvoices": "invoice_no",
+        "quotations": "quote_no",
         "accounts": "code",
         "ledger": "ref",
         "bills": "bill_no",
@@ -157,27 +158,15 @@ async def app_data_action(
 
     if action == "documents.extract":
         file = payload.get("file", {})
-        base = clean_base(file.get("name") or "PUR-UPLOAD")
-        invoices = [
-            {"invoice_no": f"{base}-001", "date": "15 Jun 2024", "supplier": "Al Hamad Steel", "supplier_trn": "100234567800003", "subtotal": 12400, "vat_amount": 620, "total": 13020, "vat_rate_pct": 5, "confidence": 94, "status": "Valid", "issues": ""},
-            {"invoice_no": f"{base}-002", "date": "16 Jun 2024", "supplier": "Gulf Freight Services", "supplier_trn": "MISSING", "subtotal": 3600, "vat_amount": 180, "total": 3780, "vat_rate_pct": 5, "confidence": 76, "status": "Error", "issues": "Supplier TRN is missing or invalid"},
-        ]
-        for invoice in invoices:
-            save_app_record(db, current_user, "purchaseExtractions", invoice)
-        log_action(db, current_user, "documents", "document_extracted", {"file": file.get("name")})
+        invoices: list[dict[str, Any]] = []
+        log_action(db, current_user, "documents", "document_extraction_requested", {"file": file.get("name"), "result": "no_demo_data"})
         db.commit()
         return {"ok": True, "invoices": invoices}
 
     if action == "invoices.import":
         file = payload.get("file", {})
-        base = clean_base(file.get("name") or "INV-UPLOAD")
-        invoices = [
-            {"invoice_no": f"{base}-001", "customer": "Dubai Steel Co.", "customer_trn": "100348712600001", "date": "22 Jun 2024", "due_date": "22 Jul 2024", "subtotal": 42000, "vat_amount": 2100, "total": 44100, "confidence": 96, "status": "Ready", "source": "AI Upload", "issues": ""},
-            {"invoice_no": f"{base}-002", "customer": "Gulf Logistics Ltd", "customer_trn": "100874321500002", "date": "23 Jun 2024", "due_date": "23 Jul 2024", "subtotal": 18500, "vat_amount": 925, "total": 19425, "confidence": 91, "status": "Ready", "source": "AI Upload", "issues": ""},
-        ]
-        for invoice in invoices:
-            save_app_record(db, current_user, "salesInvoices", invoice)
-            sync_sales_invoice(db, current_user, invoice)
+        invoices: list[dict[str, Any]] = []
+        log_action(db, current_user, "salesInvoices", "invoice_import_requested", {"file": file.get("name"), "result": "no_demo_data"})
         db.commit()
         return {"ok": True, "invoices": invoices}
 
@@ -227,6 +216,11 @@ def sync_domain_model(db: Session, current_user: User, collection: str, record: 
                 mapping = StockProductMapping(company_id=current_user.company_id, sku=code, name=name)
                 db.add(mapping)
             mapping.name = name
+            if not mapping.taxflow_name:
+                mapping.taxflow_name = name
+            supplier_name = str(record.get("supplier_name") or record.get("supplier") or "").strip()
+            if supplier_name:
+                mapping.supplier_name = supplier_name
             mapping.tax_code = "ZERO" if "0" in str(record.get("vat", "")) and "5" not in str(record.get("vat", "")) else "VAT5"
 
     elif collection == "accounts":

@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models import InventoryValuationLayer, ItemUnit, StockAdjustmentApproval, StockProductMapping, User, Warehouse
+from app.models import InventoryValuationLayer, ItemUnit, ItemUnitConversion, StockAdjustmentApproval, StockProductMapping, User, Warehouse
 from app.schemas import (
     InventoryValuationLayerOut,
+    ItemUnitConversionIn,
+    ItemUnitConversionOut,
     ItemUnitIn,
     ItemUnitOut,
     StockAdjustmentApprovalIn,
@@ -54,11 +56,58 @@ def create_mapping(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StockProductMapping:
-    mapping = StockProductMapping(company_id=current_user.company_id, **payload.model_dump())
-    db.add(mapping)
+    mapping = (
+        db.query(StockProductMapping)
+        .filter(StockProductMapping.company_id == current_user.company_id, StockProductMapping.sku == payload.sku)
+        .first()
+    )
+    if mapping:
+        for field, value in payload.model_dump().items():
+            setattr(mapping, field, value)
+    else:
+        mapping = StockProductMapping(company_id=current_user.company_id, **payload.model_dump())
+        db.add(mapping)
     db.commit()
     db.refresh(mapping)
     return mapping
+
+
+@router.put("/inventory/mappings/{mapping_id}", response_model=StockMappingOut)
+def update_mapping(
+    mapping_id: str,
+    payload: StockMappingIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> StockProductMapping:
+    mapping = (
+        db.query(StockProductMapping)
+        .filter(StockProductMapping.company_id == current_user.company_id, StockProductMapping.id == mapping_id)
+        .first()
+    )
+    if not mapping:
+        raise HTTPException(status_code=404, detail="Stock mapping not found")
+    for field, value in payload.model_dump().items():
+        setattr(mapping, field, value)
+    db.commit()
+    db.refresh(mapping)
+    return mapping
+
+
+@router.delete("/inventory/mappings/{mapping_id}", status_code=204)
+def delete_mapping(
+    mapping_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    mapping = (
+        db.query(StockProductMapping)
+        .filter(StockProductMapping.company_id == current_user.company_id, StockProductMapping.id == mapping_id)
+        .first()
+    )
+    if not mapping:
+        raise HTTPException(status_code=404, detail="Stock mapping not found")
+    db.delete(mapping)
+    db.commit()
 
 
 @router.get("/item-units", response_model=list[ItemUnitOut])
@@ -85,12 +134,55 @@ def create_item_unit(
         unit.unit_name = payload.unit_name
         unit.conversion_factor = payload.conversion_factor
         unit.is_base_unit = payload.is_base_unit
+        unit.purchase_default = payload.purchase_default
+        unit.sales_default = payload.sales_default
+        unit.status = payload.status
     else:
         unit = ItemUnit(company_id=current_user.company_id, **payload.model_dump())
         db.add(unit)
     db.commit()
     db.refresh(unit)
     return unit
+
+
+@router.get("/item-unit-conversions", response_model=list[ItemUnitConversionOut])
+def list_item_unit_conversions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[ItemUnitConversion]:
+    return (
+        db.query(ItemUnitConversion)
+        .filter(ItemUnitConversion.company_id == current_user.company_id)
+        .order_by(ItemUnitConversion.item_code, ItemUnitConversion.from_unit_code, ItemUnitConversion.to_unit_code)
+        .all()
+    )
+
+
+@router.post("/item-unit-conversions", response_model=ItemUnitConversionOut, status_code=201)
+def create_item_unit_conversion(
+    payload: ItemUnitConversionIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ItemUnitConversion:
+    conversion = (
+        db.query(ItemUnitConversion)
+        .filter(
+            ItemUnitConversion.company_id == current_user.company_id,
+            ItemUnitConversion.item_code == payload.item_code,
+            ItemUnitConversion.from_unit_code == payload.from_unit_code,
+            ItemUnitConversion.to_unit_code == payload.to_unit_code,
+        )
+        .first()
+    )
+    if conversion:
+        conversion.conversion_factor = payload.conversion_factor
+        conversion.status = payload.status
+    else:
+        conversion = ItemUnitConversion(company_id=current_user.company_id, **payload.model_dump())
+        db.add(conversion)
+    db.commit()
+    db.refresh(conversion)
+    return conversion
 
 
 @router.get("/inventory/valuation-layers", response_model=list[InventoryValuationLayerOut])

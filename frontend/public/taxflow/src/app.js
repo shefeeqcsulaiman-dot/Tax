@@ -1,15 +1,17 @@
-const META={dashboard:{t:'Dashboard',s:'Loading dashboard from database',a:'+ New Invoice',ao:()=>go('sales')},company:{t:'Company Registration',s:'UAE Trade License & FTA Details',a:'Save All',ao:()=>toast('All changes saved','ok')},sales:{t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[4],'s-create'),50)}},purchase:{t:'Purchases',s:'Upload - AI Extraction - Validation',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()},bank:{t:'Bank Accounts',s:'Accounts - Transactions - Reconciliation',a:'+ Add Account',ao:()=>showM('m-bank')},inventory:{t:'Inventory',s:'Stock - Items - Movements',a:'+ Add Item',ao:()=>showM('m-inv-item')},expense:{t:'Expenses',s:'List - Create - Approvals',a:'+ New Expense',ao:()=>{go('expense');setTimeout(()=>stab(document.querySelectorAll('#page-expense .tab')[1],'exp-create'),50)}},accounting:{t:'Accounting',s:'Chart - Journal - Ledger',a:'+ New Entry',ao:()=>showM('m-acc')},reports:{t:'Reports',s:'VAT - P&L - Trial Balance',a:'Export PDF',ao:()=>toast('Exporting report...','info')},settings:{t:'Settings',s:'General - Users - Tax',a:'Save All',ao:()=>toast('Settings saved','ok')},mobile:{t:'Mobile App',s:'Preview - Features',a:'Download App',ao:()=>toast('Download link sent to email','ok')},staff:{t:'Staff Management',s:'Attendance - Leave - Corrections - Biometric',a:'+ Add Employee',ao:()=>showM('m-emp')},expert:{t:'Expert Review',s:'Find CA experts - Submit for review',a:'+ New Request',ao:()=>showM('m-newreview')},design:{t:'System Design',s:'Functional Spec - Fields - Validations - API',a:'Export Spec',ao:()=>toast('Exporting FRD to PDF...','info')}};
+const META={dashboard:{t:'Dashboard',s:'Loading dashboard from database',a:'+ New Invoice',ao:()=>go('sales')},company:{t:'Company Registration',s:'UAE Trade License & FTA Details',a:'Save All',ao:()=>toast('All changes saved','ok')},sales:{t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[4],'s-create'),50)}},purchase:{t:'Purchases',s:'Upload - AI Extraction - Validation',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()},bank:{t:'Bank Accounts',s:'Accounts - Transactions - Reconciliation',a:'+ Add Account',ao:()=>showM('m-bank')},inventory:{t:'Inventory',s:'Stock - Items - Movements',a:'+ Add Item',ao:()=>showM('m-inv-item')},expense:{t:'Expenses',s:'List - Create - Approvals',a:'+ New Expense',ao:()=>{go('expense');setTimeout(()=>stab(document.querySelectorAll('#page-expense .tab')[1],'exp-create'),50)}},accounting:{t:'Accounting',s:'Chart - Journal - Ledger',a:'+ New Entry',ao:()=>showM('m-acc')},reports:{t:'Reports',s:'VAT - P&L - Trial Balance',a:'Export PDF',ao:()=>toast('Exporting report...','info')},settings:{t:'Settings',s:'General - Users - Tax',a:'Save All',ao:()=>toast('Settings saved','ok')},staff:{t:'Staff Management',s:'Attendance - Leave - Corrections - Biometric',a:'+ Add Employee',ao:()=>showM('m-emp')},expert:{t:'Expert Review',s:'Find CA experts - Submit for review',a:'+ New Request',ao:()=>showM('m-newreview')},design:{t:'System Design',s:'Functional Spec - Fields - Validations - API',a:'Export Spec',ao:()=>toast('Exporting FRD to PDF...','info')}};
 META.settings={t:'Settings',s:'Company - Users - Tax - Security - Integrations - Invoice Design',a:'Save All',ao:()=>toast('Settings saved','ok')};
 META.payroll={t:'Payroll',s:'Salary run - WPS/SIF - Payslips - Posting',a:'Run Payroll',ao:()=>{go('payroll');setTimeout(()=>runPayroll(),50)}};
 META.sales={t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[4],'s-create'),50)}};
+META.quotations={t:'Quotations',s:'Create - share - convert to invoice',a:'+ New Quotation',ao:()=>{go('quotations');setTimeout(()=>stab(document.querySelectorAll('#page-quotations .tab')[1],'q-create'),50)}};
 META.purchase={t:'Purchases',s:'Upload - AI Extraction - Validation - Manual - Settings',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()};
 META.ai={t:'AI Assistant',s:'Ask questions about TaxFlow modules and workflows',a:'Ask AI',ao:()=>askSystemAI()};
-META.bills={t:'Bills & Vendors',s:'Vendor bills - Purchase orders - Supplier payments',a:'+ New Bill',ao:()=>showM('m-bill')};
+META.bills={t:'Bills',s:'Vendor bills - Purchase orders - Supplier payments',a:'+ New Bill',ao:()=>showM('m-bill')};
 META.payments={t:'Payments',s:'Receipts - Payouts - Gateway settlements',a:'+ Record Payment',ao:()=>showM('m-payment')};
 META.documents={t:'Documents',s:'Receipts - PDFs - Audit files - Attachments',a:'Upload Document',ao:()=>toast('Choose files to upload...','info')};
 META.notifications={t:'Notifications',s:'Email - WhatsApp - SMS - Push - In-app alerts',a:'+ New Rule',ao:()=>toast('Notification rule builder opened','info')};
 META.rota={t:'Rota Planning',s:'Shift setup - Weekly rota - Coverage - Swap requests',a:'Publish Rota',ao:()=>publishRota()};
 META.accounting={t:'Accounting',s:'Chart - Journal - Ledger - Tax - Closing',a:'+ Journal Entry',ao:()=>{go('accounting');setTimeout(()=>stab(document.querySelectorAll('#page-accounting .tab')[1],'acc-journal'),50)}};
+META.corporate={t:'Corporate Accounting',s:'Corporate tax - Assets - Accruals - Cost centers - Budgets',a:'Tax Report',ao:()=>{go('corporate');setTimeout(()=>stab(document.querySelectorAll('#page-corporate .tab')[0],'corp-tax'),50)}};
 META.reports={t:'Reports',s:'VAT - P&L - Balance Sheet - Trial Balance',a:'Export PDF',ao:()=>exportActiveReportPdf()};
 META.exception={t:'Exception Center',s:'Failed postings - duplicates - VAT/OCR - stock and payroll issues',a:'Refresh',ao:()=>loadExceptionCenter()};
 
@@ -126,6 +128,7 @@ function stab(el,target){
   if(pg)pg.querySelectorAll('.tab-body').forEach(b=>b.classList.remove('on'));
   const t=document.getElementById(target);
   if(t)t.classList.add('on');
+  if(target==='inv-mapping')loadStockMappingsFromServer();
   updateBackButton();
 }
 
@@ -175,18 +178,30 @@ function openStockMap(btn){
   currentStockMapRow=btn.closest('tr');
   const cells=currentStockMapRow?.querySelectorAll('td')||[];
   const product=document.getElementById('stock-map-product');
+  const supplier=document.getElementById('stock-map-supplier');
   const generated=document.getElementById('stock-map-generated');
+  const unitsOuter=document.getElementById('stock-map-units-outer');
   if(product)product.value=cells[0]?.textContent.trim()||'';
-  if(generated)generated.value=cells[1]?.textContent.trim()||generateStockMapName(product?.value||'');
-  document.getElementById('stock-map-empty')?.classList.add('hidden');
-  document.getElementById('stock-map-panel')?.classList.remove('hidden');
+  if(supplier)supplier.value=(cells[1]?.textContent.trim()||'').replace(/^[-—]$/,'');
+  if(generated)generated.value=cells[2]?.textContent.trim()||generateStockMapName(product?.value||'');
+  if(unitsOuter)unitsOuter.value=cells[3]?.textContent.trim()||currentStockMapRow?.dataset.unitsPerOuter||'1';
+  setFieldValue(document.getElementById('stock-map-cost'),currentStockMapRow?.dataset.cost||'0.00');
+  setFieldValue(document.getElementById('stock-map-markup'),currentStockMapRow?.dataset.markupPercent||'0');
+  setSelectValue(document.getElementById('stock-map-tax-rate'),currentStockMapRow?.dataset.taxRate||'5');
   updateStockMapPricing();
+  document.getElementById('stock-map-empty')?.classList.add('hidden');
+  const panel=document.getElementById('stock-map-panel');
+  panel?.classList.remove('hidden');
+  panel?.scrollIntoView({block:'nearest'});
   setTimeout(()=>product?.focus(),30);
 }
 
 function saveStockMap(){
   const product=(document.getElementById('stock-map-product')?.value||'').trim();
+  const supplier=(document.getElementById('stock-map-supplier')?.value||'').trim();
   const generated=(document.getElementById('stock-map-generated')?.value||generateStockMapName(product)).trim();
+  const unitsOuter=parseAmount(document.getElementById('stock-map-units-outer')?.value)||1;
+  const pricing=updateStockMapPricing();
   if(!product||!generated){
     toast('Enter Product Name and Generated Name','warn');
     return;
@@ -194,46 +209,91 @@ function saveStockMap(){
   if(currentStockMapRow){
     const cells=currentStockMapRow.querySelectorAll('td');
     cells[0].textContent=product;
-    cells[1].textContent=generated;
+    cells[1].textContent=supplier||'Not assigned';
+    cells[2].textContent=generated;
+    cells[3].textContent=String(unitsOuter);
     cells[4].innerHTML='<span class="b b-g">Mapped</span>';
+    currentStockMapRow.dataset.unitsPerOuter=String(unitsOuter);
+    currentStockMapRow.dataset.cost=String(pricing.cost);
+    currentStockMapRow.dataset.markupPercent=String(pricing.markup);
+    currentStockMapRow.dataset.taxRate=String(pricing.taxRate);
+    currentStockMapRow.dataset.vatAmount=String(pricing.vat);
+    currentStockMapRow.dataset.incVat=String(pricing.incVat);
+    currentStockMapRow.dataset.priceOuter=String(pricing.priceOuter);
+    const payload=stockMappingPayloadFromRow(currentStockMapRow);
+    payload.name=product;
+    payload.supplier_name=supplier||null;
+    payload.taxflow_name=generated;
+    payload.units_per_outer=unitsOuter;
+    payload.cost=pricing.cost;
+    payload.markup_percent=pricing.markup;
+    payload.tax_rate=pricing.taxRate;
+    payload.vat_amount=pricing.vat;
+    payload.inc_vat=pricing.incVat;
+    payload.price_outer=pricing.priceOuter;
+    const mappingId=currentStockMapRow.dataset.mappingId;
+    moduleApi(mappingId?`/inventory/mappings/${encodeURIComponent(mappingId)}`:'/inventory/mappings',{
+      method:mappingId?'PUT':'POST',
+      body:payload
+    }).then(saved=>{
+      if(saved?.id){
+        currentStockMapRow.dataset.mappingId=saved.id;
+        currentStockMapRow.dataset.stockSku=saved.sku;
+        currentStockMapRow.dataset.salesAccountCode=saved.sales_account_code||'3000';
+        currentStockMapRow.dataset.purchaseAccountCode=saved.purchase_account_code||'4000';
+        currentStockMapRow.dataset.inventoryAccountCode=saved.inventory_account_code||'1200';
+        currentStockMapRow.dataset.taxCode=saved.tax_code||'VAT5';
+        currentStockMapRow.dataset.reorderLevel=saved.reorder_level??0;
+        currentStockMapRow.dataset.unitsPerOuter=saved.units_per_outer??unitsOuter;
+        currentStockMapRow.dataset.cost=saved.cost??pricing.cost;
+        currentStockMapRow.dataset.markupPercent=saved.markup_percent??pricing.markup;
+        currentStockMapRow.dataset.taxRate=saved.tax_rate??pricing.taxRate;
+        currentStockMapRow.dataset.vatAmount=saved.vat_amount??pricing.vat;
+        currentStockMapRow.dataset.incVat=saved.inc_vat??pricing.incVat;
+        currentStockMapRow.dataset.priceOuter=saved.price_outer??pricing.priceOuter;
+      }
+      toast('Stock mapping saved to database','ok');
+    }).catch(err=>{
+      console.warn('Stock mapping save failed:',err);
+      toast('Stock mapping saved on screen, database save failed','warn');
+    });
   }
   toast('Stock product mapped','ok');
   audit('Mapped stock product',product,'Saved');
-  filterStockMapList();
+  refreshEnhancedTable(document.getElementById('stock-map-tbody')?.closest('table'));
 }
 
 function clearStockMapPanel(){
   currentStockMapRow=null;
   const product=document.getElementById('stock-map-product');
+  const supplier=document.getElementById('stock-map-supplier');
   const generated=document.getElementById('stock-map-generated');
+  const unitsOuter=document.getElementById('stock-map-units-outer');
   if(product)product.value='';
+  if(supplier)supplier.value='';
   if(generated)generated.value='';
+  if(unitsOuter)unitsOuter.value='1';
+  setFieldValue(document.getElementById('stock-map-cost'),'0.00');
+  setFieldValue(document.getElementById('stock-map-markup'),'0');
+  setSelectValue(document.getElementById('stock-map-tax-rate'),'5');
+  updateStockMapPricing();
   document.getElementById('stock-map-panel')?.classList.add('hidden');
   document.getElementById('stock-map-empty')?.classList.remove('hidden');
 }
 
-function filterStockMapList(){
-  const query=(document.getElementById('stock-map-search')?.value||'').trim().toLowerCase();
-  document.querySelectorAll('#stock-map-tbody tr').forEach(row=>{
-    const text=row.textContent.toLowerCase();
-    row.style.display=!query||text.includes(query)?'':'none';
-  });
-}
-
-function sortStockMapList(){
-  const tbody=document.getElementById('stock-map-tbody');
-  if(!tbody)return;
-  const mode=document.getElementById('stock-map-sort')?.value||'product-asc';
-  const rows=[...tbody.querySelectorAll('tr')];
-  const col=mode.startsWith('generated')?1:mode==='status'?4:0;
-  rows.sort((a,b)=>{
-    const av=(a.children[col]?.textContent||'').trim().toLowerCase();
-    const bv=(b.children[col]?.textContent||'').trim().toLowerCase();
-    const result=av.localeCompare(bv);
-    return mode==='product-desc'?-result:result;
-  });
-  rows.forEach(row=>tbody.appendChild(row));
-  filterStockMapList();
+function updateStockMapPricing(){
+  const cost=parseAmount(document.getElementById('stock-map-cost')?.value);
+  const markup=parseAmount(document.getElementById('stock-map-markup')?.value);
+  const taxRate=parseAmount(document.getElementById('stock-map-tax-rate')?.value);
+  const unitsOuter=parseAmount(document.getElementById('stock-map-units-outer')?.value)||1;
+  const base=cost*(1+(markup/100));
+  const vat=base*(taxRate/100);
+  const incVat=base;
+  const priceOuter=unitsOuter>0?base/unitsOuter:0;
+  setFieldValue(document.getElementById('stock-map-vat'),vat.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  setFieldValue(document.getElementById('stock-map-inc-vat'),incVat.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  setFieldValue(document.getElementById('stock-map-price-outer'),priceOuter.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  return {cost,markup,taxRate,vat,incVat,priceOuter};
 }
 
 function generateStockMapName(value){
@@ -258,26 +318,134 @@ function generateStockMapField(){
   toast('Generated name updated','info');
 }
 
-function updateStockMapPricing(){
-  const costEl=document.getElementById('stock-map-cost');
-  const markupEl=document.getElementById('stock-map-markup');
-  const fixedEl=document.getElementById('stock-map-fixed');
-  const priceEl=document.getElementById('stock-map-price');
-  const taxEl=document.getElementById('stock-map-tax-rate');
-  const incVatEl=document.getElementById('stock-map-inc-vat');
-  if(!costEl||!markupEl||!fixedEl||!priceEl||!taxEl||!incVatEl)return;
+function stockMapActionsHtml(){
+  return `<div class="row-actions">
+    <button class="icon-btn edit" type="button" title="Edit mapping" aria-label="Edit mapping" onclick="openStockMap(this)">${editIconSvg()}</button>
+    <button class="icon-btn danger" type="button" title="Delete mapping" aria-label="Delete mapping" onclick="deleteStockMapRow(this)">${deleteIconSvg()}</button>
+  </div>`;
+}
 
-  const cost=parseFloat(String(costEl.value).replace(/,/g,''))||0;
-  const markup=parseFloat(String(markupEl.value).replace(/,/g,''))||0;
-  const taxRate=parseFloat(taxEl.value)||0;
-  let price=parseFloat(String(priceEl.value).replace(/,/g,''))||0;
-
-  if(!fixedEl.checked){
-    price=cost*(1+(markup/100));
-    priceEl.value=price.toFixed(2);
+function deleteStockMapRow(btn){
+  const row=btn.closest('tr');
+  const name=row?.children[0]?.textContent.trim()||'mapping';
+  const mappingId=row?.dataset.mappingId;
+  if(mappingId){
+    moduleApi(`/inventory/mappings/${encodeURIComponent(mappingId)}`,{method:'DELETE'})
+      .catch(err=>{
+        console.warn('Stock mapping delete failed:',err);
+        toast('Mapping removed on screen, database delete failed','warn');
+      });
   }
+  row?.remove();
+  clearStockMapPanel();
+  refreshEnhancedTable(document.getElementById('stock-map-tbody')?.closest('table'));
+  toast(`${name} mapping removed`,'warn');
+  audit('Deleted stock mapping',name,'Deleted');
+}
 
-  incVatEl.value=(price*(1+(taxRate/100))).toFixed(2);
+function stockSupplierNameFromItem(row){
+  return row?.dataset?.supplier||'Not assigned';
+}
+
+function renderStockMappingRecord(mapping){
+  const tbody=document.getElementById('stock-map-tbody');
+  if(!tbody||!mapping?.sku)return;
+  removeEmptyState(tbody);
+  const selector=`tr[data-stock-sku="${CSS.escape(String(mapping.sku))}"]`;
+  let tr=tbody.querySelector(selector);
+  if(!tr){
+    tr=document.createElement('tr');
+    tbody.appendChild(tr);
+  }
+  const name=mapping.name||mapping.taxflow_name||mapping.sku;
+  const supplier=mapping.supplier_name||'Not assigned';
+  const taxflowName=mapping.taxflow_name||mapping.name||mapping.sku;
+  tr.dataset.mappingId=mapping.id||'';
+  tr.dataset.stockSku=mapping.sku;
+  tr.dataset.salesAccountCode=mapping.sales_account_code||'3000';
+  tr.dataset.purchaseAccountCode=mapping.purchase_account_code||'4000';
+  tr.dataset.inventoryAccountCode=mapping.inventory_account_code||'1200';
+  tr.dataset.taxCode=mapping.tax_code||'VAT5';
+  tr.dataset.reorderLevel=mapping.reorder_level??0;
+  tr.dataset.unitsPerOuter=mapping.units_per_outer??1;
+  tr.dataset.cost=mapping.cost??0;
+  tr.dataset.markupPercent=mapping.markup_percent??0;
+  tr.dataset.taxRate=mapping.tax_rate??5;
+  tr.dataset.vatAmount=mapping.vat_amount??0;
+  tr.dataset.incVat=mapping.inc_vat??0;
+  tr.dataset.priceOuter=mapping.price_outer??0;
+  tr.innerHTML=`<td>${escapeHtml(name)}</td><td>${escapeHtml(supplier)}</td><td>${escapeHtml(taxflowName)}</td><td class="mono">${Number(mapping.units_per_outer||1).toLocaleString('en-AE',{maximumFractionDigits:4})}</td><td><span class="b b-g">Mapped</span></td><td data-action-col="1">${stockMapActionsHtml()}</td>`;
+}
+
+function stockMappingPayloadFromRow(row){
+  const cells=row?.querySelectorAll('td')||[];
+  const sku=row?.dataset.stockSku||row?.dataset.itemCode||cells[0]?.textContent.trim()||'';
+  return {
+    sku,
+    name:cells[0]?.textContent.trim()||sku,
+    supplier_name:(cells[1]?.textContent.trim()||'').replace(/^Not assigned$/,'')||null,
+    taxflow_name:cells[2]?.textContent.trim()||cells[0]?.textContent.trim()||sku,
+    units_per_outer:parseAmount(cells[3]?.textContent)||Number(row?.dataset.unitsPerOuter||1),
+    cost:Number(row?.dataset.cost||0),
+    markup_percent:Number(row?.dataset.markupPercent||0),
+    tax_rate:Number(row?.dataset.taxRate||5),
+    vat_amount:Number(row?.dataset.vatAmount||0),
+    inc_vat:Number(row?.dataset.incVat||0),
+    price_outer:Number(row?.dataset.priceOuter||0),
+    sales_account_code:row?.dataset.salesAccountCode||'3000',
+    purchase_account_code:row?.dataset.purchaseAccountCode||'4000',
+    inventory_account_code:row?.dataset.inventoryAccountCode||'1200',
+    tax_code:row?.dataset.taxCode||'VAT5',
+    reorder_level:Number(row?.dataset.reorderLevel||0)
+  };
+}
+
+async function loadStockMappingsFromServer(){
+  const tbody=document.getElementById('stock-map-tbody');
+  if(!tbody)return;
+  try{
+    await ensureBackendSession();
+    const mappings=await moduleApi('/inventory/mappings');
+    tbody.innerHTML='';
+    (mappings||[]).forEach(renderStockMappingRecord);
+    syncStockMappingFromItems();
+  }catch(err){
+    console.warn('Stock mappings unavailable:',err);
+    syncStockMappingFromItems();
+  }
+}
+
+function syncStockMappingFromItems(){
+  const tbody=document.getElementById('stock-map-tbody');
+  if(!tbody)return;
+  removeEmptyState(tbody);
+  const existing=new Set([...tbody.querySelectorAll('tr:not([data-empty-state])')]
+    .map(row=>(row.dataset.stockSku||row.children[0]?.textContent.trim()||'').toLowerCase()));
+  const itemRows=[...document.querySelectorAll('#prod-tbody tr:not([data-empty-state])')];
+  itemRows.forEach(row=>{
+    const cells=row.children;
+    const code=cells[0]?.textContent.trim()||'';
+    const name=cells[1]?.textContent.trim()||'';
+    const key=(code||name).toLowerCase();
+    if(!name||existing.has(key))return;
+    const mappedName=generateStockMapName(name||code);
+    const supplier=stockSupplierNameFromItem(row);
+    const tr=document.createElement('tr');
+    tr.dataset.itemCode=code;
+    tr.dataset.stockSku=code||name;
+    tr.dataset.unitsPerOuter='1';
+    tr.dataset.cost='0';
+    tr.dataset.markupPercent='0';
+    tr.dataset.taxRate='5';
+    tr.dataset.vatAmount='0';
+    tr.dataset.incVat='0';
+    tr.dataset.priceOuter='0';
+    tr.innerHTML=`<td>${escapeHtml(name)}</td><td>${escapeHtml(supplier)}</td><td>${escapeHtml(mappedName)}</td><td class="mono">1</td><td><span class="b b-a">Not mapped</span></td><td data-action-col="1">${stockMapActionsHtml()}</td>`;
+    tbody.appendChild(tr);
+    existing.add(key);
+  });
+  refreshEnhancedTable(tbody.closest('table'));
+  refreshInvoiceProductSuggestions();
 }
 
 function logout(){
@@ -322,8 +490,46 @@ function backendHeaders(){
 
 function apiBaseUrl(){
   if(window.TAXFLOW_API_BASE_URL)return window.TAXFLOW_API_BASE_URL;
-  const host=window.location.hostname||'127.0.0.1';
+  const currentHost=window.location.hostname||'127.0.0.1';
+  const host=['localhost','::1',''].includes(currentHost)?'127.0.0.1':currentHost;
   return `http://${host}:8000/api/v1`;
+}
+
+async function ensureBackendSession(){
+  if(localStorage.getItem('taxflow_token'))return true;
+  return loginLocalBackend();
+}
+
+async function loginLocalBackend(){
+  const host=window.location.hostname||'127.0.0.1';
+  if(!['localhost','127.0.0.1','::1',''].includes(host))return false;
+  try{
+    const response=await fetch(`${apiBaseUrl()}/auth/login`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:'admin@taxflowapp.com',password:'admin123'})
+    });
+    if(!response.ok)throw new Error('Login returned '+response.status);
+    const data=await response.json();
+    if(data.access_token)localStorage.setItem('taxflow_token',data.access_token);
+    return !!data.access_token;
+  }catch(err){
+    console.warn('Local backend login failed:',err);
+    return false;
+  }
+}
+
+async function authenticatedFetch(url,options={}){
+  await ensureBackendSession();
+  let response=await fetch(url,{...options,headers:{...backendHeaders(),...(options.headers||{})}});
+  if(response.status===401||response.status===403){
+    localStorage.removeItem('taxflow_token');
+    const relogged=await loginLocalBackend();
+    if(relogged){
+      response=await fetch(url,{...options,headers:{...backendHeaders(),...(options.headers||{})}});
+    }
+  }
+  return response;
 }
 
 function formatAed(value){
@@ -348,6 +554,12 @@ function setFieldValue(input,value){
   input.dispatchEvent(new Event('input',{bubbles:true}));
 }
 
+function setCheckboxValue(input,checked){
+  if(!input)return;
+  input.checked=Boolean(checked);
+  input.dispatchEvent(new Event('change',{bubbles:true}));
+}
+
 function readFieldValue(labelText,scopeId='set-company'){
   return (findSettingsInput(labelText,scopeId)?.value||'').trim();
 }
@@ -366,10 +578,10 @@ function applyCompanyToUi(company){
 }
 
 async function syncCompanyFromDatabase(){
-  const token=localStorage.getItem('taxflow_token');
-  if(!token)return null;
+  const ready=await ensureBackendSession();
+  if(!ready)return null;
   try{
-    const response=await fetch(`${apiBaseUrl()}/companies/current`,{headers:backendHeaders()});
+    const response=await authenticatedFetch(`${apiBaseUrl()}/companies/current`);
     if(!response.ok)throw new Error('Company API returned '+response.status);
     const company=await response.json();
     applyCompanyToUi(company);
@@ -384,9 +596,8 @@ async function saveCompanySettingsToDatabase(){
   const name=readFieldValue('Legal Company Name')||currentCompany?.name||'TaxFlow UAE LLC';
   const trn=(document.getElementById('set-company-trn')?.value||currentCompany?.trn||'').replace(/\D/g,'');
   const country=currentCompany?.country||'United Arab Emirates';
-  const response=await fetch(`${apiBaseUrl()}/companies/current`,{
+  const response=await authenticatedFetch(`${apiBaseUrl()}/companies/current`,{
     method:'PUT',
-    headers:backendHeaders(),
     body:JSON.stringify({name,trn:trn||null,country})
   });
   if(!response.ok)throw new Error('Company save returned '+response.status);
@@ -438,6 +649,7 @@ function syncSidebarCounts(data){
   const purchaseTotal=Number(counts.purchase_record_count??counts.purchase_source_count??0)||0;
   const billsTotal=(Number(counts.bill_count)||0)+(Number(counts.vendor_count)||0);
   setNavBadge('sales',salesTotal);
+  setNavBadge('quotations',counts.quotation_count||0,'warn');
   setNavBadge('purchase',purchaseTotal,'warn');
   setNavBadge('bills',billsTotal,'warn');
   setNavBadge('bank',counts.account_count);
@@ -451,7 +663,6 @@ function syncSidebarCounts(data){
   setNavBadge('payroll',counts.payroll_run_count||counts.employee_count);
   setNavBadge('notifications',counts.job_count);
   setNavBadge('expert',counts.audit_count?'1':0,counts.audit_count?'red':'');
-  setNavBadge('mobile',counts.invoice_count);
   setNavBadge('settings',(Number(counts.sales_category_count)||0)+(Number(counts.sales_unit_count)||0)+(Number(counts.account_count)||0));
 }
 
@@ -469,19 +680,49 @@ function renderDashboardMeta(data){
 }
 
 async function syncDashboardFromDatabase(){
-  const token=localStorage.getItem('taxflow_token');
-  if(!token)return;
+  const ready=await ensureBackendSession();
+  if(!ready){
+    setDashboardStat('Total Revenue','Login needed','Open the root app and sign in');
+    setDashboardStat('VAT Payable','Login needed','No backend token found');
+    setDashboardStat('Open Invoices','Login needed','Dashboard cannot read database');
+    setDashboardStat('Staff Present','Login needed','Use admin@taxflowapp.com');
+    return;
+  }
+  if(!window.__taxflowFreshDashboardLoaded)renderCachedDashboardSnapshot();
   try{
-    const response=await fetch(`${apiBaseUrl()}/reports/dashboard`,{headers:backendHeaders()});
+    const response=await authenticatedFetch(`${apiBaseUrl()}/reports/dashboard`);
     if(!response.ok)throw new Error('Dashboard API returned '+response.status);
     const data=await response.json();
+    window.__taxflowFreshDashboardLoaded=true;
+    try{localStorage.setItem('taxflow_dashboard_snapshot',JSON.stringify(data));}catch{}
     if(data.company)applyCompanyToUi(data.company);
     renderDashboardMeta(data);
     syncSidebarCounts(data);
     renderFullDashboardFromDatabase(data);
   }catch(err){
     console.warn('Dashboard database sync failed:',err);
+    setDashboardStat('Total Revenue','API error','Check backend connection');
+    setDashboardStat('VAT Payable','API error','Dashboard sync failed');
+    setDashboardStat('Open Invoices','API error','Open browser console for details');
+    setDashboardStat('Staff Present','API error','Try http://127.0.0.1:5173');
+    const target=document.getElementById('dash-recent-activity');
+    if(target)target.innerHTML=`<div style="font-size:12px;color:var(--red)">Dashboard database sync failed: ${escapeHtml(err.message||err)}</div>`;
   }
+}
+
+function renderCachedDashboardSnapshot(){
+  let cached=null;
+  try{cached=JSON.parse(localStorage.getItem('taxflow_dashboard_snapshot')||'null');}catch{}
+  if(cached){
+    renderDashboardMeta(cached);
+    syncSidebarCounts(cached);
+    renderFullDashboardFromDatabase(cached);
+    return;
+  }
+  setDashboardStat('Total Revenue','AED 0.00','Syncing database...');
+  setDashboardStat('VAT Payable','AED 0.00','Syncing database...');
+  setDashboardStat('Open Invoices','0','Syncing database...');
+  setDashboardStat('Staff Present','0/0','Syncing database...');
 }
 
 function renderFullDashboardFromDatabase(data){
@@ -585,10 +826,10 @@ function renderStaffToday(staff){
 }
 
 async function syncReportsFromDatabase(){
-  const token=localStorage.getItem('taxflow_token');
-  if(!token)return;
+  const ready=await ensureBackendSession();
+  if(!ready)return;
   try{
-    const response=await fetch(`${apiBaseUrl()}/reports/summary`,{headers:backendHeaders()});
+    const response=await authenticatedFetch(`${apiBaseUrl()}/reports/summary`);
     if(!response.ok)throw new Error('Reports API returned '+response.status);
     const data=await response.json();
     renderReportsFromDatabase(data);
@@ -646,7 +887,7 @@ function renderReportDashboard(report){
   if(aiScore)aiScore.textContent=report.ai_score||0;
   const actionBox=document.getElementById('ai-actions');
   if(actionBox)actionBox.innerHTML=(report.actions||[]).map(item=>`<div>- ${escapeHtml(item)}</div>`).join('');
-  const forecastRows=document.querySelectorAll('#rep-dash .g3 .card:nth-child(2) .risk-row');
+  const forecastRows=document.querySelectorAll('#rep-cash-forecast .risk-row');
   (report.cash_forecast||[]).forEach((item,index)=>{
     const row=forecastRows[index];
     if(!row)return;
@@ -663,7 +904,7 @@ function renderReportDashboard(report){
 function renderReceivableRiskMix(receivables){
   const donut=document.querySelector('#rep-dash .donut');
   if(donut)donut.dataset.label=formatAed(receivables.label||0).replace('AED ','AED ');
-  const rows=document.querySelectorAll('#rep-dash .g2 .card:nth-child(2) .risk-row');
+  const rows=document.querySelectorAll('#rep-receivable-card .risk-row');
   (receivables.buckets||[]).forEach((bucket,index)=>{
     const row=rows[index];
     if(!row)return;
@@ -867,13 +1108,19 @@ function renderDatabaseDashboardSummary(data){
   }
   const rows=[
     {label:'Invoices',count:counts.invoice_count,page:'sales',tab:'s-invoices',icon:'INV',tone:'accent',copy:'Open sales invoice register'},
+    {label:'Customers',count:counts.customer_count,page:'sales',tab:'s-customers',icon:'CUS',tone:'green',copy:'Customer master from database'},
+    {label:'Products',count:counts.product_count,page:'sales',tab:'s-products',icon:'SKU',tone:'teal',copy:'Item and service catalogue'},
+    {label:'Quotations',count:counts.quotation_count,page:'quotations',tab:'q-list',icon:'QTN',tone:'purple',copy:'Quotation list connected to database'},
+    {label:'Purchases',count:counts.purchase_record_count,page:'purchase',tab:'p-records',icon:'PUR',tone:'amber',copy:'Purchase register from database'},
+    {label:'Vendors',count:counts.vendor_count,page:'purchase',tab:'p-vendors',icon:'VEN',tone:'green',copy:'Supplier and vendor master'},
+    {label:'Payments',count:counts.payment_count,page:'payments',icon:'PAY',tone:'accent',copy:'Receipts and supplier payments'},
     {label:'Accounts',count:counts.account_count,page:'accounting',tab:'acc-chart',icon:'COA',tone:'teal',copy:'Chart of accounts'},
     {label:'Journals',count:counts.journal_count,page:'accounting',tab:'acc-journal',icon:'JE',tone:'purple',copy:'Journal entries and ledger'},
     {label:'Source Transactions',count:counts.source_transaction_count,page:'purchase',tab:'p-records',icon:'SRC',tone:'amber',copy:'Sales, purchase, and payment sources'},
     {label:'Tax Codes',count:counts.tax_code_count,page:'settings',tab:'set-tax',icon:'VAT',tone:'green',copy:'VAT setup and tax rules'},
     {label:'Tax Lines',count:counts.tax_line_count,page:'reports',tab:'rep-vat',icon:'TAX',tone:'red',copy:'VAT report lines'},
     {label:'Warehouses',count:counts.warehouse_count,page:'inventory',tab:'inv-stock',icon:'WH',tone:'teal',copy:'Warehouse stock dashboard'},
-    {label:'Inventory Mappings',count:counts.inventory_mapping_count,page:'inventory',tab:'inv-map',icon:'SKU',tone:'accent',copy:'Product and stock mappings'},
+    {label:'Inventory Mappings',count:counts.inventory_mapping_count,page:'inventory',tab:'inv-mapping',icon:'SKU',tone:'accent',copy:'Product and stock mappings'},
     {label:'Employees',count:counts.employee_count,page:'staff',tab:'staff-list',icon:'HR',tone:'purple',copy:'Staff management'},
     {label:'Jobs',count:counts.job_count,page:'notifications',icon:'JOB',tone:'amber',copy:'Background jobs and alerts'},
     {label:'Documents',count:counts.document_count,page:'documents',icon:'DOC',tone:'green',copy:'Uploaded files and attachments'},
@@ -934,10 +1181,10 @@ function toggleNightMode(enabled){
 }
 
 async function apiRequest(action,payload,options={}){
+  await ensureBackendSession();
   const endpoint=APP_CONFIG.apiEndpoint||`${apiBaseUrl()}/app-data`;
-  const response=await fetch(`${endpoint}?action=${encodeURIComponent(action)}`,{
+  const response=await authenticatedFetch(`${endpoint}?action=${encodeURIComponent(action)}`,{
     method:options.method||'POST',
-    headers:backendHeaders(),
     body:options.method==='GET'?undefined:JSON.stringify(payload||{})
   });
   if(!response.ok)throw new Error('FastAPI app-data endpoint returned '+response.status);
@@ -951,12 +1198,12 @@ function saveServer(collection,record){
 }
 
 async function moduleApi(path,options={}){
-  const response=await fetch(`${apiBaseUrl()}${path}`,{
+  const response=await authenticatedFetch(`${apiBaseUrl()}${path}`,{
     method:options.method||'GET',
-    headers:backendHeaders(),
     body:options.body?JSON.stringify(options.body):undefined
   });
   if(!response.ok)throw new Error(`FastAPI ${path} returned ${response.status}`);
+  if(response.status===204)return null;
   return response.json();
 }
 
@@ -1047,8 +1294,97 @@ function restoreSalesInvoices(){
   // Sales invoices are restored from the database by hydrateFromServer().
 }
 
+function emptyTableMessage(tbody,message='No database records yet.'){
+  if(!tbody)return;
+  const table=tbody.closest('table');
+  const cols=table?.tHead?.rows?.[0]?.cells?.length||1;
+  tbody.innerHTML=`<tr data-empty-state="1"><td colspan="${cols}" style="color:var(--text3);text-align:center">${escapeHtml(message)}</td></tr>`;
+}
+
+function removeEmptyState(tbody){
+  tbody?.querySelectorAll('[data-empty-state]').forEach(row=>row.remove());
+}
+
+function clearStaticDemoData(){
+  const emptyTables={
+    'sales-invoice-tbody':'No sales invoices in database yet.',
+    'customer-tbody':'No customers in database yet.',
+    'quotation-tbody':'No quotations in database yet.',
+    'purchase-record-tbody':'No purchase records in database yet.',
+    'bill-tbody':'No vendor bills in database yet.',
+    'vendor-tbody':'No vendors in database yet.',
+    'payment-in-tbody':'No receipts in database yet.',
+    'payment-out-tbody':'No payments in database yet.',
+    'prod-tbody':'No products in database yet.',
+    'account-tbody':'No accounts in database yet.',
+    'ledger-tbody':'No ledger entries in database yet.',
+    'audit-tbody':'No audit records in database yet.'
+  };
+  Object.entries(emptyTables).forEach(([id,message])=>emptyTableMessage(document.getElementById(id),message));
+  document.querySelectorAll('.page table.tbl tbody').forEach(tbody=>{
+    if(tbody.querySelector('[data-empty-state]'))return;
+    if(tbody.closest('#page-dashboard'))return;
+    emptyTableMessage(tbody,'No database records yet.');
+  });
+  document.querySelectorAll('[data-demo-static="1"]').forEach(node=>node.remove());
+}
+
+function quotationActionsHtml(){
+  return `<div class="row-actions"><button class="icon-btn view" type="button" title="View" aria-label="View quotation" onclick="previewQuotation(this)">${viewIconSvg()}</button><button class="icon-btn share" type="button" title="Share" aria-label="Share quotation" onclick="shareQuotation(this)">${shareIconSvg()}</button><button class="icon-btn edit" type="button" title="Convert" aria-label="Convert quotation" onclick="convertQuotation(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9"/><path d="M9 5l3 3-3 3"/></svg></button></div>`;
+}
+
+function quotationRecordFromRow(row){
+  if(row?.dataset.quotation){
+    try{return JSON.parse(row.dataset.quotation);}catch{}
+  }
+  const c=row?.cells||[];
+  return {
+    quote_no:c[0]?.textContent?.trim()||'',
+    customer:c[1]?.textContent?.trim()||'',
+    date:c[2]?.textContent?.trim()||'',
+    valid_until:c[3]?.textContent?.trim()||'',
+    subtotal:c[4]?.textContent?.trim()||'0',
+    vat_amount:c[5]?.textContent?.trim()||'0',
+    total:c[6]?.textContent?.trim()||'0',
+    status:c[7]?.textContent?.trim()||'Draft',
+    owner:c[8]?.textContent?.trim()||'Sales Team'
+  };
+}
+
+function quotationStatusClass(status){
+  const value=String(status||'').toLowerCase();
+  if(value.includes('accept')||value.includes('convert'))return 'b-g';
+  if(value.includes('expire')||value.includes('reject'))return 'b-r';
+  if(value.includes('sent')||value.includes('pending'))return 'b-a';
+  return 'b-gray';
+}
+
+function renderQuotationRecord(quote){
+  const tbody=document.getElementById('quotation-tbody');
+  const quoteNo=quote?.quote_no||quote?.quotation_no||quote?.ref;
+  if(!tbody||!quoteNo||hasFirstCellValue(tbody,quoteNo))return;
+  const row=document.createElement('tr');
+  const record={
+    quote_no:quoteNo,
+    customer:quote.customer||'Customer',
+    date:quote.date||'Today',
+    valid_until:quote.valid_until||quote.valid||'15 days',
+    subtotal:quote.subtotal||0,
+    vat_amount:quote.vat_amount||quote.vat||0,
+    total:quote.total||0,
+    status:quote.status||'Draft',
+    owner:quote.owner||'Sales Team'
+  };
+  row.dataset.serverRecord='quotations';
+  row.dataset.quotation=JSON.stringify(record);
+  row.innerHTML=`<td class="mono">${escapeHtml(record.quote_no)}</td><td>${escapeHtml(record.customer)}</td><td>${escapeHtml(record.date)}</td><td>${escapeHtml(record.valid_until)}</td><td class="mono">${Number(String(record.subtotal).replace(/,/g,'')||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(String(record.vat_amount).replace(/,/g,'')||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(String(record.total).replace(/,/g,'')||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b ${quotationStatusClass(record.status)}">${escapeHtml(record.status)}</span></td><td>${escapeHtml(record.owner)}</td><td data-action-col="1">${quotationActionsHtml()}</td>`;
+  removeEmptyState(tbody);
+  tbody.prepend(row);
+  refreshEnhancedTable(tbody.closest('table'));
+}
+
 function hasFirstCellValue(tbody,value){
-  return !!tbody&&[...tbody.querySelectorAll('tr td:first-child')].some(td=>td.textContent.trim().toLowerCase()===String(value||'').trim().toLowerCase());
+  return !!tbody&&[...tbody.querySelectorAll('tr:not([data-empty-state]) td:first-child')].some(td=>td.textContent.trim().toLowerCase()===String(value||'').trim().toLowerCase());
 }
 
 function renderCustomerRecord(customer){
@@ -1057,6 +1393,7 @@ function renderCustomerRecord(customer){
   const row=document.createElement('tr');
   row.dataset.serverRecord='customers';
   row.innerHTML=`<td>${escapeHtml(customer.name)}</td><td class="mono">${escapeHtml(customer.trn||'Not registered')}</td><td>${escapeHtml(customer.emirate||'Dubai')}</td><td>${escapeHtml(customer.email||customer.phone||'-')}</td><td class="mono" style="color:var(--accent)">AED 0</td><td><button class="btn btn-g btn-sm">View</button></td>`;
+  removeEmptyState(tbody);
   tbody.prepend(row);
 }
 
@@ -1067,8 +1404,12 @@ function renderProductRecord(product){
   const vatClass=vatText==='5%'?'b-b':'b-t';
   const row=document.createElement('tr');
   row.dataset.serverRecord='products';
-  row.innerHTML=`<td class="mono">${escapeHtml(product.code||'PRD')}</td><td>${escapeHtml(product.name)}</td><td><span class="b b-gray">${escapeHtml(product.category||'Materials')}</span></td><td>${escapeHtml(product.unit||'Each')}</td><td class="mono">${Number(product.price||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td><span class="b ${vatClass}">${escapeHtml(vatText)}</span></td><td><span class="b b-g">Active</span></td><td><button class="btn btn-g btn-sm" onclick="editProd(this.closest('tr').querySelector('td').textContent)">Edit</button></td>`;
+  row.innerHTML=`<td class="mono">${escapeHtml(product.code||'PRD')}</td><td>${escapeHtml(product.name)}</td><td>Stock Item</td><td>${escapeHtml(product.category||'Materials')}</td><td>${escapeHtml(product.unit||'Each')}</td><td>Main Store</td><td><span class="b b-g">Yes</span></td><td><span class="b ${vatClass}">${escapeHtml(vatText)}</span></td><td><span class="b b-g">Active</span></td>`;
+  removeEmptyState(tbody);
   tbody.prepend(row);
+  refreshEnhancedTable(tbody.closest('table'));
+  syncStockMappingFromItems();
+  refreshInvoiceProductSuggestions();
 }
 
 function syncProductMasterOptions(){
@@ -1100,6 +1441,7 @@ function renderSalesCategoryRecord(category){
   const row=document.createElement('tr');
   row.dataset.serverRecord='salesCategories';
   row.innerHTML=`<td>${escapeHtml(name)}</td><td>${escapeHtml(category.scope||'Sales & Purchase')}</td><td><span class="b b-b">${escapeHtml(vat)}</span></td><td><span class="b b-g">${escapeHtml(category.status||'Active')}</span></td>`;
+  removeEmptyState(tbody);
   tbody.prepend(row);
   syncProductMasterOptions();
 }
@@ -1112,6 +1454,7 @@ function renderSalesUnitRecord(unit){
   const row=document.createElement('tr');
   row.dataset.serverRecord='salesUnits';
   row.innerHTML=`<td class="mono">${escapeHtml(code)}</td><td>${escapeHtml(name)}</td><td>${escapeHtml(unit.type||'Quantity')}</td><td class="mono">${escapeHtml(unit.decimals??'2')}</td><td><span class="b b-g">${escapeHtml(unit.status||'Active')}</span></td>`;
+  removeEmptyState(tbody);
   tbody.prepend(row);
   syncProductMasterOptions();
 }
@@ -1122,6 +1465,7 @@ function renderBillRecord(bill){
   const row=document.createElement('tr');
   row.dataset.serverRecord='bills';
   row.innerHTML=`<td class="mono">${escapeHtml(bill.bill_no)}</td><td>${escapeHtml(bill.vendor)}</td><td>${escapeHtml(bill.date)}</td><td>${escapeHtml(bill.due)}</td><td class="mono">${Number(bill.subtotal||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(bill.vat||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(bill.total||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b b-a">${escapeHtml(bill.status||'Awaiting Payment')}</span></td><td><button class="btn btn-g btn-sm" onclick="openRowDetail(this,'Bill / Vendor Detail','Bill detail')">View</button></td>`;
+  removeEmptyState(tbody);
   tbody.prepend(row);
 }
 
@@ -1131,7 +1475,27 @@ function renderVendorRecord(vendor){
   const row=document.createElement('tr');
   row.dataset.serverRecord='vendors';
   row.innerHTML=`<td>${escapeHtml(vendor.name)}</td><td class="mono">${escapeHtml(vendor.trn||'Not registered')}</td><td>${escapeHtml(vendor.category||'Services')}</td><td>${escapeHtml(vendor.email||'-')}</td><td class="mono">0.00</td><td><span class="b b-g">Active</span></td>`;
+  removeEmptyState(tbody);
   tbody.prepend(row);
+  syncSupplierOptions(vendor.name);
+}
+
+function syncSupplierOptions(selected=''){
+  const select=document.getElementById('mp-supplier');
+  if(!select)return;
+  const current=selected||select.value;
+  const names=[...document.querySelectorAll('#vendor-tbody tr:not([data-empty-state]) td:first-child')]
+    .map(td=>td.textContent.trim())
+    .filter(Boolean);
+  const existing=[...select.options].map(option=>option.value||option.textContent.trim()).filter(Boolean);
+  const all=[...new Set([...existing, ...names])];
+  select.innerHTML='<option value="">Please Select</option>'+all.map(name=>`<option>${escapeHtml(name)}</option>`).join('');
+  if(current&&all.includes(current))select.value=current;
+}
+
+function openSupplierPopup(){
+  showM('m-vendor');
+  setTimeout(()=>document.getElementById('vendor-name')?.focus(),50);
 }
 
 function renderPaymentRecord(payment){
@@ -1141,6 +1505,7 @@ function renderPaymentRecord(payment){
   const row=document.createElement('tr');
   row.dataset.serverRecord='payments';
   row.innerHTML=`<td class="mono">${escapeHtml(payment.ref)}</td><td>${escapeHtml(payment.contact)}</td><td class="mono">${escapeHtml(label)}</td><td>${escapeHtml(payment.method||'Bank Transfer')}</td><td>${escapeHtml(payment.date)}</td><td class="mono">${Number(payment.amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b b-g">Posted</span></td>`;
+  removeEmptyState(tbody);
   tbody.prepend(row);
 }
 
@@ -1156,6 +1521,7 @@ function renderPurchaseRecord(purchase){
   const source=String(purchase.source||'Manual');
   const sourceClass=source.toLowerCase().includes('ai')?'b-p':'b-gray';
   row.innerHTML=`<td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(purchase.supplier||'-')}</td><td>${escapeHtml(purchase.date||'-')}</td><td>${escapeHtml(purchase.location||'-')}</td><td class="mono">${Number(purchase.items||0)}</td><td class="mono">${Number(purchase.net_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.tax_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.shipping||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.total||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.paid||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.due||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td>`;
+  removeEmptyState(tbody);
   tbody.prepend(row);
   refreshEnhancedTable(tbody.closest('table'));
 }
@@ -1167,25 +1533,39 @@ function renderAccountRecord(account){
   const row=document.createElement('tr');
   row.dataset.serverRecord='accounts';
   row.innerHTML=`<td class="mono">${escapeHtml(account.code)}</td><td>${escapeHtml(account.name)}</td><td><span class="b ${typeClass}">${escapeHtml(account.type||'Asset')}</span></td><td>${escapeHtml(account.category||'Current')}</td><td class="mono">0.00</td><td><span class="b b-g">Active</span></td><td><button class="btn btn-g btn-sm" onclick="viewAccountLedger(this)">View</button></td>`;
+  removeEmptyState(tbody);
   tbody.appendChild(row);
 }
 
 function hydrateFromServer(){
-  apiRequest('bootstrap',{}, {method:'GET'}).then(({data})=>{
+  return apiRequest('bootstrap',{}, {method:'GET'}).then(({data})=>{
     if(!data)return;
     if(data.company)applyCompanyToUi(data.company);
-    (data.salesInvoices||[]).forEach(inv=>registerSalesInvoiceKey(inv.invoice_no||inv.invoice_number));
     (data.products||[]).reverse().forEach(renderProductRecord);
     (data.salesCategories||[]).reverse().forEach(renderSalesCategoryRecord);
     (data.salesUnits||[]).reverse().forEach(renderSalesUnitRecord);
     (data.customers||[]).reverse().forEach(renderCustomerRecord);
     (data.salesInvoices||[]).reverse().forEach(inv=>addSalesInvoiceRow(inv,{persist:false}));
+    (data.quotations||[]).reverse().forEach(renderQuotationRecord);
     (data.accounts||[]).reverse().forEach(renderAccountRecord);
     (data.ledger||[]).reverse().forEach(line=>postLedgerLine(line,{persist:false}));
     (data.bills||[]).reverse().forEach(renderBillRecord);
     (data.vendors||[]).reverse().forEach(renderVendorRecord);
     (data.payments||[]).reverse().forEach(renderPaymentRecord);
     (data.purchaseRecords||[]).reverse().forEach(renderPurchaseRecord);
+    const totalLoaded=[
+      data.products,
+      data.customers,
+      data.salesInvoices,
+      data.quotations,
+      data.bills,
+      data.vendors,
+      data.payments,
+      data.purchaseRecords
+    ].reduce((sum,rows)=>sum+(Array.isArray(rows)?rows.length:0),0);
+    window.__taxflowLastDbLoad={at:new Date().toISOString(),totalLoaded};
+    console.info(`TaxFlow DB tables loaded: ${totalLoaded} records`);
+    if(totalLoaded>0)toast(`Database tables loaded: ${totalLoaded} records`,'ok');
     if(data.invoiceLayout){
       setInvoiceLayoutFields(data.invoiceLayout);
       updateInvoiceLayoutPreview();
@@ -1195,6 +1575,8 @@ function hydrateFromServer(){
     }
     updateAccountSelectors();
     syncProductMasterOptions();
+    syncSupplierOptions();
+    loadStockMappingsFromServer();
     filterLedger();
     scheduleIdleTask(()=>{
       revalidateSalesAiRows();
@@ -1207,17 +1589,21 @@ function hydrateFromServer(){
   }).catch(err=>console.warn('Database bootstrap unavailable:',err));
 }
 
+function forceDbRefresh(){
+  window.__taxflowFreshDashboardLoaded=false;
+  syncDashboardFromDatabase();
+  return hydrateFromServer();
+}
+
+window.hydrateFromServer=hydrateFromServer;
+window.forceDbRefresh=forceDbRefresh;
+
 function escapeHtml(value){
   return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
 
 function buildFallbackExtraction(entry){
-  const cleanBase=(entry?.name||'PUR-UPLOAD').replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/gi,'-').slice(0,18).toUpperCase()||'PUR-UPLOAD';
-  return [
-    {invoice_no:cleanBase+'-001',date:'15 Jun 2024',supplier:'Al Hamad Steel',supplier_trn:'100234567800003',subtotal:12400,vat_amount:620,total:13020,vat_rate_pct:5,confidence:94,status:'Valid',issues:''},
-    {invoice_no:cleanBase+'-002',date:'16 Jun 2024',supplier:'Gulf Freight Services',supplier_trn:'MISSING',subtotal:3600,vat_amount:180,total:3780,vat_rate_pct:5,confidence:76,status:'Error',issues:'Supplier TRN is missing or invalid'},
-    {invoice_no:cleanBase+'-003',date:'18 Jun 2024',supplier:'UAE Paints Co.',supplier_trn:'100987654300003',subtotal:5800,vat_amount:410,total:6210,vat_rate_pct:5,confidence:82,status:'Review',issues:'VAT amount does not match 5% calculation'}
-  ];
+  return [];
 }
 
 async function requestInvoiceExtraction(entry){
@@ -1229,9 +1615,8 @@ async function requestInvoiceExtraction(entry){
 
   try{
     const endpoint=APP_CONFIG.extractionEndpoint||`${apiBaseUrl()}/app-data?action=documents.extract`;
-    const response=await fetch(endpoint,{
+    const response=await authenticatedFetch(endpoint,{
       method:'POST',
-      headers:backendHeaders(),
       body:JSON.stringify(payload)
     });
     if(!response.ok)throw new Error('Extraction service returned '+response.status);
@@ -1241,8 +1626,8 @@ async function requestInvoiceExtraction(entry){
     return invoices;
   }catch(err){
     if(!APP_CONFIG.extractionFallback)throw err;
-    console.warn('Using local extraction fallback:',err);
-    toast('Backend extraction unavailable; using local extraction fallback','warn');
+    console.warn('Extraction unavailable:',err);
+    toast('Extraction unavailable. No demo data was added.','warn');
     return buildFallbackExtraction(entry);
   }
 }
@@ -1261,11 +1646,7 @@ function registerSalesInvoiceKey(value){
 }
 
 function buildFallbackSalesExtraction(entry){
-  const cleanBase=(entry?.name||'INV-UPLOAD').replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/gi,'-').slice(0,16).toUpperCase()||'INV-UPLOAD';
-  return [
-    {invoice_no:cleanBase+'-001',customer:'Dubai Steel Co.',customer_trn:'100348712600001',date:'22 Jun 2024',due_date:'22 Jul 2024',subtotal:42000,vat_amount:2100,total:44100,confidence:96,status:'Ready',issues:''},
-    {invoice_no:cleanBase+'-002',customer:'Gulf Logistics Ltd',customer_trn:'100874321500002',date:'23 Jun 2024',due_date:'23 Jul 2024',subtotal:18500,vat_amount:925,total:19425,confidence:91,status:'Ready',issues:''}
-  ];
+  return [];
 }
 
 async function requestSalesInvoiceExtraction(entry){
@@ -1278,9 +1659,8 @@ async function requestSalesInvoiceExtraction(entry){
 
   try{
     const endpoint=APP_CONFIG.salesExtractionEndpoint||`${apiBaseUrl()}/app-data?action=invoices.import`;
-    const response=await fetch(endpoint,{
+    const response=await authenticatedFetch(endpoint,{
       method:'POST',
-      headers:backendHeaders(),
       body:JSON.stringify(payload)
     });
     if(!response.ok)throw new Error('Invoice import service returned '+response.status);
@@ -1290,8 +1670,8 @@ async function requestSalesInvoiceExtraction(entry){
     return invoices;
   }catch(err){
     if(!APP_CONFIG.extractionFallback)throw err;
-    console.warn('Using sales invoice fallback extraction:',err);
-    toast('Invoice import backend unavailable; using local extraction fallback','warn');
+    console.warn('Sales invoice extraction unavailable:',err);
+    toast('Invoice extraction unavailable. No demo data was added.','warn');
     return buildFallbackSalesExtraction(entry);
   }
 }
@@ -1617,6 +1997,7 @@ function addSalesInvoiceRow(inv,options={persist:true}){
   row.dataset.salesInvoice=JSON.stringify({...inv,source});
   row.dataset.rowActionsAdded='1';
   row.innerHTML=`<td class="mono">${escapeHtml(inv.invoice_no)}</td><td>${escapeHtml(inv.customer)}</td><td>${escapeHtml(inv.date)}</td><td>${escapeHtml(inv.due_date||'30 days')}</td><td class="mono">${fmt(inv.subtotal)}</td><td class="mono">${fmt(inv.vat_amount)}</td><td class="mono">${fmt(inv.total)}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b b-a">Pending</span></td><td data-action-col="1">${salesInvoiceActionsHtml()}</td>`;
+  removeEmptyState(tbody);
   tbody.prepend(row);
   registerSalesInvoiceKey(inv.invoice_no);
   if(options.persist)persistSalesInvoice({...inv,source});
@@ -1742,7 +2123,7 @@ function updateInvoiceLayoutPreview(){
         <div class="g2 mb16">
           <div>
             <div class="section-hd">Bill To</div>
-            <div style="font-weight:600">Dubai Steel Co.</div>
+            <div style="font-weight:600">Customer Name</div>
             <div class="mono" style="font-size:11px;color:var(--text3)">TRN 100348712600001</div>
           </div>
           <div style="font-size:12px;line-height:1.7">
@@ -1857,10 +2238,9 @@ function normalizeSalesInvoiceActions(){
 
 function buildDraftInvoice(){
   const lines=[...document.querySelectorAll('#inv-lines .inv-item')].map(row=>{
-    const inputs=[...row.querySelectorAll('input')];
-    const qty=parseAmount(inputs[1]?.value);
-    const price=parseAmount(inputs[2]?.value);
-    return {description:inputs[0]?.value||'Item',qty,price,amount:qty*price};
+    const qty=parseAmount(row.querySelector('.inv-qty')?.value);
+    const price=parseAmount(row.querySelector('.inv-price')?.value);
+    return {description:row.querySelector('.inv-product')?.value||'Item',unit:row.querySelector('.inv-unit')?.value||'',qty,price,amount:qty*price};
   });
   const subtotal=lines.reduce((sum,line)=>sum+line.amount,0);
   const vat=subtotal*.05;
@@ -2393,15 +2773,29 @@ function setManualPurchaseDefaults(){
   });
   const ref=document.getElementById('mp-ref');
   if(ref&&!ref.value)ref.value=`PUR-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
-  if(!document.querySelector('#mp-lines tr'))addManualPurchaseLine();
+  removeInitialBlankPurchaseLine();
   calcManualPurchase();
+}
+
+function removeInitialBlankPurchaseLine(){
+  const rows=[...document.querySelectorAll('#mp-lines tr')];
+  if(rows.length!==1||manualPurchaseEditingRef)return;
+  const row=rows[0];
+  const product=(row.querySelector('.mp-product')?.value||'').trim();
+  const qty=(row.querySelector('.mp-qty')?.value||'').trim();
+  const cost=parseAmount(row.querySelector('.mp-cost')?.value);
+  const discount=parseAmount(row.querySelector('.mp-discount-pct')?.value);
+  const margin=parseAmount(row.querySelector('.mp-margin')?.value);
+  if(!product&&(!qty||qty==='1')&&!cost&&!discount&&!margin){
+    row.remove();
+  }
 }
 
 function addManualPurchaseLine(){
   const tbody=document.getElementById('mp-lines');
   if(!tbody)return;
   const row=document.createElement('tr');
-  row.innerHTML=`<td class="mono"></td><td><input class="fi mp-product" placeholder="Product name"></td><td><input class="fi mono mp-qty" value="1" oninput="calcManualPurchase()"></td><td><input class="fi mono mp-cost" value="0.00" oninput="calcManualPurchase()"></td><td><input class="fi mono mp-discount-pct" value="0" oninput="calcManualPurchase()"></td><td class="mono mp-before-tax">0.00</td><td class="mono mp-line-total">0.00</td><td><input class="fi mono mp-margin" value="0" oninput="calcManualPurchase()"></td><td class="mono mp-selling">0.00</td><td><button class="icon-btn danger" type="button" onclick="removeManualPurchaseLine(this)" title="Remove line">${deleteIconSvg()}</button></td>`;
+  row.innerHTML=`<td class="line-no-cell"><span class="line-no">1</span></td><td><input class="fi mp-product" placeholder="Product name"></td><td><input class="fi mono mp-qty" value="1" oninput="calcManualPurchase()"></td><td><select class="fi mp-unit"><option>PCS</option><option>BOX</option><option>PACK</option><option>CTN</option><option>KG</option><option>LTR</option><option>Unit</option></select></td><td><input class="fi mono mp-units-outer" value="1" placeholder="1"></td><td><input class="fi mono mp-cost" value="0.00" oninput="calcManualPurchase()"></td><td><input class="fi mono mp-discount-pct" value="0" oninput="calcManualPurchase()"></td><td class="mono mp-before-tax">0.00</td><td class="mono mp-line-total">0.00</td><td><input class="fi mono mp-margin" value="0" oninput="calcManualPurchase()"></td><td class="mono mp-selling">0.00</td><td><button class="icon-btn danger" type="button" onclick="removeManualPurchaseLine(this)" title="Remove line">${deleteIconSvg()}</button></td>`;
   tbody.appendChild(row);
   calcManualPurchase();
   refreshEnhancedTable(tbody.closest('table'));
@@ -2417,6 +2811,8 @@ function collectManualPurchaseLines(){
   return [...document.querySelectorAll('#mp-lines tr')].map(row=>({
     product:row.querySelector('.mp-product')?.value||'',
     quantity:parseAmount(row.querySelector('.mp-qty')?.value),
+    unit_of_measure:row.querySelector('.mp-unit')?.value||'PCS',
+    units_per_outer:parseAmount(row.querySelector('.mp-units-outer')?.value)||1,
     unit_cost:parseAmount(row.querySelector('.mp-cost')?.value),
     discount_percent:parseAmount(row.querySelector('.mp-discount-pct')?.value),
     profit_margin:parseAmount(row.querySelector('.mp-margin')?.value),
@@ -2444,7 +2840,8 @@ function calcManualPurchase(){
   const rows=[...document.querySelectorAll('#mp-lines tr')];
   let net=0;
   rows.forEach((row,index)=>{
-    row.children[0].textContent=String(index+1);
+    const lineNo=row.querySelector('.line-no')||row.children[0];
+    lineNo.textContent=String(index+1);
     const qty=parseAmount(row.querySelector('.mp-qty')?.value);
     const cost=parseAmount(row.querySelector('.mp-cost')?.value);
     const discountPct=parseAmount(row.querySelector('.mp-discount-pct')?.value);
@@ -2498,9 +2895,13 @@ function saveManualPurchase(){
   setManualPurchaseDefaults();
   const totals=calcManualPurchase();
   const supplier=document.getElementById('mp-supplier')?.value||'';
-  const status=document.getElementById('mp-status')?.value||'Draft';
+  const status=totals.due<=0?'Paid':'Pending Payment';
   if(!supplier){
     toast('Select supplier','warn');
+    return;
+  }
+  if(!document.querySelector('#mp-lines tr')){
+    toast('Add at least one product','warn');
     return;
   }
   const ref=(document.getElementById('mp-ref')?.value||`PUR-${Date.now()}`).trim();
@@ -2510,7 +2911,7 @@ function saveManualPurchase(){
     address:document.getElementById('mp-address')?.value||'',
     date:document.getElementById('mp-date')?.value||'',
     status,
-    location:document.getElementById('mp-location')?.value||'Nuevo (BL0001)',
+    location:'Main Store',
     pay_term:document.getElementById('mp-term')?.value||'',
     items:totals.items,
     net_amount:totals.net,
@@ -2574,6 +2975,8 @@ function addManualPurchaseLineFromData(line={}){
   if(!row)return;
   row.querySelector('.mp-product').value=line.product||line.name||'Purchase item';
   row.querySelector('.mp-qty').value=line.quantity||line.qty||1;
+  setSelectValue(row.querySelector('.mp-unit'),line.unit_of_measure||line.unit||line.uom||'PCS');
+  row.querySelector('.mp-units-outer').value=line.units_per_outer||line.unitsOuter||line.conversion_factor||1;
   row.querySelector('.mp-cost').value=line.unit_cost||line.cost||line.unitCost||0;
   row.querySelector('.mp-discount-pct').value=line.discount_percent||line.discountPct||0;
   row.querySelector('.mp-margin').value=line.profit_margin||line.margin||0;
@@ -2591,9 +2994,7 @@ function editPurchaseRecord(btn){
   setSelectValue(document.getElementById('mp-supplier'),purchase.supplier);
   setFieldValue(document.getElementById('mp-ref'),purchase.ref);
   setFieldValue(document.getElementById('mp-date'),purchase.date);
-  setSelectValue(document.getElementById('mp-status'),purchase.status||'Draft');
   setFieldValue(document.getElementById('mp-address'),purchase.address||'');
-  setSelectValue(document.getElementById('mp-location'),purchase.location||'Nuevo (BL0001)');
   setSelectValue(document.getElementById('mp-term'),purchase.pay_term||'');
   setSelectValue(document.getElementById('mp-discount-type'),purchase.discount_type||'None');
   setFieldValue(document.getElementById('mp-discount'),purchase.discount_value||purchase.discount||0);
@@ -2626,20 +3027,76 @@ let productTargetLine=null;
 function addLine(){
   lineCount++;
   const d=document.createElement('div');d.className='inv-item';
-  d.innerHTML=`<input class="fi" placeholder="Description" style="font-size:12.5px"><input class="fi" value="1" style="font-size:12.5px" oninput="calcLine(this)"><input class="fi" value="0.00" style="font-size:12.5px" oninput="calcLine(this)"><input class="fi mono" value="0.00" readonly style="background:var(--bg)"><button class="btn btn-g" style="padding:4px 8px" onclick="remLine(this)">?</button>`;
+  d.classList.add('sales-inv-line');
+  d.innerHTML=`<input class="fi inv-product" list="invoice-product-options" placeholder="Description" style="font-size:12.5px" onfocus="refreshInvoiceProductSuggestions()" onchange="applyInvoiceProductSuggestion(this)"><input class="fi inv-unit" value="PCS" readonly style="font-size:12.5px;background:var(--bg)"><input class="fi inv-qty" value="1" style="font-size:12.5px" oninput="calcLine(this)"><input class="fi inv-price" value="0.00" style="font-size:12.5px" oninput="calcLine(this)"><input class="fi mono inv-amount" value="0.00" readonly style="background:var(--bg)"><button class="btn btn-g" style="padding:4px 8px" onclick="remLine(this)">x</button>`;
   document.getElementById('inv-lines').appendChild(d);
+  refreshInvoiceProductSuggestions();
   calcLine(null);
   return d;
 }
 function remLine(btn){btn.closest('.inv-item').remove();calcLine(null);}
 function calcLine(inp){
-  if(inp){const row=inp.closest('.inv-item');const inputs=[...row.querySelectorAll('input')];const qty=parseFloat(inputs[1].value)||0,price=parseFloat(inputs[2].value)||0;inputs[3].value=(qty*price).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  if(inp){
+    const row=inp.closest('.inv-item');
+    const qty=parseAmount(row?.querySelector('.inv-qty')?.value);
+    const price=parseAmount(row?.querySelector('.inv-price')?.value);
+    const amount=row?.querySelector('.inv-amount');
+    if(amount)amount.value=(qty*price).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
   let sub=0;
-  document.querySelectorAll('#inv-lines .inv-item').forEach(r=>{const ins=[...r.querySelectorAll('input')];sub+=(parseFloat(ins[1].value)||0)*(parseFloat(ins[2].value)||0);});
+  document.querySelectorAll('#inv-lines .inv-item').forEach(r=>{
+    sub+=parseAmount(r.querySelector('.inv-qty')?.value)*parseAmount(r.querySelector('.inv-price')?.value);
+  });
   const vat=sub*0.05,tot=sub+vat;
   document.getElementById('subtotal').textContent='AED '+sub.toLocaleString('en-AE',{minimumFractionDigits:2});
   document.getElementById('vat-amt').textContent='AED '+vat.toLocaleString('en-AE',{minimumFractionDigits:2});
   document.getElementById('inv-total').textContent='AED '+tot.toLocaleString('en-AE',{minimumFractionDigits:2});
+}
+
+function invoiceProductRecords(){
+  const records=[];
+  document.querySelectorAll('#prod-tbody tr:not([data-empty-state])').forEach(row=>{
+    const cells=row.children;
+    const code=cells[0]?.textContent.trim()||'';
+    const name=cells[1]?.textContent.trim()||'';
+    if(!name)return;
+    const isItemMasterRow=cells.length>=9;
+    records.push({
+      code,
+      name,
+      unit:(isItemMasterRow?cells[4]?.textContent.trim():cells[3]?.textContent.trim())||'PCS',
+      price:isItemMasterRow?0:parseAmount(cells[4]?.textContent)
+    });
+  });
+  document.querySelectorAll('#stock-map-tbody tr:not([data-empty-state])').forEach(row=>{
+    const name=row.children[2]?.textContent.trim()||row.children[0]?.textContent.trim()||'';
+    if(!name||records.some(item=>item.name.toLowerCase()===name.toLowerCase()))return;
+    const itemRow=[...document.querySelectorAll('#prod-tbody tr:not([data-empty-state])')]
+      .find(item=>(item.children[1]?.textContent.trim()||'').toLowerCase()===(row.children[0]?.textContent.trim()||'').toLowerCase());
+    records.push({code:row.dataset.stockSku||'',name,unit:itemRow?.children[4]?.textContent.trim()||'PCS',price:Number(row.dataset.priceOuter||0)});
+  });
+  return records;
+}
+
+function refreshInvoiceProductSuggestions(){
+  const list=document.getElementById('invoice-product-options');
+  if(!list)return;
+  list.innerHTML=invoiceProductRecords()
+    .map(item=>`<option value="${escapeHtml(item.name)}" label="${escapeHtml([item.code,item.unit].filter(Boolean).join(' - '))}"></option>`)
+    .join('');
+}
+
+function applyInvoiceProductSuggestion(input){
+  const value=(input?.value||'').trim().toLowerCase();
+  if(!value)return;
+  const match=invoiceProductRecords().find(item=>[item.name,item.code].some(text=>String(text||'').toLowerCase()===value));
+  if(!match)return;
+  const row=input.closest('.inv-item');
+  const unit=row?.querySelector('.inv-unit');
+  const price=row?.querySelector('.inv-price');
+  if(unit)unit.value=match.unit||'PCS';
+  if(price&&match.price)price.value=Number(match.price).toFixed(2);
+  calcLine(price||input);
 }
 
 function editProd(code){
@@ -2694,8 +3151,8 @@ function openAddProductFromInvoice(){
   syncProductMasterOptions();
   productReturnToInvoice=true;
   productTargetLine=document.activeElement?.closest?.('.inv-item')||[...document.querySelectorAll('#inv-lines .inv-item')].find(row=>!(row.querySelector('input')?.value||'').trim())||document.querySelector('#inv-lines .inv-item')||addLine();
-  const currentName=productTargetLine?.querySelector('input')?.value||'';
-  const currentPrice=productTargetLine?.querySelectorAll('input')?.[2]?.value||'';
+  const currentName=productTargetLine?.querySelector('.inv-product')?.value||'';
+  const currentPrice=productTargetLine?.querySelector('.inv-price')?.value||'';
   document.getElementById('prod-name').value=currentName;
   document.getElementById('prod-price').value=currentPrice;
   showM('m-product');
@@ -2724,13 +3181,17 @@ function saveProd(){
   row.innerHTML=`<td class="mono">${escapeHtml(code)}</td><td>${escapeHtml(name)}</td><td><span class="b b-gray">${escapeHtml(category)}</span></td><td>${escapeHtml(unit)}</td><td class="mono">${price.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td><span class="b ${vatClass}">${escapeHtml(vatText)}</span></td><td><span class="b b-g">Active</span></td><td><button class="btn btn-g btn-sm" onclick="editProd(this.closest('tr').querySelector('td').textContent)">Edit</button></td>`;
   tbody.prepend(row);
   saveServer('products',{code,name,category,unit,price,vat});
+  refreshInvoiceProductSuggestions();
 
   closeM('m-product');
   if(shouldFillInvoice&&targetLine){
-    const inputs=[...targetLine.querySelectorAll('input')];
-    if(inputs[0])inputs[0].value=name;
-    if(inputs[2])inputs[2].value=price.toFixed(2);
-    calcLine(inputs[2]||null);
+    const productInput=targetLine.querySelector('.inv-product');
+    const unitInput=targetLine.querySelector('.inv-unit');
+    const priceInput=targetLine.querySelector('.inv-price');
+    if(productInput)productInput.value=name;
+    if(unitInput)unitInput.value=unit;
+    if(priceInput)priceInput.value=price.toFixed(2);
+    calcLine(priceInput||null);
   }
 
   ['prod-code','prod-name','prod-price','prod-desc'].forEach(id=>{
@@ -3355,7 +3816,7 @@ function runAIReport(){
     summary.textContent='AI detected strong revenue growth, stable gross margin, and a collection risk concentrated in one 61-90 day customer balance. VAT payable is manageable if purchase invoice exceptions are cleared before filing.';
   }
   if(actions){
-    actions.innerHTML='<div>- Prioritize Emirates Supplies collection before month-end.</div><div>- Clear supplier TRN and VAT math exceptions before VAT return approval.</div><div>- Model supplier discount impact because COGS is the largest profit lever.</div>';
+    actions.innerHTML='<div>- Prioritize overdue collection before month-end.</div><div>- Clear supplier TRN and VAT math exceptions before VAT return approval.</div><div>- Model supplier discount impact because COGS is the largest profit lever.</div>';
   }
   if(output){
     output.innerHTML=`<strong style="color:var(--text)">${reportType}</strong><br>Revenue is trending ahead of prior month by 14.2%, while gross margin remains healthy at 34.0%. The main operational risk is receivables aging: AED 32,550 is now in the 61-90 day bucket. VAT payable is AED 16,410, with AI recommending invoice validation cleanup before export. Cash remains positive over 60 days but turns negative in the 90-day forecast unless collections improve.`;
@@ -3415,7 +3876,7 @@ function buildSystemAIResponse(question){
     return 'Purchases support document upload and extraction through the backend app-data API. Extracted purchase invoices are saved to the database, can be reviewed, corrected, and validated before becoming records.';
   }
   if(q.includes('bill')||q.includes('vendor')||q.includes('payable')||q.includes('purchase order')){
-    return 'Bills & Vendors covers vendor bills, supplier directory, purchase orders, and aged payables. Use it to record payables, track due dates, manage vendor TRNs, and monitor supplier balances before payment.';
+    return 'Bills covers vendor bills, purchase orders, and aged payables. Supplier and vendor directory is managed from the Purchase module.';
   }
   if(q.includes('payment')||q.includes('receipt')||q.includes('gateway')||q.includes('settlement')){
     return 'Payments tracks customer receipts, supplier payments, and gateway settlements. Customer receipts can be allocated to invoices, supplier payments can clear bills, and gateway settlement views show gross, fees, and net amounts.';
@@ -3465,7 +3926,7 @@ function buildSystemAIResponse(question){
   if(q.includes('roadmap')||q.includes('production')||q.includes('improve')||q.includes('backend')||q.includes('database')){
     return 'Production priorities: add authentication, tenant/company scoping, database persistence, object storage for uploaded files, real extraction APIs, audit trails, role permissions, backend AI, eInvoicing adapters, bank integrations, tests, and CI. The detailed backlog is in docs/improvement-roadmap.md.';
   }
-  return 'TaxFlow is organized into Dashboard, Sales & Invoices, Purchases, Expenses, Bank, Accounting, Reports, Inventory, Staff, Payroll, Expert Review, Mobile App, Settings, and this AI Assistant. Ask about a module name or workflow such as invoice creation, purchase extraction, journal posting, VAT filing, payroll WPS, settings, or production roadmap.';
+  return 'TaxFlow is organized into Dashboard, Sales & Invoices, Quotations, Purchases, Expenses, Bank, Accounting, Reports, Inventory, Staff, Payroll, Expert Review, Settings, and this AI Assistant. Ask about a module name or workflow such as quotation creation, invoice creation, purchase extraction, stock mapping, journal posting, VAT filing, payroll WPS, settings, or production roadmap.';
 }
 
 function askSystemAI(prompt){
@@ -3591,7 +4052,19 @@ function tableControlsTemplate(){
   `;
 }
 
+function skipTableTools(table){
+  return table?.dataset?.noTableTools==='1';
+}
+
 function enhanceTable(table){
+  if(skipTableTools(table)){
+    addTableDeleteActions(table);
+    getTableRows(table).forEach(row=>{
+      row.style.display='';
+      row.hidden=false;
+    });
+    return;
+  }
   removeDuplicateTablePagers(table.closest('.page')||document);
   if(table.closest('.tbl-scroll')&&tableEnhanceState.has(table)){
     refreshEnhancedTable(table);
@@ -3889,6 +4362,13 @@ function getTableRows(table){
 
 function refreshEnhancedTable(table){
   if(!table)return;
+  if(skipTableTools(table)){
+    getTableRows(table).forEach(row=>{
+      row.style.display='';
+      row.hidden=false;
+    });
+    return;
+  }
   const state=tableEnhanceState.get(table);
   if(!state){
     enhanceTable(table);
@@ -4220,6 +4700,7 @@ function inferCollectionFromContext(node){
     'prod-tbody':'products',
     'customer-tbody':'customers',
     'sales-invoice-tbody':'salesInvoices',
+    'quotation-tbody':'quotations',
     'bill-tbody':'bills',
     'vendor-tbody':'vendors',
     'payment-in-tbody':'payments',
@@ -4333,9 +4814,8 @@ function saveVendor(){
   const email=(document.getElementById('vendor-email')?.value||'').trim();
   if(!name){toast('Vendor name is required','err');return;}
   if(trn&&trn.length!==15){toast('Vendor TRN must be 15 digits','err');return;}
-  const row=document.createElement('tr');
-  row.innerHTML=`<td>${escapeHtml(name)}</td><td class="mono">${escapeHtml(trn||'Not registered')}</td><td>${escapeHtml(category)}</td><td>${escapeHtml(email||'-')}</td><td class="mono">0.00</td><td><span class="b b-g">Active</span></td>`;
-  document.getElementById('vendor-tbody')?.prepend(row);
+  renderVendorRecord({name,trn,category,email});
+  syncSupplierOptions(name);
   saveServer('vendors',{name,trn,category,email});
   closeM('m-vendor');
   toast('Vendor added ?','ok');
@@ -4384,6 +4864,156 @@ function runBackup(){
   setTimeout(()=>{toast('Encrypted backup completed ?','ok');audit('Completed encrypted backup','Full tenant','Complete');},1200);
 }
 
+function quotationNumber(){
+  return document.getElementById('quote-no')?.value?.trim()||'QTN-2024-0063';
+}
+
+function calcQuotationTotals(){
+  let subtotal=0;
+  document.querySelectorAll('#quote-lines .quote-line').forEach(line=>{
+    const qty=Number(line.querySelector('.quote-qty')?.value||0);
+    const price=Number(line.querySelector('.quote-price')?.value||0);
+    const amount=qty*price;
+    subtotal+=amount;
+    const target=line.querySelector('.quote-amount');
+    if(target)target.value=amount.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  });
+  const vat=subtotal*0.05;
+  const total=subtotal+vat;
+  const sub=document.getElementById('quote-subtotal');
+  const vatEl=document.getElementById('quote-vat');
+  const totalEl=document.getElementById('quote-total');
+  if(sub)sub.textContent=formatAed(subtotal);
+  if(vatEl)vatEl.textContent=formatAed(vat);
+  if(totalEl)totalEl.textContent=formatAed(total);
+}
+
+function calcQuotationLine(input){
+  calcQuotationTotals();
+}
+
+function addQuotationLine(){
+  const box=document.getElementById('quote-lines');
+  if(!box)return;
+  const row=document.createElement('div');
+  row.className='inv-item quote-line';
+  row.innerHTML=`<input class="fi" placeholder="Description"><input class="fi quote-qty" value="1" oninput="calcQuotationLine(this)"><input class="fi quote-price" value="0.00" oninput="calcQuotationLine(this)"><input class="fi mono quote-amount" value="0.00" readonly style="background:var(--bg)"><button class="btn btn-g" style="padding:4px 8px" onclick="removeQuotationLine(this)">x</button>`;
+  box.appendChild(row);
+  calcQuotationTotals();
+}
+
+function removeQuotationLine(btn){
+  btn.closest('.quote-line')?.remove();
+  calcQuotationTotals();
+}
+
+function previewQuotation(btn){
+  const quote=quotationRecordFromRow(btn.closest('tr'));
+  openRowDetail(btn,'Quotation Preview',quote.quote_no||'Quotation');
+  audit('Viewed quotation',quote.quote_no||'Quotation','Opened');
+}
+
+function shareQuotation(btn){
+  const quote=quotationRecordFromRow(btn.closest('tr'));
+  saveServer('quotations',{...quote,last_shared_at:new Date().toISOString()});
+  toast(`Share link prepared for ${quote.quote_no||'quotation'}`,'ok');
+}
+
+function convertQuotation(btn){
+  const row=btn.closest('tr');
+  const quote=quotationRecordFromRow(row);
+  const badge=row?.querySelector('td:nth-child(8) .b');
+  if(badge){
+    badge.classList.remove('b-a','b-r','b-b','b-gray');
+    badge.classList.add('b-g');
+    badge.textContent='Converted';
+  }
+  const updated={...quote,status:'Converted',converted_at:new Date().toISOString()};
+  row.dataset.quotation=JSON.stringify(updated);
+  saveServer('quotations',updated);
+  const invoiceNo=`INV-${String(quote.quote_no||Date.now()).replace(/^QTN-?/,'')}`;
+  const invoice={
+    invoice_no:invoiceNo,
+    customer:quote.customer||'Customer',
+    date:new Date().toISOString().split('T')[0],
+    due_date:'30 days',
+    subtotal:parseAmount(quote.subtotal),
+    vat_amount:parseAmount(quote.vat_amount),
+    total:parseAmount(quote.total),
+    source:'Quotation',
+    status:'Draft',
+    quotation_no:quote.quote_no||''
+  };
+  addSalesInvoiceRow(invoice,{persist:false});
+  saveServer('salesInvoices',invoice);
+  toast(`${quote.quote_no||'Quotation'} converted to invoice draft ${invoiceNo}`,'ok');
+}
+
+function saveQuotationDraft(){
+  calcQuotationTotals();
+  saveServer('quotations',buildDraftQuotationRecord('Draft'));
+  toast(`${quotationNumber()} saved as draft`,'ok');
+}
+
+function previewDraftQuotation(){
+  calcQuotationTotals();
+  toast(`Preview opened for ${quotationNumber()}`,'info');
+}
+
+function shareDraftQuotation(){
+  calcQuotationTotals();
+  saveServer('quotations',{...buildDraftQuotationRecord('Draft'),last_shared_at:new Date().toISOString()});
+  toast(`Share link prepared for ${quotationNumber()}`,'ok');
+}
+
+function buildDraftQuotationRecord(status='Sent'){
+  return {
+    quote_no:quotationNumber(),
+    customer:document.getElementById('quote-customer')?.value?.trim()||'New Customer',
+    date:document.getElementById('quote-date')?.value||'Today',
+    valid_until:document.getElementById('quote-valid')?.value||'15 days',
+    subtotal:document.getElementById('quote-subtotal')?.textContent?.replace('AED ','')||'0.00',
+    vat_amount:document.getElementById('quote-vat')?.textContent?.replace('AED ','')||'0.00',
+    total:document.getElementById('quote-total')?.textContent?.replace('AED ','')||'0.00',
+    status,
+    owner:'Sales Team',
+    subject:document.getElementById('quote-subject')?.value?.trim()||''
+  };
+}
+
+function sendDraftQuotation(){
+  calcQuotationTotals();
+  const record=buildDraftQuotationRecord('Sent');
+  renderQuotationRecord(record);
+  saveServer('quotations',record);
+  stab(document.querySelector('#page-quotations .tab:nth-child(1)'),'q-list');
+  toast(`${quotationNumber()} sent to customer`,'ok');
+}
+
+function separateCorporateAccountingModule(){
+  const target=document.getElementById('corporate-accounting-bodies');
+  if(!target||target.dataset.ready==='1')return;
+  const idMap={
+    'acc-corp-tax':'corp-tax',
+    'acc-assets':'corp-assets',
+    'acc-accruals':'corp-accruals',
+    'acc-cost-centers':'corp-cost-centers',
+    'acc-budget':'corp-budget',
+    'acc-cashflow':'corp-cashflow',
+    'acc-credit':'corp-credit',
+    'acc-consolidation':'corp-consolidation',
+    'acc-approval':'corp-approval'
+  };
+  Object.entries(idMap).forEach(([oldId,newId],index)=>{
+    const section=document.getElementById(oldId);
+    if(!section)return;
+    section.id=newId;
+    section.classList.toggle('on',index===0);
+    target.appendChild(section);
+  });
+  target.dataset.ready='1';
+}
+
 function initApp(){
   if(window.__taxflowAppInitialized)return;
   window.__taxflowAppInitialized=true;
@@ -4403,6 +5033,8 @@ function initApp(){
       document.querySelectorAll('.overlay.on').forEach(modal=>modal.classList.remove('on'));
     }
   });
+  separateCorporateAccountingModule();
+  clearStaticDemoData();
   watchVisibleTablePagination();
   applyAllTableActions();
   updateBackButton();
@@ -4415,8 +5047,8 @@ function initApp(){
   setManualPurchaseDefaults();
   syncCompanyFromDatabase();
   syncDashboardFromDatabase();
+  hydrateFromServer();
   enhancePageTables('page-dashboard');
-  scheduleIdleTask(()=>hydrateFromServer(),500);
   scheduleIdleTask(()=>{
     updateAccountSelectors();
     recalcJournal();

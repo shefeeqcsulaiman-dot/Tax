@@ -48,7 +48,7 @@ function TaxFlowLegacyApp({ onLogout }) {
     let cancelled = false;
 
     async function mountOriginalDesign() {
-      const response = await fetch("/taxflow/index.html");
+      const response = await fetch(`/taxflow/index.html?v=${Date.now()}`, { cache: "no-store" });
       const html = await response.text();
       if (cancelled) return;
 
@@ -56,19 +56,22 @@ function TaxFlowLegacyApp({ onLogout }) {
       document.body.className = doc.body.className || "theme-light";
       document.title = doc.title || "TaxFlow UAE - Business Management Platform";
       ensureStylesheet("taxflow-fonts", "https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap");
-      ensureStylesheet("taxflow-original-css", "/taxflow/src/styles.css");
+      ensureStylesheet("taxflow-original-css", `/taxflow/src/styles.css?v=${Date.now()}`);
 
       document.body.innerHTML = doc.body.innerHTML
         .replace(/<script[\s\S]*?<\/script>/gi, "")
         .replace(/<noscript[\s\S]*?<\/noscript>/gi, "");
 
       window.__taxflowLogout = onLogout;
-      window.TAXFLOW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || `http://${window.location.hostname || "127.0.0.1"}:8000/api/v1`;
+      const localApiHost = ["localhost", "::1", ""].includes(window.location.hostname) ? "127.0.0.1" : window.location.hostname;
+      window.TAXFLOW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || `http://${localApiHost}:8000/api/v1`;
       await loadScriptFresh(`/taxflow/src/app.js?v=${Date.now()}`);
       patchLegacyLogout(onLogout);
       patchBackendBridge();
       if (!window.__taxflowAppInitialized) window.initApp?.();
       window.go?.("dashboard");
+      window.forceDbRefresh?.();
+      window.setTimeout?.(() => window.forceDbRefresh?.(), 700);
       window.toast?.("TaxFlow app loaded", "ok");
     }
 
@@ -85,7 +88,11 @@ function TaxFlowLegacyApp({ onLogout }) {
 }
 
 function ensureStylesheet(id, href) {
-  if (document.getElementById(id)) return;
+  const existing = document.getElementById(id);
+  if (existing) {
+    existing.href = href;
+    return;
+  }
   const link = document.createElement("link");
   link.id = id;
   link.rel = "stylesheet";
