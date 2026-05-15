@@ -70,8 +70,12 @@ function TaxFlowLegacyApp({ onLogout }) {
       patchBackendBridge();
       if (!window.__taxflowAppInitialized) window.initApp?.();
       window.go?.("dashboard");
-      window.forceDbRefresh?.();
-      window.setTimeout?.(() => window.forceDbRefresh?.(), 700);
+      try {
+        window.forceDbRefresh?.();
+        window.setTimeout?.(() => window.forceDbRefresh?.(), 700);
+      } catch (refreshError) {
+        console.warn("TaxFlow database refresh failed after mount:", refreshError);
+      }
       window.toast?.("TaxFlow app loaded", "ok");
     }
 

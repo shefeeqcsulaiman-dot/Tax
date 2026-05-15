@@ -517,7 +517,7 @@
           <div class="flx" style="justify-content:center;gap:6px;margin-top:12px">
             <span class="b b-r">PDF</span><span class="b b-g">CSV</span><span class="b b-b">XLSX</span><span class="b b-a">ZIP</span>
           </div>
-          <input type="file" id="pur-file" style="display:none" multiple accept=".pdf,.csv,.xlsx,.xls,.zip" onchange="purUpload(this)">
+          <input type="file" id="pur-file" style="display:none" multiple accept=".pdf,.jpg,.jpeg,.png,.csv,.xlsx,.zip" onchange="purUpload(this)">
         </div>
         <div class="card">
           <div class="card-hd"><div class="card-title">Upload Settings</div></div>
@@ -562,9 +562,9 @@
         <div class="flx"><button class="btn btn-g btn-sm" onclick="togglePurchaseAiSelection(true)">Select All</button><button class="btn btn-g btn-sm" onclick="runOCR()">Run Extraction</button><button class="btn btn-p btn-sm" onclick="storeExtractedPurchaseRecords()">Save All</button></div>
       </div>
       <table class="tbl" data-delete-actions-bound="skip">
-        <thead><tr><th style="width:42px"><input type="checkbox" aria-label="Select all purchase AI invoices" onchange="togglePurchaseAiSelection(this.checked)"></th><th>Invoice No.</th><th>Date</th><th>Supplier</th><th>Supplier TRN</th><th>Subtotal</th><th>VAT 5%</th><th>Total</th><th>Confidence</th><th>Validation</th><th>Details</th><th>Actions</th></tr></thead>
+        <thead><tr><th style="width:42px"><input type="checkbox" aria-label="Select all purchase AI invoices" onchange="togglePurchaseAiSelection(this.checked)"></th><th>Details</th><th>Actions</th><th>Invoice No.</th><th>Purchase Date</th><th>Supplier</th><th>Address</th><th>Pay Term</th><th>Product Name</th><th>Purchase Qty</th><th>Unit</th><th>Unit Cost Before Discount</th><th>Discount %</th><th>Unit Cost Before Tax</th><th>Line Total</th><th>Profit Margin %</th><th>Selling Price Inc. Tax</th><th>Discount Type</th><th>Discount Amount</th><th>Purchase Tax</th><th>Shipping Details</th><th>Shipping Charges</th><th>Paid Amount</th><th>Paid On</th><th>Payment Method</th><th>Payment Account</th><th>Payment Note</th><th>Notes</th><th>Payment Due</th><th>Validation</th></tr></thead>
         <tbody id="ext-tbody">
-          <tr><td colspan="12" style="color:var(--text3);text-align:center">AI uploaded purchase data will appear here for validation.</td></tr>
+          <tr><td colspan="30" style="color:var(--text3);text-align:center">AI uploaded purchase data will appear here for validation.</td></tr>
         </tbody>
       </table>
       <div id="ext-prog" style="display:none;margin-top:14px">
@@ -620,7 +620,7 @@
     <div class="card mb16">
       <div class="card-hd"><div><div class="card-title" id="mp-form-title">Add Purchase</div><div class="card-sub" id="mp-form-sub">Manual supplier purchase entry with items, discounts, tax, shipping, and payment</div></div><button class="btn btn-g btn-sm" onclick="resetManualPurchase()">Clear</button></div>
       <div class="fr3">
-        <div class="fg"><label class="fl">Supplier *</label><div class="field-action-row"><select class="fi" id="mp-supplier"><option value="">Please Select</option><option>Al Hamad Steel</option><option>Gulf Freight</option><option>Office Depot UAE</option><option>UAE Paints Co.</option></select><button class="btn btn-g btn-sm" type="button" onclick="openSupplierPopup()">+ Add</button></div></div>
+        <div class="fg"><label class="fl">Supplier *</label><div class="field-action-row"><select class="fi" id="mp-supplier" onchange="applySupplierAddress()"><option value="">Please Select</option><option>Al Hamad Steel</option><option>Gulf Freight</option><option>Office Depot UAE</option><option>UAE Paints Co.</option></select><button class="btn btn-g btn-sm" type="button" onclick="openSupplierPopup()">+ Add</button></div></div>
         <div class="fg"><label class="fl">Reference No.</label><input class="fi mono" id="mp-ref" placeholder="PUR-2026-0001"></div>
         <div class="fg"><label class="fl">Purchase Date *</label><input class="fi" id="mp-date" type="datetime-local"></div>
       </div>
@@ -637,9 +637,10 @@
         <div class="flx"><button class="btn btn-g btn-sm" onclick="toast('Product import ready','info')">Import Products</button><button class="btn btn-p btn-sm" onclick="addManualPurchaseLine()">+ Add Product</button></div>
       </div>
       <table class="tbl" data-delete-actions-bound="skip" data-no-table-tools="1">
-        <thead><tr><th class="line-no-head">#</th><th>Product Name</th><th>Purchase Quantity</th><th>Unit of Measure</th><th>Units/Outer</th><th>Unit Cost Before Discount</th><th>Discount %</th><th>Unit Cost Before Tax</th><th>Line Total</th><th>Profit Margin %</th><th>Unit Selling Price Inc. Tax</th><th></th></tr></thead>
+        <thead><tr><th class="line-no-head">#</th><th>Product Name</th><th>Purchase Quantity</th><th>Unit of Measure</th><th>Unit Cost Before Discount</th><th>Discount %</th><th>Unit Cost Before Tax</th><th>Line Total</th><th>Profit Margin %</th><th>Unit Selling Price Inc. Tax</th><th></th></tr></thead>
         <tbody id="mp-lines"></tbody>
       </table>
+      <datalist id="purchase-product-options"></datalist>
       <div class="flx-b" style="justify-content:flex-end;gap:26px;margin-top:14px">
         <div><strong>Total Items:</strong> <span class="mono" id="mp-total-items">0</span></div>
         <div><strong>Net Total Amount:</strong> <span class="mono" id="mp-net-total">0.00</span></div>
@@ -704,7 +705,7 @@
     <div class="card">
       <div class="card-hd"><div class="card-title">Vendor Directory</div><button class="btn btn-p btn-sm" onclick="showM('m-vendor')">+ Add Vendor</button></div>
       <table class="tbl">
-        <thead><tr><th>Vendor</th><th>TRN</th><th>Category</th><th>Email</th><th>Open Balance</th><th>Status</th></tr></thead>
+        <thead><tr><th>Vendor</th><th>TRN</th><th>Category</th><th>Email</th><th>Address</th><th>Open Balance</th><th>Status</th></tr></thead>
         <tbody id="vendor-tbody">
           <tr><td>Al Hamad Steel</td><td class="mono">100224455600003</td><td>Materials</td><td>accounts@alhamadsteel.ae</td><td class="mono">AED 29,400</td><td><span class="b b-g">Active</span></td></tr>
           <tr><td>Gulf Freight</td><td class="mono">100445566700004</td><td>Logistics</td><td>ap@gulffreight.ae</td><td class="mono">AED 12,600</td><td><span class="b b-g">Active</span></td></tr>
@@ -1733,7 +1734,7 @@
       <div class="stat"><div class="stat-lbl">Out of Stock</div><div class="stat-val" style="color:var(--red)">6</div><div class="stat-delta">need reorder</div></div>
     </div>
     <div class="card">
-      <div class="card-hd"><div class="card-title">Current Stock Levels</div><button class="btn btn-p" onclick="showM('m-inv-item')">+ Add Item</button></div>
+      <div class="card-hd"><div class="card-title">Current Stock Levels</div><button class="btn btn-p" onclick="openInventoryItemModal()">+ Add Item</button></div>
       <table class="tbl">
         <thead><tr><th>Item Code</th><th>Item Name</th><th>Category</th><th>Available</th><th>Reserved</th><th>Unit</th><th>Reorder Level</th><th>Status</th><th></th></tr></thead>
         <tbody>
@@ -1748,7 +1749,7 @@
 
   <div class="tab-body" id="inv-items">
     <div class="card">
-      <div class="card-hd"><div class="card-title">Item Master</div><button class="btn btn-p" onclick="showM('m-inv-item')">+ New Item</button></div>
+      <div class="card-hd"><div class="card-title">Item Master</div><button class="btn btn-p" onclick="openInventoryItemModal()">+ New Item</button></div>
       <table class="tbl">
         <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Category</th><th>Unit</th><th>Default Warehouse</th><th>Tracking</th><th>VAT</th><th>Status</th></tr></thead>
         <tbody id="prod-tbody">
@@ -1783,7 +1784,7 @@
   <div class="tab-body" id="inv-mapping">
     <div class="g2 mb16">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">Stock Mapping</div><div class="card-sub">Item Master list with TaxFlow mapping status</div></div></div>
+        <div class="card-hd"><div><div class="card-title">Stock Mapping</div><div class="card-sub">Item Master list with TaxFlow mapping status</div></div><button class="btn btn-p btn-sm" type="button" onclick="openNewStockMap()">+ Add Mapping</button></div>
         <table class="tbl" data-delete-actions-bound="skip">
           <thead><tr><th>Name</th><th>Supplier Name</th><th>TaxFlow Name</th><th>Units/Outer</th><th>Mapping Status</th><th>Actions</th></tr></thead>
           <tbody id="stock-map-tbody">
@@ -4423,6 +4424,7 @@ period_locks ─< audit_logs
     <div class="fg"><label class="fl">Vendor Name</label><input class="fi" id="vendor-name" placeholder="Vendor company"></div>
     <div class="fr2"><div class="fg"><label class="fl">TRN</label><input class="fi mono" id="vendor-trn" maxlength="15" placeholder="15-digit TRN"></div><div class="fg"><label class="fl">Category</label><select class="fi" id="vendor-category"><option>Materials</option><option>Logistics</option><option>Supplies</option><option>Services</option></select></div></div>
     <div class="fr2"><div class="fg"><label class="fl">Email</label><input class="fi" id="vendor-email" type="email"></div><div class="fg"><label class="fl">Phone</label><input class="fi" id="vendor-phone"></div></div>
+    <div class="fg"><label class="fl">Address</label><textarea class="fi" id="vendor-address" rows="3" placeholder="Vendor billing or delivery address"></textarea></div>
     <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-vendor')">Cancel</button><button class="btn btn-p" onclick="saveVendor()">Save Vendor</button></div>
   </div>
 </div>
@@ -4598,15 +4600,15 @@ period_locks ─< audit_logs
 
 <div class="overlay" id="m-inv-item" onclick="closeOvBg(event,'m-inv-item')">
   <div class="modal modal-lg"><div class="modal-title">Add Inventory Item</div><div class="modal-sub">Add item, stock settings, warehouse, and accounting mappings</div>
-    <div class="fr2"><div class="fg"><label class="fl">Item Code</label><input class="fi mono" placeholder="ITM-005"></div><div class="fg"><label class="fl">Category</label><select class="fi"><option>Materials</option><option>Supplies</option><option>PPE</option><option>Tools</option></select></div></div>
-    <div class="fg"><label class="fl">Item Name</label><input class="fi" placeholder="Full item name"></div>
-    <div class="fr3"><div class="fg"><label class="fl">Unit of Measure</label><select class="fi" id="inv-item-unit"><option>Pcs</option><option>Ton</option><option>Kg</option><option>Liter</option><option>Box</option></select></div><div class="fg"><label class="fl">Cost Price</label><input class="fi mono" placeholder="0.00"></div><div class="fg"><label class="fl">Sales Price</label><input class="fi mono" placeholder="0.00"></div></div>
+    <div class="fr2"><div class="fg"><label class="fl">Item Code</label><input class="fi mono" id="inv-item-code" placeholder="ITM-005"></div><div class="fg"><label class="fl">Category</label><select class="fi" id="inv-item-category"><option value="">Select Category</option></select></div></div>
+    <div class="fg"><label class="fl">Item Name</label><input class="fi" id="inv-item-name" placeholder="Full item name"></div>
+    <div class="fr2"><div class="fg"><label class="fl">Unit of Measure</label><select class="fi" id="inv-item-unit"><option value="">Select Unit</option></select></div><div class="fg"><label class="fl">Cost Price</label><input class="fi mono" id="inv-item-cost" placeholder="0.00"></div></div>
     <div class="section-hd">Stock Settings</div>
-    <div class="fr2"><div class="fg"><label class="fl">Stock Tracking</label><select class="fi"><option>Yes</option><option>No</option><option>Optional</option></select></div><div class="fg"><label class="fl">Opening Date</label><input class="fi" type="date"></div></div>
-    <div class="fr3"><div class="fg"><label class="fl">Reorder Level</label><input class="fi mono" placeholder="50"></div><div class="fg"><label class="fl">Minimum Stock</label><input class="fi mono" placeholder="25"></div><div class="fg"><label class="fl">Maximum Stock</label><input class="fi mono" placeholder="500"></div></div>
-    <div class="fg"><label class="fl">Preferred Supplier</label><input class="fi" placeholder="Supplier name"></div>
-    <div class="fr2"><div class="fg"><label class="fl">Status</label><select class="fi"><option>Active</option><option>Inactive</option><option>Draft</option></select></div></div>
-    <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-inv-item')">Cancel</button><button class="btn btn-p" onclick="saveM('m-inv-item','Item added to inventory ✓')">Add Item</button></div>
+    <div class="fr2"><div class="fg"><label class="fl">Stock Tracking</label><select class="fi" id="inv-item-tracking"><option>Yes</option><option>No</option><option>Optional</option></select></div><div class="fg"><label class="fl">Opening Date</label><input class="fi" id="inv-item-opening-date" type="date"></div></div>
+    <div class="fr3"><div class="fg"><label class="fl">Reorder Level</label><input class="fi mono" id="inv-item-reorder" placeholder="50"></div><div class="fg"><label class="fl">Minimum Stock</label><input class="fi mono" id="inv-item-min" placeholder="25"></div><div class="fg"><label class="fl">Maximum Stock</label><input class="fi mono" id="inv-item-max" placeholder="500"></div></div>
+    <div class="fg"><label class="fl">Preferred Supplier</label><select class="fi" id="inv-item-supplier"><option value="">Select Supplier</option></select></div>
+    <div class="fr2"><div class="fg"><label class="fl">Status</label><select class="fi" id="inv-item-status"><option>Active</option><option>Inactive</option><option>Draft</option></select></div></div>
+    <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-inv-item')">Cancel</button><button class="btn btn-p" onclick="saveInventoryItem()">Add Item</button></div>
   </div>
 </div>
 

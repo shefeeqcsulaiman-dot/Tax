@@ -1,4 +1,4 @@
-const META={dashboard:{t:'Dashboard',s:'Loading dashboard from database',a:'+ New Invoice',ao:()=>go('sales')},company:{t:'Company Registration',s:'UAE Trade License & FTA Details',a:'Save All',ao:()=>toast('All changes saved','ok')},sales:{t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[4],'s-create'),50)}},purchase:{t:'Purchases',s:'Upload - AI Extraction - Validation',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()},bank:{t:'Bank Accounts',s:'Accounts - Transactions - Reconciliation',a:'+ Add Account',ao:()=>showM('m-bank')},inventory:{t:'Inventory',s:'Stock - Items - Movements',a:'+ Add Item',ao:()=>showM('m-inv-item')},expense:{t:'Expenses',s:'List - Create - Approvals',a:'+ New Expense',ao:()=>{go('expense');setTimeout(()=>stab(document.querySelectorAll('#page-expense .tab')[1],'exp-create'),50)}},accounting:{t:'Accounting',s:'Chart - Journal - Ledger',a:'+ New Entry',ao:()=>showM('m-acc')},reports:{t:'Reports',s:'VAT - P&L - Trial Balance',a:'Export PDF',ao:()=>toast('Exporting report...','info')},settings:{t:'Settings',s:'General - Users - Tax',a:'Save All',ao:()=>toast('Settings saved','ok')},staff:{t:'Staff Management',s:'Attendance - Leave - Corrections - Biometric',a:'+ Add Employee',ao:()=>showM('m-emp')},expert:{t:'Expert Review',s:'Find CA experts - Submit for review',a:'+ New Request',ao:()=>showM('m-newreview')},design:{t:'System Design',s:'Functional Spec - Fields - Validations - API',a:'Export Spec',ao:()=>toast('Exporting FRD to PDF...','info')}};
+const META={dashboard:{t:'Dashboard',s:'Loading dashboard from database',a:'+ New Invoice',ao:()=>go('sales')},company:{t:'Company Registration',s:'UAE Trade License & FTA Details',a:'Save All',ao:()=>toast('All changes saved','ok')},sales:{t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[4],'s-create'),50)}},purchase:{t:'Purchases',s:'Upload - AI Extraction - Validation',a:'Upload Files',ao:()=>document.getElementById('pur-file').click()},bank:{t:'Bank Accounts',s:'Accounts - Transactions - Reconciliation',a:'+ Add Account',ao:()=>showM('m-bank')},inventory:{t:'Inventory',s:'Stock - Items - Movements',a:'+ Add Item',ao:()=>openInventoryItemModal()},expense:{t:'Expenses',s:'List - Create - Approvals',a:'+ New Expense',ao:()=>{go('expense');setTimeout(()=>stab(document.querySelectorAll('#page-expense .tab')[1],'exp-create'),50)}},accounting:{t:'Accounting',s:'Chart - Journal - Ledger',a:'+ New Entry',ao:()=>showM('m-acc')},reports:{t:'Reports',s:'VAT - P&L - Trial Balance',a:'Export PDF',ao:()=>toast('Exporting report...','info')},settings:{t:'Settings',s:'General - Users - Tax',a:'Save All',ao:()=>toast('Settings saved','ok')},staff:{t:'Staff Management',s:'Attendance - Leave - Corrections - Biometric',a:'+ Add Employee',ao:()=>showM('m-emp')},expert:{t:'Expert Review',s:'Find CA experts - Submit for review',a:'+ New Request',ao:()=>showM('m-newreview')},design:{t:'System Design',s:'Functional Spec - Fields - Validations - API',a:'Export Spec',ao:()=>toast('Exporting FRD to PDF...','info')}};
 META.settings={t:'Settings',s:'Company - Users - Tax - Security - Integrations - Invoice Design',a:'Save All',ao:()=>toast('Settings saved','ok')};
 META.payroll={t:'Payroll',s:'Salary run - WPS/SIF - Payslips - Posting',a:'Run Payroll',ao:()=>{go('payroll');setTimeout(()=>runPayroll(),50)}};
 META.sales={t:'Sales & Invoices',s:'Upload - AI Extraction - Validation - Invoices',a:'+ New Invoice',ao:()=>{go('sales');setTimeout(()=>stab(document.querySelectorAll('#page-sales .tab')[4],'s-create'),50)}};
@@ -206,6 +206,21 @@ function saveStockMap(){
     toast('Enter Product Name and Generated Name','warn');
     return;
   }
+  if(!currentStockMapRow){
+    const tbody=document.getElementById('stock-map-tbody');
+    if(!tbody){
+      toast('Stock mapping table is not available','warn');
+      return;
+    }
+    removeEmptyState(tbody);
+    const sku=generateStockSku(product);
+    const tr=document.createElement('tr');
+    tr.dataset.itemCode=sku;
+    tr.dataset.stockSku=sku;
+    tr.innerHTML=`<td>${escapeHtml(product)}</td><td>${escapeHtml(supplier||'Not assigned')}</td><td>${escapeHtml(generated)}</td><td class="mono">${escapeHtml(String(unitsOuter))}</td><td><span class="b b-a">Not mapped</span></td><td data-action-col="1">${stockMapActionsHtml()}</td>`;
+    tbody.prepend(tr);
+    currentStockMapRow=tr;
+  }
   if(currentStockMapRow){
     const cells=currentStockMapRow.querySelectorAll('td');
     cells[0].textContent=product;
@@ -263,6 +278,21 @@ function saveStockMap(){
   refreshEnhancedTable(document.getElementById('stock-map-tbody')?.closest('table'));
 }
 
+function openNewStockMap(){
+  currentStockMapRow=null;
+  ['stock-map-product','stock-map-supplier','stock-map-generated'].forEach(id=>setFieldValue(document.getElementById(id),''));
+  setFieldValue(document.getElementById('stock-map-units-outer'),'1');
+  setFieldValue(document.getElementById('stock-map-cost'),'0.00');
+  setFieldValue(document.getElementById('stock-map-markup'),'0');
+  setSelectValue(document.getElementById('stock-map-tax-rate'),'5');
+  updateStockMapPricing();
+  document.getElementById('stock-map-empty')?.classList.add('hidden');
+  const panel=document.getElementById('stock-map-panel');
+  panel?.classList.remove('hidden');
+  panel?.scrollIntoView({block:'nearest'});
+  setTimeout(()=>document.getElementById('stock-map-product')?.focus(),30);
+}
+
 function clearStockMapPanel(){
   currentStockMapRow=null;
   const product=document.getElementById('stock-map-product');
@@ -307,6 +337,16 @@ function generateStockMapName(value){
     .trim();
 }
 
+function generateStockSku(value){
+  const base=String(value||'ITEM').toUpperCase().replace(/[^A-Z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,18)||'ITEM';
+  const existing=new Set([...document.querySelectorAll('#stock-map-tbody tr:not([data-empty-state]),#prod-tbody tr:not([data-empty-state])')]
+    .map(row=>(row.dataset.stockSku||row.dataset.itemCode||row.children[0]?.textContent||'').trim().toUpperCase()));
+  if(!existing.has(base))return base;
+  let index=2;
+  while(existing.has(`${base}-${index}`))index+=1;
+  return `${base}-${index}`;
+}
+
 function generateStockMapField(){
   const product=document.getElementById('stock-map-product');
   const generated=document.getElementById('stock-map-generated');
@@ -337,6 +377,10 @@ function deleteStockMapRow(btn){
       });
   }
   row?.remove();
+  const tbody=document.getElementById('stock-map-tbody');
+  if(tbody&&tbody.querySelectorAll('tr:not([data-empty-state])').length===0){
+    emptyTableMessage(tbody,'No stock mappings in database yet.');
+  }
   clearStockMapPanel();
   refreshEnhancedTable(document.getElementById('stock-map-tbody')?.closest('table'));
   toast(`${name} mapping removed`,'warn');
@@ -446,6 +490,79 @@ function syncStockMappingFromItems(){
   });
   refreshEnhancedTable(tbody.closest('table'));
   refreshInvoiceProductSuggestions();
+}
+
+function syncInventoryItemOptions(){
+  const categorySelect=document.getElementById('inv-item-category');
+  if(categorySelect){
+    const current=categorySelect.value;
+    const categories=[...document.querySelectorAll('#sales-category-tbody tr:not([data-empty-state]) td:first-child')]
+      .map(td=>td.textContent.trim())
+      .filter(Boolean);
+    const unique=[...new Set(categories)];
+    categorySelect.innerHTML='<option value="">Select Category</option>'+unique.map(name=>`<option>${escapeHtml(name)}</option>`).join('');
+    if(current&&unique.includes(current))categorySelect.value=current;
+  }
+  const supplierSelect=document.getElementById('inv-item-supplier');
+  if(supplierSelect){
+    const current=supplierSelect.value;
+    const suppliers=[...document.querySelectorAll('#vendor-tbody tr:not([data-empty-state]) td:first-child')]
+      .map(td=>td.textContent.trim())
+      .filter(Boolean);
+    const unique=[...new Set(suppliers)];
+    supplierSelect.innerHTML='<option value="">Select Supplier</option>'+unique.map(name=>`<option>${escapeHtml(name)}</option>`).join('');
+    if(current&&unique.includes(current))supplierSelect.value=current;
+  }
+  const unitSelect=document.getElementById('inv-item-unit');
+  if(unitSelect){
+    const current=unitSelect.value;
+    unitSelect.innerHTML='<option value="">Select Unit</option>'+unitOptionsHtml(current);
+    if(current&&dbUnitNames().includes(current))unitSelect.value=current;
+  }
+}
+
+function openInventoryItemModal(){
+  syncInventoryItemOptions();
+  showM('m-inv-item');
+  setTimeout(()=>document.getElementById('inv-item-name')?.focus(),50);
+}
+
+function saveInventoryItem(){
+  const code=(document.getElementById('inv-item-code')?.value||generateStockSku(document.getElementById('inv-item-name')?.value)).trim();
+  const name=(document.getElementById('inv-item-name')?.value||'').trim();
+  const category=document.getElementById('inv-item-category')?.value||'';
+  const unit=document.getElementById('inv-item-unit')?.value||'';
+  const cost=parseAmount(document.getElementById('inv-item-cost')?.value);
+  const tracking=document.getElementById('inv-item-tracking')?.value||'Yes';
+  const reorderLevel=parseAmount(document.getElementById('inv-item-reorder')?.value);
+  const supplier=document.getElementById('inv-item-supplier')?.value||'';
+  const status=document.getElementById('inv-item-status')?.value||'Active';
+  if(!name){
+    toast('Enter item name','warn');
+    return;
+  }
+  if(!category){
+    toast('Select category from database','warn');
+    return;
+  }
+  if(!unit){
+    toast('Select unit of measure from database','warn');
+    return;
+  }
+  const tbody=document.getElementById('prod-tbody');
+  if(tbody&&!hasFirstCellValue(tbody,code)){
+    removeEmptyState(tbody);
+    const row=document.createElement('tr');
+    row.innerHTML=`<td class="mono">${escapeHtml(code)}</td><td>${escapeHtml(name)}</td><td>Stock Item</td><td>${escapeHtml(category)}</td><td>${escapeHtml(unit)}</td><td>Main Store</td><td><span class="b ${tracking==='No'?'b-gray':'b-g'}">${escapeHtml(tracking)}</span></td><td><span class="b b-b">5%</span></td><td><span class="b ${status==='Active'?'b-g':'b-gray'}">${escapeHtml(status)}</span></td>`;
+    tbody.prepend(row);
+  }
+  saveServer('products',{code,name,category,unit,cost,vat:'Standard 5%',supplier_name:supplier,reorder_level:reorderLevel,status});
+  syncStockMappingFromItems();
+  closeM('m-inv-item');
+  document.querySelectorAll('#m-inv-item input').forEach(input=>input.value='');
+  syncInventoryItemOptions();
+  toast('Item added to inventory','ok');
+  audit('Added inventory item',name,'Saved');
 }
 
 function logout(){
@@ -795,6 +912,7 @@ function renderTopCustomers(rows){
     ? rows.map(row=>`<tr><td>${escapeHtml(row.name)}</td><td class="mono" style="text-align:right;color:var(--accent)">${escapeHtml(formatAed(row.total))}</td></tr>`).join('')
     : '<tr><td colspan="2" style="color:var(--text3)">No invoice customers in database.</td></tr>';
   refreshEnhancedTable(tbody.closest('table'));
+  refreshPurchaseProductSuggestions();
 }
 
 function renderInvoiceStatus(status){
@@ -1193,8 +1311,12 @@ async function apiRequest(action,payload,options={}){
   return data;
 }
 
-function saveServer(collection,record){
-  apiRequest('save',{collection,record}).catch(err=>console.warn('Database save failed:',err));
+function saveServer(collection,record,options={}){
+  return apiRequest('save',{collection,record}).catch(err=>{
+    console.warn('Database save failed:',err);
+    if(options.throwOnError)throw err;
+    return null;
+  });
 }
 
 async function moduleApi(path,options={}){
@@ -1327,6 +1449,21 @@ function clearStaticDemoData(){
     emptyTableMessage(tbody,'No database records yet.');
   });
   document.querySelectorAll('[data-demo-static="1"]').forEach(node=>node.remove());
+  clearDemoFormDefaults();
+}
+
+function clearDemoFormDefaults(){
+  const demoOptionText=/^(Al Hamad Steel|Gulf Freight|Office Depot UAE|UAE Paints Co\.|Dubai Steel Co\.|Gulf Logistics Ltd|Emirates Supplies|Al Baraka Trading|Steel Rods 12mm|Packaging Box A|Industrial Oil 5L|Safety Gloves|Sara Al Mansouri|Ahmed Rashid|Rania Abboud|Mohamed Jaber)$/i;
+  document.querySelectorAll('select').forEach(select=>{
+    [...select.options].forEach(option=>{
+      if(demoOptionText.test(option.textContent.trim()))option.remove();
+    });
+    if(select.options.length&&select.selectedIndex<0)select.selectedIndex=0;
+  });
+  const demoInputValue=/^(Sara Al Mansouri|INV-2024-\d+|PUR-2024-\d+|Steel Rods 12mm|Packaging Box A|Industrial Oil 5L|Safety Gloves)$/i;
+  document.querySelectorAll('input').forEach(input=>{
+    if(demoInputValue.test(String(input.value||'').trim()))input.value='';
+  });
 }
 
 function quotationActionsHtml(){
@@ -1404,12 +1541,15 @@ function renderProductRecord(product){
   const vatClass=vatText==='5%'?'b-b':'b-t';
   const row=document.createElement('tr');
   row.dataset.serverRecord='products';
+  row.dataset.cost=product.cost??0;
+  row.dataset.supplier=product.supplier_name||product.supplier||'';
   row.innerHTML=`<td class="mono">${escapeHtml(product.code||'PRD')}</td><td>${escapeHtml(product.name)}</td><td>Stock Item</td><td>${escapeHtml(product.category||'Materials')}</td><td>${escapeHtml(product.unit||'Each')}</td><td>Main Store</td><td><span class="b b-g">Yes</span></td><td><span class="b ${vatClass}">${escapeHtml(vatText)}</span></td><td><span class="b b-g">Active</span></td>`;
   removeEmptyState(tbody);
   tbody.prepend(row);
   refreshEnhancedTable(tbody.closest('table'));
   syncStockMappingFromItems();
   refreshInvoiceProductSuggestions();
+  refreshPurchaseProductSuggestions();
 }
 
 function syncProductMasterOptions(){
@@ -1433,6 +1573,18 @@ function syncProductMasterOptions(){
   }
 }
 
+function dbUnitNames(){
+  return [...new Set([...document.querySelectorAll('#sales-unit-tbody tr:not([data-empty-state])')]
+    .map(row=>row.children[1]?.textContent.trim()||row.children[0]?.textContent.trim())
+    .filter(Boolean))];
+}
+
+function unitOptionsHtml(selected=''){
+  const units=dbUnitNames();
+  const list=units.length?units:['PCS'];
+  return list.map(name=>`<option ${name===selected?'selected':''}>${escapeHtml(name)}</option>`).join('');
+}
+
 function renderSalesCategoryRecord(category){
   const tbody=document.getElementById('sales-category-tbody');
   const name=(category?.name||category?.category||'').trim();
@@ -1444,6 +1596,7 @@ function renderSalesCategoryRecord(category){
   removeEmptyState(tbody);
   tbody.prepend(row);
   syncProductMasterOptions();
+  syncInventoryItemOptions();
 }
 
 function renderSalesUnitRecord(unit){
@@ -1457,6 +1610,7 @@ function renderSalesUnitRecord(unit){
   removeEmptyState(tbody);
   tbody.prepend(row);
   syncProductMasterOptions();
+  syncInventoryItemOptions();
 }
 
 function renderBillRecord(bill){
@@ -1474,10 +1628,27 @@ function renderVendorRecord(vendor){
   if(!tbody||!vendor?.name||hasFirstCellValue(tbody,vendor.name))return;
   const row=document.createElement('tr');
   row.dataset.serverRecord='vendors';
-  row.innerHTML=`<td>${escapeHtml(vendor.name)}</td><td class="mono">${escapeHtml(vendor.trn||'Not registered')}</td><td>${escapeHtml(vendor.category||'Services')}</td><td>${escapeHtml(vendor.email||'-')}</td><td class="mono">0.00</td><td><span class="b b-g">Active</span></td>`;
+  row.dataset.address=vendor.address||'';
+  row.innerHTML=`<td>${escapeHtml(vendor.name)}</td><td class="mono">${escapeHtml(vendor.trn||'Not registered')}</td><td>${escapeHtml(vendor.category||'Services')}</td><td>${escapeHtml(vendor.email||'-')}</td><td>${escapeHtml(vendor.address||'-')}</td><td class="mono">0.00</td><td><span class="b b-g">Active</span></td>`;
   removeEmptyState(tbody);
   tbody.prepend(row);
   syncSupplierOptions(vendor.name);
+  syncInventoryItemOptions();
+}
+
+function vendorAddressByName(name){
+  const wanted=String(name||'').trim().toLowerCase();
+  if(!wanted)return '';
+  const row=[...document.querySelectorAll('#vendor-tbody tr:not([data-empty-state])')]
+    .find(item=>item.children[0]?.textContent.trim().toLowerCase()===wanted);
+  return row?.dataset.address||row?.children[4]?.textContent.trim().replace(/^[-]$/,'')||'';
+}
+
+function applySupplierAddress(){
+  const supplier=document.getElementById('mp-supplier')?.value||'';
+  const address=vendorAddressByName(supplier);
+  const field=document.getElementById('mp-address');
+  if(field&&address&&!field.value)field.value=address;
 }
 
 function syncSupplierOptions(selected=''){
@@ -1491,6 +1662,7 @@ function syncSupplierOptions(selected=''){
   const all=[...new Set([...existing, ...names])];
   select.innerHTML='<option value="">Please Select</option>'+all.map(name=>`<option>${escapeHtml(name)}</option>`).join('');
   if(current&&all.includes(current))select.value=current;
+  applySupplierAddress();
 }
 
 function openSupplierPopup(){
@@ -1576,6 +1748,8 @@ function hydrateFromServer(){
     updateAccountSelectors();
     syncProductMasterOptions();
     syncSupplierOptions();
+    syncInventoryItemOptions();
+    refreshPurchaseProductSuggestions();
     loadStockMappingsFromServer();
     filterLedger();
     scheduleIdleTask(()=>{
@@ -2407,7 +2581,7 @@ function animateUpload(name,size,entry){
 
 function getFileIcon(name){
   const ext=name.split('.').pop().toLowerCase();
-  return {pdf:'??',xlsx:'??',xls:'??',csv:'??',zip:'??',jpg:'??',jpeg:'??',png:'??'}[ext]||'??';
+  return {pdf:'??',xlsx:'??',csv:'??',zip:'??',jpg:'??',jpeg:'??',png:'??'}[ext]||'??';
 }
 function fmtSize(bytes){if(bytes<1024*1024)return(bytes/1024).toFixed(0)+' KB';return(bytes/(1024*1024)).toFixed(1)+' MB';}
 
@@ -2473,6 +2647,7 @@ async function extractSingleFile(entry){
     renderFileList();
     appendExtractedRows(invoices,entry.name);
     updateExtractionStats();
+    hydrateFromServer().catch(err=>console.warn('Refresh after extraction failed:',err));
 
     setTimeout(()=>{ep.style.display='none';ef.style.width='0%';},600);
     toast(`Extracted ${invoices.length} invoice(s) from ${entry.name} ?`,'ok');
@@ -2497,57 +2672,118 @@ function appendExtractedRows(invoices,filename){
   if(tbody.querySelector('td[colspan]'))tbody.innerHTML='';
   invoices.forEach(inv=>{
     // check if row already exists (by invoice_no)
-    if([...tbody.querySelectorAll('td.mono')].some(td=>td.textContent===inv.invoice_no)){
+    if([...tbody.querySelectorAll('tr[data-inv] td.mono')].some(td=>td.textContent===inv.invoice_no)){
       toast(`Duplicate in current purchase AI upload: ${inv.invoice_no}`,'warn');
       return;
     }
     const validation=validatePurchaseAiInvoice(inv);
     const confCls=inv.confidence>=90?'b-g':inv.confidence>=70?'b-a':'b-r';
     const stCls=validation.valid?'b-g':'b-a';
-    const trnColor=inv.supplier_trn&&inv.supplier_trn.length===15?'':'color:var(--red)';
     const fmt=n=>Number(n).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
-    const row=document.createElement('tr');
-    row.setAttribute('data-inv',JSON.stringify(inv));
-    row.dataset.validation=validation.valid?'valid':'review';
-    row.innerHTML=`
-      <td><input type="checkbox" class="purchase-ai-select" ${validation.valid?'checked':''} aria-label="Select ${escapeHtml(inv.invoice_no)}"></td>
-      <td class="mono">${escapeHtml(inv.invoice_no)}</td>
-      <td>${inv.date}</td>
-      <td>${escapeHtml(inv.supplier)}</td>
-      <td class="mono" style="${trnColor}">${escapeHtml(inv.supplier_trn)}</td>
-      <td class="mono">${fmt(inv.subtotal)}</td>
-      <td class="mono">${fmt(inv.vat_amount)}</td>
-      <td class="mono">${fmt(inv.total)}</td>
-      <td><span class="b ${confCls}">${inv.confidence}%</span></td>
-      <td class="purchase-ai-validation"><span class="b ${stCls}">${validation.valid?'Valid':'Review'}</span></td>
-      <td class="purchase-ai-details" style="color:var(--text3);font-size:12px">${escapeHtml(validation.issues.join('; ')||'Ready to save')}</td>
-      <td data-action-col="1">${purchaseAiUploadActionsHtml()}</td>`;
-    tbody.insertBefore(row,tbody.firstChild);
+    const lines=Array.isArray(inv.lines)&&inv.lines.length?inv.lines:[{}];
+    lines.forEach((line,index)=>{
+      const lineTotal=parseAmount(line.line_total||line.amount);
+      const vat=index===0?parseAmount(inv.vat_amount):0;
+      const paid=index===0?parseAmount(inv.paid):0;
+      const shipping=index===0?parseAmount(inv.shipping):0;
+      const total=index===0?parseAmount(inv.total):(lineTotal+vat);
+      const row=document.createElement('tr');
+      row.setAttribute('data-inv',JSON.stringify(inv));
+      row.dataset.invoiceNo=inv.invoice_no||'';
+      row.dataset.lineIndex=String(index);
+      row.dataset.validation=validation.valid?'valid':'review';
+      row.innerHTML=`
+        <td><input type="checkbox" class="purchase-ai-select" ${validation.valid?'checked':''} aria-label="Select ${escapeHtml(inv.invoice_no)} line ${index+1}"></td>
+        <td class="purchase-ai-details" style="color:var(--text3);font-size:12px">${escapeHtml(validation.issues.join('; ')||purchaseAiRawDetails(line)||'Ready to save')}</td>
+        <td data-action-col="1">${purchaseAiUploadActionsHtml()}</td>
+        <td class="mono">${escapeHtml(inv.invoice_no)}</td>
+        <td>${escapeHtml(inv.date||'')}</td>
+        <td>${escapeHtml(inv.supplier||'')}</td>
+        <td>${escapeHtml(inv.address||'')}</td>
+        <td>${escapeHtml(inv.pay_term||'')}</td>
+        <td>${escapeHtml(purchaseAiProductName(line))}</td>
+        <td class="mono">${fmt(line.quantity||line.qty||0)}</td>
+        <td>${escapeHtml(line.unit||line.unit_of_measure||line.uom||'PCS')}</td>
+        <td class="mono">${fmt(line.unit_cost||line.cost||line.unitCost||0)}</td>
+        <td class="mono">${fmt(line.discount_percent||line.discountPct||0)}</td>
+        <td class="mono">${fmt(line.unit_cost_before_tax||line.unit_cost||line.cost||0)}</td>
+        <td class="mono">${fmt(line.line_total||line.amount||0)}</td>
+        <td class="mono">${fmt(line.profit_margin||line.margin||0)}</td>
+        <td class="mono">${fmt(line.selling_price_inc_tax||line.selling_price||0)}</td>
+        <td>${escapeHtml(inv.discount_type||'None')}</td>
+        <td class="mono">${fmt(inv.discount_value||inv.discount||0)}</td>
+        <td class="mono">${fmt(vat)}</td>
+        <td>${escapeHtml(inv.shipping_details||'')}</td>
+        <td class="mono">${fmt(shipping)}</td>
+        <td class="mono">${fmt(paid)}</td>
+        <td>${escapeHtml(inv.paid_on||'')}</td>
+        <td>${escapeHtml(inv.payment_method||'Cash')}</td>
+        <td>${escapeHtml(inv.payment_account||'None')}</td>
+        <td>${escapeHtml(inv.payment_note||'')}</td>
+        <td>${escapeHtml(inv.notes||'')}</td>
+        <td class="mono">${fmt(Math.max(0,total-paid))}</td>
+        <td class="purchase-ai-validation"><span class="b ${stCls}">${validation.valid?'Valid':'Review'}</span></td>`;
+      tbody.insertBefore(row,tbody.firstChild);
+    });
   });
   revalidatePurchaseAiRows();
+}
+
+function purchaseAiProductName(line={}){
+  return String(line.product||line.product_name||line.item_name||line.description||line.item_description||line.sku||line.code||'').trim();
+}
+
+function purchaseAiRawDetails(line={}){
+  const raw=line.raw||{};
+  const entries=Object.entries(raw)
+    .filter(([key,value])=>value!==undefined&&value!==null&&String(value).trim()!=='')
+    .slice(0,8)
+    .map(([key,value])=>`${key}: ${value}`);
+  return entries.length?`Raw: ${entries.join(' | ')}`:'';
 }
 
 function purchaseRecordFromExtractedInvoice(inv){
   const total=Number(inv.total||0);
   const status=String(inv.status||'Review');
+  const lines=Array.isArray(inv.lines)?inv.lines:[];
+  const paid=Number(inv.paid||0);
   return {
     ref:inv.invoice_no,
     supplier:inv.supplier||'Supplier',
+    address:inv.address||'',
     date:inv.date||'',
     location:'Dubai HQ',
-    items:1,
-    net_amount:Number(inv.subtotal||0),
-    tax_amount:Number(inv.vat_amount||0),
-    shipping:0,
+    pay_term:inv.pay_term||'',
+    items:lines.length||1,
+    net_amount:Number(inv.net_amount||inv.subtotal||0),
+    discount:discountAmountFromExtractedInvoice(inv),
+    tax_amount:Number(inv.tax_amount||inv.vat_amount||0),
+    shipping:Number(inv.shipping||0),
     total,
-    paid:0,
-    due:total,
+    paid,
+    due:Number(inv.due??Math.max(0,total-paid)),
     source:'AI Upload',
     status:status==='Valid'?'Received':status,
     extraction_status:status,
     supplier_trn:inv.supplier_trn||'',
-    issues:inv.issues||''
+    issues:inv.issues||'',
+    discount_type:inv.discount_type||'None',
+    discount_value:Number(inv.discount_value||0),
+    tax_type:inv.tax_type||(Number(inv.vat_amount||0)>0?'VAT 5%':'None'),
+    lines,
+    payment_method:inv.payment_method||'Cash',
+    payment_account:inv.payment_account||'None',
+    payment_note:inv.payment_note||'',
+    paid_on:inv.paid_on||'',
+    shipping_details:inv.shipping_details||'',
+    notes:inv.notes||''
   };
+}
+
+function discountAmountFromExtractedInvoice(inv){
+  const net=Number(inv.net_amount||inv.subtotal||0);
+  const value=Number(inv.discount_value||inv.discount||0);
+  return inv.discount_type==='Percentage'?net*(value/100):inv.discount_type==='Fixed'?value:0;
 }
 
 function storeExtractedPurchaseRecords(){
@@ -2556,34 +2792,125 @@ function storeExtractedPurchaseRecords(){
     .filter(row=>row.querySelector('.purchase-ai-select')?.checked);
   if(rows.length===0){toast('No extracted purchase invoices to store','warn');return;}
   let stored=0;
+  let updated=0;
+  let existing=0;
   let blocked=0;
+  const selectedByInvoice=new Map();
   rows.forEach(row=>{
+    const invoiceNo=row.dataset.invoiceNo||'';
+    if(!selectedByInvoice.has(invoiceNo))selectedByInvoice.set(invoiceNo,row);
+  });
+  selectedByInvoice.forEach(row=>{
     const inv=JSON.parse(row.dataset.inv||'{}');
     const validation=validatePurchaseAiInvoice(inv);
     if(!validation.valid){
       blocked++;
-      row.querySelector('.purchase-ai-validation').innerHTML='<span class="b b-a">Review</span>';
-      row.querySelector('.purchase-ai-details').textContent=validation.issues.join('; ');
-      return;
+      markPurchaseAiInvoiceRows(inv.invoice_no,'Review',validation.issues.join('; ')||'Saved with review notes');
     }
     const record=purchaseRecordFromExtractedInvoice(inv);
-    const before=document.querySelectorAll('#purchase-record-tbody tr').length;
-    renderPurchaseRecord(record);
-    if(document.querySelectorAll('#purchase-record-tbody tr').length>before){
-      saveServer('purchaseRecords',record);
-      stored++;
-      row.querySelector('.purchase-ai-validation').innerHTML='<span class="b b-g">Saved</span>';
-      row.querySelector('.purchase-ai-details').textContent='Saved to purchase records';
-      row.querySelector('.purchase-ai-select').checked=false;
-      row.dataset.skipped='1';
+    const result=upsertExtractedPurchaseRecord(record);
+    if(result==='same'){
+      existing++;
+      markPurchaseAiInvoiceRows(inv.invoice_no,'Already Exists','Same purchase already exists in database',true);
+      return;
     }
+    if(result==='updated')updated++;
+    if(result==='created')stored++;
+    saveServer('purchaseRecords',record);
+    markPurchaseAiInvoiceRows(
+      inv.invoice_no,
+      result==='updated'?'Updated':'Saved',
+      result==='updated'?'Existing purchase updated in database':'Saved to purchase records',
+      true
+    );
   });
-  if(stored>0){
-    audit('Stored extracted purchase invoices',stored+' purchase(s)','Saved');
+  if(stored>0||updated>0){
+    audit('Stored extracted purchase invoices',`${stored} added, ${updated} updated`,'Saved');
     const tab=document.querySelector('#page-purchase .tab:nth-child(5)');
     if(tab)stab(tab,'p-records');
   }
-  toast(stored+' purchase record(s) saved'+(blocked?`; ${blocked} row(s) need review`:''),'ok');
+  toast(`${stored} added, ${updated} updated, ${existing} already exist${blocked?`; ${blocked} saved with review notes`:''}`,'ok');
+}
+
+function upsertExtractedPurchaseRecord(record){
+  const tbody=document.getElementById('purchase-record-tbody');
+  const ref=String(record.ref||record.invoice_no||'').trim().toLowerCase();
+  if(!tbody||!ref){
+    renderPurchaseRecord(record);
+    return 'created';
+  }
+  const existingRow=[...tbody.querySelectorAll('tr:not([data-empty-state])')]
+    .find(row=>row.children[0]?.textContent.trim().toLowerCase()===ref);
+  if(!existingRow){
+    renderPurchaseRecord(record);
+    return 'created';
+  }
+  const existingRecord=purchaseRecordFromRow(existingRow);
+  if(purchaseRecordsEquivalent(existingRecord,record)){
+    return 'same';
+  }
+  existingRow.remove();
+  renderPurchaseRecord(record);
+  return 'updated';
+}
+
+function purchaseRecordsEquivalent(a,b){
+  return JSON.stringify(normalizePurchaseRecordForCompare(a))===JSON.stringify(normalizePurchaseRecordForCompare(b));
+}
+
+function normalizePurchaseRecordForCompare(record={}){
+  const normNumber=value=>Number(value||0).toFixed(2);
+  const normText=value=>String(value||'').trim().toLowerCase();
+  const lines=Array.isArray(record.lines)?record.lines:[];
+  return {
+    ref:normText(record.ref||record.invoice_no),
+    supplier:normText(record.supplier),
+    address:normText(record.address),
+    date:normText(record.date),
+    pay_term:normText(record.pay_term),
+    net_amount:normNumber(record.net_amount||record.subtotal),
+    discount:normNumber(record.discount),
+    tax_amount:normNumber(record.tax_amount||record.vat_amount),
+    shipping:normNumber(record.shipping),
+    total:normNumber(record.total),
+    paid:normNumber(record.paid),
+    due:normNumber(record.due),
+    discount_type:normText(record.discount_type),
+    discount_value:normNumber(record.discount_value),
+    tax_type:normText(record.tax_type),
+    payment_method:normText(record.payment_method),
+    payment_account:normText(record.payment_account),
+    payment_note:normText(record.payment_note),
+    paid_on:normText(record.paid_on),
+    shipping_details:normText(record.shipping_details),
+    notes:normText(record.notes),
+    lines:lines.map(line=>({
+      product:normText(line.product||line.description),
+      category:normText(line.category),
+      unit:normText(line.unit||line.unit_of_measure||line.uom),
+      quantity:normNumber(line.quantity||line.qty),
+      unit_cost:normNumber(line.unit_cost||line.cost),
+      discount_percent:normNumber(line.discount_percent||line.discountPct),
+      unit_cost_before_tax:normNumber(line.unit_cost_before_tax||line.unit_cost||line.cost),
+      line_total:normNumber(line.line_total||line.amount),
+      profit_margin:normNumber(line.profit_margin||line.margin),
+      selling_price_inc_tax:normNumber(line.selling_price_inc_tax||line.selling_price)
+    }))
+  };
+}
+
+function markPurchaseAiInvoiceRows(invoiceNo,status,details,skip=false){
+  document.querySelectorAll('#ext-tbody tr[data-inv]').forEach(row=>{
+    if((row.dataset.invoiceNo||'')!==String(invoiceNo||''))return;
+    const cls=status==='Saved'?'b-g':status==='Review'?'b-a':'b-gray';
+    row.querySelector('.purchase-ai-validation').innerHTML=`<span class="b ${cls}">${escapeHtml(status)}</span>`;
+    row.querySelector('.purchase-ai-details').textContent=details||status;
+    if(skip){
+      row.dataset.skipped='1';
+      const box=row.querySelector('.purchase-ai-select');
+      if(box)box.checked=false;
+    }
+  });
 }
 
 function validatePurchaseAiInvoice(inv){
@@ -2615,9 +2942,277 @@ function countPurchaseAiInvoiceNo(invoiceNo){
 
 function purchaseAiUploadActionsHtml(){
   return `<div class="row-actions">
+    <button class="icon-btn" type="button" title="Edit" aria-label="Edit purchase AI row" onclick="openPurchaseAiEdit(this)">${editIconSvg()}</button>
     <button class="icon-btn skip" type="button" title="Skip" aria-label="Skip purchase AI row" onclick="skipPurchaseAiRow(this)">${skipIconSvg()}</button>
     <button class="icon-btn danger" type="button" title="Delete" aria-label="Delete purchase AI row" onclick="deletePurchaseAiRow(this)">${deleteIconSvg()}</button>
   </div>`;
+}
+
+let purchaseAiEditRow=null;
+
+function ensurePurchaseAiEditModal(){
+  let overlay=document.getElementById('m-purchase-ai-edit');
+  if(overlay)return overlay;
+  overlay=document.createElement('div');
+  overlay.className='overlay';
+  overlay.id='m-purchase-ai-edit';
+  overlay.onclick=e=>closeOvBg(e,'m-purchase-ai-edit');
+  overlay.innerHTML=`
+    <div class="modal modal-lg">
+      <div class="modal-title">Edit Extracted Purchase</div>
+      <div class="modal-sub" id="pai-edit-sub">Correct extracted invoice and item details</div>
+      <div class="fr3">
+        <div class="fg"><label class="fl">Invoice No.</label><input class="fi mono" id="pai-invoice"></div>
+        <div class="fg"><label class="fl">Purchase Date</label><input class="fi" id="pai-date"></div>
+        <div class="fg"><label class="fl">Supplier</label><input class="fi" id="pai-supplier"></div>
+      </div>
+      <div class="fr3">
+        <div class="fg"><label class="fl">Address</label><input class="fi" id="pai-address"></div>
+        <div class="fg"><label class="fl">Pay Term</label><select class="fi" id="pai-term"><option value="">Please Select</option><option>Due on receipt</option><option>Net 15</option><option>Net 30</option><option>Net 45</option></select></div>
+        <div class="fg"><label class="fl">Product Name</label><input class="fi" id="pai-product"></div>
+      </div>
+      <div class="fr3">
+        <div class="fg"><label class="fl">Category</label><input class="fi" id="pai-category"></div>
+        <div class="fg"><label class="fl">Purchase Quantity</label><input class="fi mono" id="pai-qty" oninput="calcPurchaseAiEditLine()"></div>
+        <div class="fg"><label class="fl">Unit of Measure</label><input class="fi mono" id="pai-unit"></div>
+      </div>
+      <div class="fr3">
+        <div class="fg"><label class="fl">Unit Cost Before Discount</label><input class="fi mono" id="pai-cost" oninput="calcPurchaseAiEditLine()"></div>
+        <div class="fg"><label class="fl">Discount %</label><input class="fi mono" id="pai-line-discount" oninput="calcPurchaseAiEditLine()"></div>
+        <div class="fg"><label class="fl">Unit Cost Before Tax</label><input class="fi mono" id="pai-cost-before-tax" readonly></div>
+      </div>
+      <div class="fr3">
+        <div class="fg"><label class="fl">Line Total</label><input class="fi mono" id="pai-line-total" oninput="calcPurchaseAiEditInvoice()"></div>
+        <div class="fg"><label class="fl">Profit Margin %</label><input class="fi mono" id="pai-margin" oninput="calcPurchaseAiEditLine()"></div>
+        <div class="fg"><label class="fl">Unit Selling Price Inc. Tax</label><input class="fi mono" id="pai-selling" readonly></div>
+      </div>
+      <div class="fr3">
+        <div class="fg"><label class="fl">Discount Type</label><select class="fi" id="pai-discount-type" onchange="calcPurchaseAiEditInvoice()"><option>None</option><option>Fixed</option><option>Percentage</option></select></div>
+        <div class="fg"><label class="fl">Discount Amount</label><input class="fi mono" id="pai-discount-value" oninput="calcPurchaseAiEditInvoice()"></div>
+        <div class="fg"><label class="fl">Purchase Tax</label><select class="fi" id="pai-tax-type" onchange="calcPurchaseAiEditInvoice()"><option>None</option><option>VAT 5%</option><option>Reverse Charge 5%</option><option>Exempt</option></select></div>
+      </div>
+      <div class="fr3">
+        <div class="fg"><label class="fl">Purchase Tax Amount</label><input class="fi mono" id="pai-vat" oninput="calcPurchaseAiEditInvoice()"></div>
+        <div class="fg"><label class="fl">Shipping Details</label><input class="fi" id="pai-shipping-details"></div>
+        <div class="fg"><label class="fl">Shipping Charges</label><input class="fi mono" id="pai-shipping" oninput="calcPurchaseAiEditInvoice()"></div>
+      </div>
+      <div class="fr3">
+        <div class="fg"><label class="fl">Purchase Total</label><input class="fi mono" id="pai-total" readonly></div>
+        <div class="fg"><label class="fl">Paid Amount</label><input class="fi mono" id="pai-paid" oninput="calcPurchaseAiEditInvoice()"></div>
+        <div class="fg"><label class="fl">Payment Due</label><input class="fi mono" id="pai-due" readonly></div>
+      </div>
+      <div class="fr3">
+        <div class="fg"><label class="fl">Paid On</label><input class="fi" id="pai-paid-on"></div>
+        <div class="fg"><label class="fl">Payment Method</label><select class="fi" id="pai-pay-method"><option>Cash</option><option>Bank Transfer</option><option>Card</option><option>Cheque</option><option>Online</option></select></div>
+        <div class="fg"><label class="fl">Payment Account</label><input class="fi" id="pai-pay-account"></div>
+      </div>
+      <div class="fr2">
+        <div class="fg"><label class="fl">Payment Note</label><input class="fi" id="pai-pay-note"></div>
+        <div class="fg"><label class="fl">Additional Notes</label><input class="fi" id="pai-notes"></div>
+      </div>
+      <div class="fr3">
+        <div class="fg"><label class="fl">Confidence %</label><input class="fi mono" id="pai-confidence" type="number" min="0" max="100"></div>
+        <div class="fg"><label class="fl">Status</label><select class="fi" id="pai-status"><option>Valid</option><option>Review</option><option>Error</option></select></div>
+        <div class="fg"><label class="fl">Issues</label><input class="fi" id="pai-issues"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-g" onclick="closeM('m-purchase-ai-edit')">Cancel</button>
+        <button class="btn btn-g" onclick="savePurchaseAiEdit(true)">Save & Next</button>
+        <button class="btn btn-p" onclick="savePurchaseAiEdit(false)">Save</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function openPurchaseAiEdit(btn){
+  const row=btn.closest('tr');
+  if(!row)return;
+  purchaseAiEditRow=row;
+  let inv={};
+  try{inv=JSON.parse(row.dataset.inv||'{}');}catch{return;}
+  const lineIndex=Number(row.dataset.lineIndex||0);
+  const line=Array.isArray(inv.lines)?(inv.lines[lineIndex]||{}):{};
+  ensurePurchaseAiEditModal();
+  document.getElementById('pai-invoice').value=inv.invoice_no||'';
+  document.getElementById('pai-date').value=inv.date||'';
+  document.getElementById('pai-supplier').value=inv.supplier||'';
+  document.getElementById('pai-address').value=inv.address||'';
+  document.getElementById('pai-term').value=inv.pay_term||'';
+  document.getElementById('pai-product').value=purchaseAiProductName(line);
+  document.getElementById('pai-category').value=line.category||'';
+  document.getElementById('pai-unit').value=line.unit||line.unit_of_measure||line.uom||'PCS';
+  document.getElementById('pai-qty').value=line.quantity||line.qty||0;
+  document.getElementById('pai-cost').value=line.unit_cost||line.cost||line.unitCost||0;
+  document.getElementById('pai-line-discount').value=line.discount_percent||line.discountPct||0;
+  document.getElementById('pai-cost-before-tax').value=line.unit_cost_before_tax||line.unit_cost||line.cost||0;
+  document.getElementById('pai-line-total').value=line.line_total||line.amount||0;
+  document.getElementById('pai-margin').value=line.profit_margin||line.margin||0;
+  document.getElementById('pai-selling').value=line.selling_price_inc_tax||line.selling_price||0;
+  document.getElementById('pai-discount-type').value=inv.discount_type||'None';
+  document.getElementById('pai-discount-value').value=inv.discount_value||inv.discount||0;
+  document.getElementById('pai-tax-type').value=inv.tax_type||((Number(inv.vat_amount||0)>0)?'VAT 5%':'None');
+  document.getElementById('pai-vat').value=inv.vat_amount||0;
+  document.getElementById('pai-shipping-details').value=inv.shipping_details||'';
+  document.getElementById('pai-shipping').value=inv.shipping||0;
+  document.getElementById('pai-total').value=inv.total||0;
+  document.getElementById('pai-paid').value=inv.paid||0;
+  document.getElementById('pai-due').value=inv.due||0;
+  document.getElementById('pai-paid-on').value=inv.paid_on||'';
+  document.getElementById('pai-pay-method').value=inv.payment_method||'Cash';
+  document.getElementById('pai-pay-account').value=inv.payment_account||'None';
+  document.getElementById('pai-pay-note').value=inv.payment_note||'';
+  document.getElementById('pai-notes').value=inv.notes||'';
+  document.getElementById('pai-confidence').value=inv.confidence||90;
+  document.getElementById('pai-status').value=inv.status||'Valid';
+  document.getElementById('pai-issues').value=inv.issues||'';
+  document.getElementById('pai-edit-sub').textContent=`${inv.invoice_no||'Purchase'} - line ${lineIndex+1}`;
+  calcPurchaseAiEditInvoice();
+  showM('m-purchase-ai-edit');
+}
+
+function calcPurchaseAiEditLine(){
+  const qty=parseAmount(document.getElementById('pai-qty')?.value);
+  const cost=parseAmount(document.getElementById('pai-cost')?.value);
+  const discountPct=parseAmount(document.getElementById('pai-line-discount')?.value);
+  const beforeTax=cost*(1-(discountPct/100));
+  const margin=parseAmount(document.getElementById('pai-margin')?.value);
+  document.getElementById('pai-cost-before-tax').value=beforeTax.toFixed(2);
+  document.getElementById('pai-line-total').value=(qty*beforeTax).toFixed(2);
+  document.getElementById('pai-selling').value=(beforeTax*(1+margin/100)*1.05).toFixed(2);
+  calcPurchaseAiEditInvoice();
+}
+
+function calcPurchaseAiEditInvoice(){
+  const lineTotal=parseAmount(document.getElementById('pai-line-total')?.value);
+  const discountType=document.getElementById('pai-discount-type')?.value||'None';
+  const discountValue=parseAmount(document.getElementById('pai-discount-value')?.value);
+  const discount=discountType==='Percentage'?lineTotal*(discountValue/100):discountType==='Fixed'?discountValue:0;
+  const taxable=Math.max(0,lineTotal-discount);
+  const taxType=document.getElementById('pai-tax-type')?.value||'None';
+  const calculatedVat=taxType.includes('5%')&&!taxType.toLowerCase().includes('exempt')?taxable*.05:0;
+  const vatField=document.getElementById('pai-vat');
+  if(vatField&&document.activeElement!==vatField)vatField.value=calculatedVat.toFixed(2);
+  const vat=parseAmount(vatField?.value);
+  const shipping=parseAmount(document.getElementById('pai-shipping')?.value);
+  const paid=parseAmount(document.getElementById('pai-paid')?.value);
+  const gross=taxable+vat+shipping;
+  const total=document.getElementById('pai-total');
+  if(total)total.value=gross.toFixed(2);
+  const due=document.getElementById('pai-due');
+  if(due)due.value=Math.max(0,gross-paid).toFixed(2);
+}
+
+function savePurchaseAiEdit(next=false){
+  if(!purchaseAiEditRow)return closeM('m-purchase-ai-edit');
+  let inv={};
+  try{inv=JSON.parse(purchaseAiEditRow.dataset.inv||'{}');}catch{return;}
+  const oldInvoiceNo=inv.invoice_no||purchaseAiEditRow.dataset.invoiceNo||'';
+  const lineIndex=Number(purchaseAiEditRow.dataset.lineIndex||0);
+  const lines=Array.isArray(inv.lines)?inv.lines:[{}];
+  lines[lineIndex]={
+    ...(lines[lineIndex]||{}),
+    product:document.getElementById('pai-product').value.trim(),
+    category:document.getElementById('pai-category').value.trim(),
+    unit:document.getElementById('pai-unit').value.trim()||'PCS',
+    quantity:parseAmount(document.getElementById('pai-qty').value),
+    unit_cost:parseAmount(document.getElementById('pai-cost').value),
+    discount_percent:parseAmount(document.getElementById('pai-line-discount').value),
+    unit_cost_before_tax:parseAmount(document.getElementById('pai-cost-before-tax').value),
+    line_total:parseAmount(document.getElementById('pai-line-total').value),
+    profit_margin:parseAmount(document.getElementById('pai-margin').value),
+    selling_price_inc_tax:parseAmount(document.getElementById('pai-selling').value)
+  };
+  const subtotal=lines.reduce((sum,line)=>sum+parseAmount(line.line_total||line.amount),0);
+  const paid=parseAmount(document.getElementById('pai-paid').value);
+  const total=parseAmount(document.getElementById('pai-total').value);
+  inv={
+    ...inv,
+    invoice_no:document.getElementById('pai-invoice').value.trim(),
+    date:document.getElementById('pai-date').value.trim(),
+    supplier:document.getElementById('pai-supplier').value.trim(),
+    address:document.getElementById('pai-address').value.trim(),
+    pay_term:document.getElementById('pai-term').value,
+    subtotal,
+    net_amount:subtotal,
+    discount_type:document.getElementById('pai-discount-type').value,
+    discount_value:parseAmount(document.getElementById('pai-discount-value').value),
+    tax_type:document.getElementById('pai-tax-type').value,
+    vat_amount:parseAmount(document.getElementById('pai-vat').value),
+    tax_amount:parseAmount(document.getElementById('pai-vat').value),
+    shipping_details:document.getElementById('pai-shipping-details').value.trim(),
+    shipping:parseAmount(document.getElementById('pai-shipping').value),
+    total,
+    paid,
+    due:Math.max(0,total-paid),
+    paid_on:document.getElementById('pai-paid-on').value,
+    payment_method:document.getElementById('pai-pay-method').value,
+    payment_account:document.getElementById('pai-pay-account').value,
+    payment_note:document.getElementById('pai-pay-note').value.trim(),
+    notes:document.getElementById('pai-notes').value.trim(),
+    confidence:parseAmount(document.getElementById('pai-confidence').value),
+    status:document.getElementById('pai-status').value,
+    issues:document.getElementById('pai-issues').value.trim(),
+    lines
+  };
+  updatePurchaseAiInvoiceRows(oldInvoiceNo,inv);
+  revalidatePurchaseAiRows();
+  toast('Extracted purchase updated','ok');
+  const current=purchaseAiEditRow;
+  closeM('m-purchase-ai-edit');
+  if(next){
+    const nextRow=[...document.querySelectorAll('#ext-tbody tr[data-inv]')]
+      .find(row=>row.dataset.skipped!=='1'&&row!==current);
+    if(nextRow)setTimeout(()=>openPurchaseAiEdit(nextRow.querySelector('.row-actions .icon-btn')),80);
+  }
+}
+
+function updatePurchaseAiInvoiceRows(oldInvoiceNo,inv){
+  const fmt=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const validation=validatePurchaseAiInvoice(inv);
+  const stCls=validation.valid?'b-g':'b-a';
+  document.querySelectorAll('#ext-tbody tr[data-inv]').forEach(row=>{
+    if((row.dataset.invoiceNo||'')!==String(oldInvoiceNo||''))return;
+    const index=Number(row.dataset.lineIndex||0);
+    const line=Array.isArray(inv.lines)?(inv.lines[index]||{}):{};
+    const lineTotal=parseAmount(line.line_total||line.amount);
+    const vat=index===0?parseAmount(inv.vat_amount||inv.tax_amount):0;
+    const paid=index===0?parseAmount(inv.paid):0;
+    const shipping=index===0?parseAmount(inv.shipping):0;
+    const total=index===0?parseAmount(inv.total):(lineTotal+vat);
+    row.dataset.invoiceNo=inv.invoice_no||'';
+    row.dataset.inv=JSON.stringify(inv);
+    row.dataset.validation=validation.valid?'valid':'review';
+    const cells=row.children;
+    cells[1].textContent=validation.issues.join('; ')||purchaseAiRawDetails(line)||'Ready to save';
+    cells[3].textContent=inv.invoice_no||'';
+    cells[4].textContent=inv.date||'';
+    cells[5].textContent=inv.supplier||'';
+    cells[6].textContent=inv.address||'';
+    cells[7].textContent=inv.pay_term||'';
+    cells[8].textContent=purchaseAiProductName(line);
+    cells[9].textContent=fmt(line.quantity||line.qty);
+    cells[10].textContent=line.unit||line.unit_of_measure||line.uom||'PCS';
+    cells[11].textContent=fmt(line.unit_cost||line.cost||line.unitCost);
+    cells[12].textContent=fmt(line.discount_percent||line.discountPct);
+    cells[13].textContent=fmt(line.unit_cost_before_tax||line.unit_cost||line.cost);
+    cells[14].textContent=fmt(line.line_total||line.amount);
+    cells[15].textContent=fmt(line.profit_margin||line.margin);
+    cells[16].textContent=fmt(line.selling_price_inc_tax||line.selling_price);
+    cells[17].textContent=inv.discount_type||'None';
+    cells[18].textContent=fmt(inv.discount_value||inv.discount);
+    cells[19].textContent=fmt(vat);
+    cells[20].textContent=inv.shipping_details||'';
+    cells[21].textContent=fmt(shipping);
+    cells[22].textContent=fmt(paid);
+    cells[23].textContent=inv.paid_on||'';
+    cells[24].textContent=inv.payment_method||'Cash';
+    cells[25].textContent=inv.payment_account||'None';
+    cells[26].textContent=inv.payment_note||'';
+    cells[27].textContent=inv.notes||'';
+    cells[28].textContent=fmt(Math.max(0,total-paid));
+    cells[29].innerHTML=`<span class="b ${stCls}">${validation.valid?'Valid':'Review'}</span>`;
+  });
 }
 
 function togglePurchaseAiSelection(checked){
@@ -2630,20 +3225,19 @@ function togglePurchaseAiSelection(checked){
 function skipPurchaseAiRow(btn){
   const row=btn.closest('tr');
   if(!row)return;
-  row.dataset.skipped='1';
-  const box=row.querySelector('.purchase-ai-select');
-  if(box)box.checked=false;
-  row.querySelector('.purchase-ai-validation').innerHTML='<span class="b b-gray">Skipped</span>';
-  row.querySelector('.purchase-ai-details').textContent='Skipped by user';
+  markPurchaseAiInvoiceRows(row.dataset.invoiceNo,'Skipped','Skipped by user',true);
   toast('Purchase AI row skipped','info');
 }
 
 function deletePurchaseAiRow(btn){
   const row=btn.closest('tr');
   const tbody=row?.parentElement;
-  row?.remove();
+  const invoiceNo=row?.dataset.invoiceNo||'';
+  document.querySelectorAll('#ext-tbody tr[data-inv]').forEach(item=>{
+    if((item.dataset.invoiceNo||'')===invoiceNo)item.remove();
+  });
   if(tbody&&tbody.querySelectorAll('tr[data-inv]').length===0){
-    tbody.innerHTML='<tr><td colspan="12" style="color:var(--text3);text-align:center">AI uploaded purchase data will appear here for validation.</td></tr>';
+    tbody.innerHTML='<tr><td colspan="30" style="color:var(--text3);text-align:center">AI uploaded purchase data will appear here for validation.</td></tr>';
   }
   toast('Purchase AI row deleted','warn');
 }
@@ -2659,8 +3253,7 @@ function revalidatePurchaseAiRows(){
     const detailsCell=row.querySelector('.purchase-ai-details');
     const checkbox=row.querySelector('.purchase-ai-select');
     if(validationCell)validationCell.innerHTML=`<span class="b ${validation.valid?'b-g':'b-a'}">${validation.valid?'Valid':'Review'}</span>`;
-    if(detailsCell)detailsCell.textContent=validation.issues.join('; ')||'Ready to save';
-    if(checkbox&&!validation.valid)checkbox.checked=false;
+    if(detailsCell)detailsCell.textContent=validation.issues.join('; ')||purchaseAiRawDetails(inv.lines?.[Number(row.dataset.lineIndex||0)]||{})||'Ready to save';
   });
 }
 
@@ -2773,7 +3366,10 @@ function setManualPurchaseDefaults(){
   });
   const ref=document.getElementById('mp-ref');
   if(ref&&!ref.value)ref.value=`PUR-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
-  removeInitialBlankPurchaseLine();
+  if(!document.querySelector('#mp-lines tr')&&document.getElementById('mp-lines')){
+    addManualPurchaseLine();
+    return;
+  }
   calcManualPurchase();
 }
 
@@ -2794,8 +3390,9 @@ function removeInitialBlankPurchaseLine(){
 function addManualPurchaseLine(){
   const tbody=document.getElementById('mp-lines');
   if(!tbody)return;
+  refreshPurchaseProductSuggestions();
   const row=document.createElement('tr');
-  row.innerHTML=`<td class="line-no-cell"><span class="line-no">1</span></td><td><input class="fi mp-product" placeholder="Product name"></td><td><input class="fi mono mp-qty" value="1" oninput="calcManualPurchase()"></td><td><select class="fi mp-unit"><option>PCS</option><option>BOX</option><option>PACK</option><option>CTN</option><option>KG</option><option>LTR</option><option>Unit</option></select></td><td><input class="fi mono mp-units-outer" value="1" placeholder="1"></td><td><input class="fi mono mp-cost" value="0.00" oninput="calcManualPurchase()"></td><td><input class="fi mono mp-discount-pct" value="0" oninput="calcManualPurchase()"></td><td class="mono mp-before-tax">0.00</td><td class="mono mp-line-total">0.00</td><td><input class="fi mono mp-margin" value="0" oninput="calcManualPurchase()"></td><td class="mono mp-selling">0.00</td><td><button class="icon-btn danger" type="button" onclick="removeManualPurchaseLine(this)" title="Remove line">${deleteIconSvg()}</button></td>`;
+  row.innerHTML=`<td class="line-no-cell"><span class="line-no">1</span></td><td><input class="fi mp-product" list="purchase-product-options" placeholder="Product name" onfocus="refreshPurchaseProductSuggestions()" onchange="applyPurchaseProductSuggestion(this)"></td><td><input class="fi mono mp-qty" value="1" oninput="calcManualPurchase()"></td><td><select class="fi mp-unit">${unitOptionsHtml('PCS')}</select></td><td><input class="fi mono mp-cost" value="0.00" oninput="calcManualPurchase()"></td><td><input class="fi mono mp-discount-pct" value="0" oninput="calcManualPurchase()"></td><td class="mono mp-before-tax">0.00</td><td class="mono mp-line-total">0.00</td><td><input class="fi mono mp-margin" value="0" oninput="calcManualPurchase()"></td><td class="mono mp-selling">0.00</td><td><button class="icon-btn danger" type="button" onclick="removeManualPurchaseLine(this)" title="Remove line">${deleteIconSvg()}</button></td>`;
   tbody.appendChild(row);
   calcManualPurchase();
   refreshEnhancedTable(tbody.closest('table'));
@@ -2807,19 +3404,84 @@ function removeManualPurchaseLine(btn){
   refreshEnhancedTable(document.getElementById('mp-lines')?.closest('table'));
 }
 
+function manualPurchaseLineHasValue(row){
+  return Boolean(
+    (row.querySelector('.mp-product')?.value||'').trim()||
+    parseAmount(row.querySelector('.mp-qty')?.value)>1||
+    parseAmount(row.querySelector('.mp-cost')?.value)>0||
+    parseAmount(row.querySelector('.mp-discount-pct')?.value)>0||
+    parseAmount(row.querySelector('.mp-margin')?.value)>0
+  );
+}
+
 function collectManualPurchaseLines(){
-  return [...document.querySelectorAll('#mp-lines tr')].map(row=>({
-    product:row.querySelector('.mp-product')?.value||'',
-    quantity:parseAmount(row.querySelector('.mp-qty')?.value),
-    unit_of_measure:row.querySelector('.mp-unit')?.value||'PCS',
-    units_per_outer:parseAmount(row.querySelector('.mp-units-outer')?.value)||1,
-    unit_cost:parseAmount(row.querySelector('.mp-cost')?.value),
-    discount_percent:parseAmount(row.querySelector('.mp-discount-pct')?.value),
-    profit_margin:parseAmount(row.querySelector('.mp-margin')?.value),
-    unit_cost_before_tax:parseAmount(row.querySelector('.mp-before-tax')?.textContent),
-    line_total:parseAmount(row.querySelector('.mp-line-total')?.textContent),
-    selling_price_inc_tax:parseAmount(row.querySelector('.mp-selling')?.textContent)
-  }));
+  return [...document.querySelectorAll('#mp-lines tr')]
+    .filter(manualPurchaseLineHasValue)
+    .map(row=>({
+      product:(row.querySelector('.mp-product')?.value||'').trim(),
+      quantity:parseAmount(row.querySelector('.mp-qty')?.value),
+      unit_of_measure:row.querySelector('.mp-unit')?.value||'PCS',
+      unit_cost:parseAmount(row.querySelector('.mp-cost')?.value),
+      discount_percent:parseAmount(row.querySelector('.mp-discount-pct')?.value),
+      profit_margin:parseAmount(row.querySelector('.mp-margin')?.value),
+      unit_cost_before_tax:parseAmount(row.querySelector('.mp-before-tax')?.textContent),
+      line_total:parseAmount(row.querySelector('.mp-line-total')?.textContent),
+      selling_price_inc_tax:parseAmount(row.querySelector('.mp-selling')?.textContent)
+    }));
+}
+
+function purchaseProductRecords(){
+  const records=[];
+  document.querySelectorAll('#prod-tbody tr:not([data-empty-state])').forEach(row=>{
+    const cells=row.children;
+    const code=cells[0]?.textContent.trim()||'';
+    const name=cells[1]?.textContent.trim()||'';
+    if(!name)return;
+    records.push({
+      code,
+      name,
+      unit:cells[4]?.textContent.trim()||'PCS',
+      cost:Number(row.dataset.cost||0),
+      supplier:row.dataset.supplier||''
+    });
+  });
+  document.querySelectorAll('#stock-map-tbody tr:not([data-empty-state])').forEach(row=>{
+    const cells=row.children;
+    const sku=row.dataset.stockSku||'';
+    const name=cells[2]?.textContent.trim()||cells[0]?.textContent.trim()||sku;
+    if(!name)return;
+    records.push({
+      code:sku,
+      name,
+      unit:row.dataset.unit||'PCS',
+      cost:Number(row.dataset.cost||0),
+      supplier:(cells[1]?.textContent.trim()||'').replace(/^Not assigned$/,'')
+    });
+  });
+  return records;
+}
+
+function refreshPurchaseProductSuggestions(){
+  const list=document.getElementById('purchase-product-options');
+  if(!list)return;
+  list.innerHTML=purchaseProductRecords()
+    .map(item=>`<option value="${escapeHtml(item.name)}" label="${escapeHtml([item.code,item.unit,item.supplier].filter(Boolean).join(' - '))}"></option>`)
+    .join('');
+}
+
+function applyPurchaseProductSuggestion(input){
+  const value=(input?.value||'').trim().toLowerCase();
+  if(!value)return;
+  const match=purchaseProductRecords().find(item=>[item.name,item.code].some(text=>String(text||'').toLowerCase()===value));
+  if(!match)return;
+  const row=input.closest('tr');
+  setSelectValue(row?.querySelector('.mp-unit'),match.unit||'PCS');
+  if(row?.querySelector('.mp-cost')&&match.cost)row.querySelector('.mp-cost').value=Number(match.cost).toFixed(2);
+  if(match.supplier&&!document.getElementById('mp-supplier')?.value){
+    setSelectValue(document.getElementById('mp-supplier'),match.supplier);
+    applySupplierAddress();
+  }
+  calcManualPurchase();
 }
 
 function setSelectValue(select,value){
@@ -2839,6 +3501,7 @@ let manualPurchaseEditingRef='';
 function calcManualPurchase(){
   const rows=[...document.querySelectorAll('#mp-lines tr')];
   let net=0;
+  let activeItems=0;
   rows.forEach((row,index)=>{
     const lineNo=row.querySelector('.line-no')||row.children[0];
     lineNo.textContent=String(index+1);
@@ -2852,26 +3515,29 @@ function calcManualPurchase(){
     row.querySelector('.mp-before-tax').textContent=beforeTax.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
     row.querySelector('.mp-line-total').textContent=lineTotal.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
     row.querySelector('.mp-selling').textContent=selling.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
-    net+=lineTotal;
+    if(manualPurchaseLineHasValue(row)){
+      activeItems+=1;
+      net+=lineTotal;
+    }
   });
   const discountType=document.getElementById('mp-discount-type')?.value||'None';
   const discountValue=parseAmount(document.getElementById('mp-discount')?.value);
   const discount=discountType==='Percentage'?net*(discountValue/100):discountType==='Fixed'?discountValue:0;
   const taxable=Math.max(0,net-discount);
   const taxType=document.getElementById('mp-tax')?.value||'None';
-  const tax=taxType.includes('5%')?taxable*.05:0;
+  const tax=taxType.includes('5%')&&!taxType.toLowerCase().includes('exempt')?taxable*.05:0;
   const shipping=parseAmount(document.getElementById('mp-shipping')?.value);
   const total=taxable+tax+shipping;
   const paid=parseAmount(document.getElementById('mp-pay-amount')?.value);
   const due=Math.max(0,total-paid);
-  setText('mp-total-items',String(rows.length));
+  setText('mp-total-items',String(activeItems));
   setText('mp-net-total',net.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
   setText('mp-discount-total',discount.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
   setText('mp-tax-total',tax.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
   setText('mp-purchase-total',total.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
   setText('mp-grand-total',total.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
   setText('mp-payment-due',due.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
-  return {items:rows.length,net,discount,tax,shipping,total,paid,due};
+  return {items:activeItems,net,discount,tax,shipping,total,paid,due};
 }
 
 function resetManualPurchase(){
@@ -2891,8 +3557,9 @@ function resetManualPurchase(){
   setManualPurchaseDefaults();
 }
 
-function saveManualPurchase(){
+async function saveManualPurchase(){
   setManualPurchaseDefaults();
+  removeInitialBlankPurchaseLine();
   const totals=calcManualPurchase();
   const supplier=document.getElementById('mp-supplier')?.value||'';
   const status=totals.due<=0?'Paid':'Pending Payment';
@@ -2902,6 +3569,16 @@ function saveManualPurchase(){
   }
   if(!document.querySelector('#mp-lines tr')){
     toast('Add at least one product','warn');
+    return;
+  }
+  const lines=collectManualPurchaseLines();
+  if(!lines.length){
+    toast('Add at least one product','warn');
+    return;
+  }
+  const invalidLine=lines.find(line=>!line.product||line.quantity<=0||line.unit_cost<0);
+  if(invalidLine){
+    toast('Each purchase line needs product name and quantity','warn');
     return;
   }
   const ref=(document.getElementById('mp-ref')?.value||`PUR-${Date.now()}`).trim();
@@ -2924,7 +3601,7 @@ function saveManualPurchase(){
     discount_type:document.getElementById('mp-discount-type')?.value||'None',
     discount_value:parseAmount(document.getElementById('mp-discount')?.value),
     tax_type:document.getElementById('mp-tax')?.value||'None',
-    lines:collectManualPurchaseLines(),
+    lines,
     payment_method:document.getElementById('mp-pay-method')?.value||'Cash',
     payment_account:document.getElementById('mp-pay-account')?.value||'None',
     payment_note:document.getElementById('mp-pay-note')?.value||'',
@@ -2933,13 +3610,15 @@ function saveManualPurchase(){
     notes:document.getElementById('mp-notes')?.value||'',
     source:'Manual'
   };
+  const wasEditing=Boolean(manualPurchaseEditingRef);
   if(manualPurchaseEditingRef){
     [...document.querySelectorAll('#purchase-record-tbody tr')].find(row=>row.children[0]?.textContent.trim()===manualPurchaseEditingRef)?.remove();
   }
   renderPurchaseRecord(record);
-  saveServer('purchaseRecords',record);
   audit(manualPurchaseEditingRef?'Updated manual purchase':'Added manual purchase',ref,'Saved');
-  toast(manualPurchaseEditingRef?'Purchase updated':'Purchase saved','ok');
+  saveServer('purchaseRecords',record,{throwOnError:true})
+    .then(()=>toast(wasEditing?'Purchase updated in database':'Purchase saved to database','ok'))
+    .catch(()=>toast('Purchase added on screen, database save failed','warn'));
   manualPurchaseEditingRef='';
   const refField=document.getElementById('mp-ref');
   if(refField)refField.disabled=false;
@@ -2976,7 +3655,6 @@ function addManualPurchaseLineFromData(line={}){
   row.querySelector('.mp-product').value=line.product||line.name||'Purchase item';
   row.querySelector('.mp-qty').value=line.quantity||line.qty||1;
   setSelectValue(row.querySelector('.mp-unit'),line.unit_of_measure||line.unit||line.uom||'PCS');
-  row.querySelector('.mp-units-outer').value=line.units_per_outer||line.unitsOuter||line.conversion_factor||1;
   row.querySelector('.mp-cost').value=line.unit_cost||line.cost||line.unitCost||0;
   row.querySelector('.mp-discount-pct').value=line.discount_percent||line.discountPct||0;
   row.querySelector('.mp-margin').value=line.profit_margin||line.margin||0;
@@ -3143,6 +3821,7 @@ function saveSalesUnit(){
     if(field)field.value='';
   });
   refreshEnhancedTable(document.getElementById('sales-unit-tbody')?.closest('table'));
+  syncInventoryItemOptions();
   toast('Unit added','ok');
   audit('Added unit',name,'Saved');
 }
@@ -4497,7 +5176,13 @@ function deleteCurrentDetailRow(){
   const collection=inferCollectionFromContext(currentDetailTable);
   const record=currentDetailTable?recordFromTableRow(currentDetailTable,currentDetailRow):{id:label,name:label};
   currentDetailRow.remove();
-  if(currentDetailTable)refreshEnhancedTable(currentDetailTable);
+  if(currentDetailTable){
+    const tbody=currentDetailTable.tBodies?.[0];
+    if(tbody&&tbody.querySelectorAll('tr:not([data-empty-state])').length===0){
+      emptyTableMessage(tbody,'No database records yet.');
+    }
+    refreshEnhancedTable(currentDetailTable);
+  }
   apiRequest('delete',{collection,record}).catch(err=>console.warn('Database delete failed:',err));
   saveServer('app_actions',{mode:'delete',record:label,page:document.getElementById('ptitle')?.textContent||'App'});
   audit('Deleted record',label,'Deleted');
@@ -4667,6 +5352,7 @@ function saveGenericForm(){
   }else{
     const table=genericFormState.table;
     if(table?.querySelector('tbody')){
+      removeEmptyState(table.querySelector('tbody'));
       const row=document.createElement('tr');
       const headers=[...table.querySelectorAll('thead th')].map(th=>th.textContent.trim());
       const hasActionColumn=headers.some(label=>!label||['action','actions'].includes(label.toLowerCase()));
@@ -4812,12 +5498,15 @@ function saveVendor(){
   const trn=(document.getElementById('vendor-trn')?.value||'').replace(/\D/g,'');
   const category=document.getElementById('vendor-category')?.value||'Services';
   const email=(document.getElementById('vendor-email')?.value||'').trim();
+  const phone=(document.getElementById('vendor-phone')?.value||'').trim();
+  const address=(document.getElementById('vendor-address')?.value||'').trim();
   if(!name){toast('Vendor name is required','err');return;}
   if(trn&&trn.length!==15){toast('Vendor TRN must be 15 digits','err');return;}
-  renderVendorRecord({name,trn,category,email});
+  renderVendorRecord({name,trn,category,email,phone,address});
   syncSupplierOptions(name);
-  saveServer('vendors',{name,trn,category,email});
+  saveServer('vendors',{name,trn,category,email,phone,address});
   closeM('m-vendor');
+  ['vendor-name','vendor-trn','vendor-email','vendor-phone','vendor-address'].forEach(id=>setFieldValue(document.getElementById(id),''));
   toast('Vendor added ?','ok');
   audit('Added vendor',name,'Saved');
 }
@@ -5046,8 +5735,8 @@ function initApp(){
   syncProductMasterOptions();
   setManualPurchaseDefaults();
   syncCompanyFromDatabase();
-  syncDashboardFromDatabase();
-  hydrateFromServer();
+  syncDashboardFromDatabase().catch(err=>console.warn('Dashboard sync failed during init:',err));
+  hydrateFromServer().catch(err=>console.warn('Database hydrate failed during init:',err));
   enhancePageTables('page-dashboard');
   scheduleIdleTask(()=>{
     updateAccountSelectors();

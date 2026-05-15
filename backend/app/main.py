@@ -116,9 +116,6 @@ def seed_initial_data() -> None:
 
         seed_accounts(db, company.id)
         seed_tax_codes(db, company.id)
-        seed_inventory(db, company.id)
-        seed_employees(db, company.id)
-        seed_audit(db, company.id, user.id)
         db.commit()
     finally:
         db.close()
