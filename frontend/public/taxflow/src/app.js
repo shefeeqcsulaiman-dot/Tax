@@ -589,6 +589,7 @@ function chkSettingsTRN(inp){
 
 // -- UPLOAD: store real files --------------------------------------
 const uploadedFiles = []; // {name, size, type, base64, category, period, status}
+const PURCHASE_AI_PREVIEW_LIMIT = 500;
 
 const APP_CONFIG={
   apiEndpoint:null,
@@ -1319,6 +1320,14 @@ function saveServer(collection,record,options={}){
   });
 }
 
+function bulkSaveServer(collection,records,options={}){
+  return apiRequest('bulk-save',{collection,records}).catch(err=>{
+    console.warn('Database bulk save failed:',err);
+    if(options.throwOnError)throw err;
+    return null;
+  });
+}
+
 async function moduleApi(path,options={}){
   const response=await authenticatedFetch(`${apiBaseUrl()}${path}`,{
     method:options.method||'GET',
@@ -1681,7 +1690,7 @@ function renderPaymentRecord(payment){
   tbody.prepend(row);
 }
 
-function renderPurchaseRecord(purchase){
+function renderPurchaseRecord(purchase,options={}){
   const tbody=document.getElementById('purchase-record-tbody');
   const ref=purchase?.ref||purchase?.invoice_no||purchase?.reference;
   if(!tbody||!ref||hasFirstCellValue(tbody,ref))return;
@@ -1695,7 +1704,7 @@ function renderPurchaseRecord(purchase){
   row.innerHTML=`<td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(purchase.supplier||'-')}</td><td>${escapeHtml(purchase.date||'-')}</td><td>${escapeHtml(purchase.location||'-')}</td><td class="mono">${Number(purchase.items||0)}</td><td class="mono">${Number(purchase.net_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.tax_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.shipping||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.total||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.paid||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.due||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td>`;
   removeEmptyState(tbody);
   tbody.prepend(row);
-  refreshEnhancedTable(tbody.closest('table'));
+  if(!options.deferRefresh)refreshEnhancedTable(tbody.closest('table'));
 }
 
 function renderAccountRecord(account){
@@ -2543,14 +2552,26 @@ function purUpload(inp){
 }
 
 function readAndAddFile(file){
+  const cat=document.getElementById('pur-cat')?.value||'Purchase Invoices';
+  const period=document.getElementById('pur-period')?.value||'June 2024';
+  const entry={name:file.name,size:file.size,type:file.type,base64:'',category:cat,period,status:'Reading',id:'F'+Date.now()+Math.random().toString(36).slice(2,6)};
+  uploadedFiles.push(entry);
+  renderFileList();
+  updatePurchaseValidationFileStatus();
+  updateFileCount();
+  toast(`Reading ${file.name}...`,'info');
   const reader=new FileReader();
   reader.onload=function(e){
     const base64=e.target.result; // full data URL
-    const cat=document.getElementById('pur-cat')?.value||'Purchase Invoices';
-    const period=document.getElementById('pur-period')?.value||'June 2024';
-    const entry={name:file.name,size:file.size,type:file.type,base64,category:cat,period,status:'Queued',id:'F'+Date.now()+Math.random().toString(36).slice(2,6)};
-    uploadedFiles.push(entry);
+    entry.base64=base64;
+    entry.status='Queued';
     animateUpload(file.name,file.size,entry);
+  };
+  reader.onerror=function(){
+    entry.status='Error';
+    renderFileList();
+    updatePurchaseValidationFileStatus();
+    toast(`Could not read ${file.name}`,'err');
   };
   reader.readAsDataURL(file);
 }
@@ -2567,6 +2588,7 @@ function animateUpload(name,size,entry){
         pg.style.display='none';fill.style.width='0%';
         entry.status='Ready';
         renderFileList();
+        updatePurchaseValidationFileStatus();
         updateFileCount();
         toast(name+' uploaded ?','ok');
         // auto-extract if setting says yes
@@ -2594,6 +2616,7 @@ function renderFileList(){
   uploadedFiles.forEach(f=>{
     const statusBadge={
       Queued:'<span class="b b-gray">Queued</span>',
+      Reading:'<span class="b b-a">Reading</span>',
       Ready:'<span class="b b-b">Ready</span>',
       Extracting:'<span class="b b-a">Extracting-</span>',
       Extracted:'<span class="b b-g">Extracted ?</span>',
@@ -2623,6 +2646,47 @@ function updateFileCount(){
   if(badge) badge.textContent=(3+uploadedFiles.length)+' files';
 }
 
+function updatePurchaseValidationFileStatus(){
+  const wrap=document.getElementById('pur-validation-file-status');
+  if(!wrap)return;
+  const files=uploadedFiles.filter(file=>['Extracted','Error','Ready','Queued'].includes(file.status));
+  if(!files.length){
+    wrap.innerHTML='<div class="stat"><div class="stat-lbl">Uploaded Files</div><div class="stat-val" style="font-size:18px;color:var(--text3)">No files</div><div class="stat-delta">Upload and extract purchase files first</div></div>';
+    return;
+  }
+  wrap.innerHTML=files.map(file=>{
+    const invoices=Array.isArray(file.invoices)?file.invoices:[];
+    const saved=file.savedInvoiceNos instanceof Set?file.savedInvoiceNos:new Set(file.savedInvoiceNos||[]);
+    const total=invoices.length;
+    const savedCount=invoices.filter(inv=>saved.has(String(inv.invoice_no||''))).length;
+    let label='Not uploaded';
+    let cls='b-r';
+    let color='var(--red)';
+    let note=file.status==='Error'?'Extraction failed':'Not saved to purchase records';
+    if(total>0&&savedCount>=total){
+      label='Completed';
+      cls='b-g';
+      color='var(--green)';
+      note=`${savedCount}/${total} saved to purchase records`;
+    }else if(savedCount>0){
+      label='Partial';
+      cls='b-a';
+      color='var(--amber)';
+      note=`${savedCount}/${total||savedCount} saved to purchase records`;
+    }else if(file.status==='Extracted'){
+      note=`0/${total} saved to purchase records`;
+    }else if(file.status==='Ready'){
+      note='Ready for extraction';
+    }
+    return `<div class="stat">
+      <div class="stat-lbl">${escapeHtml(file.name)}</div>
+      <div class="stat-val" style="font-size:18px;color:${color}">${escapeHtml(label)}</div>
+      <div class="stat-delta"><span class="b ${cls}">${escapeHtml(label)}</span> ${escapeHtml(note)}</div>
+    </div>`;
+  }).join('');
+  renderPurchaseValidationDocumentStatus();
+}
+
 // -- AI EXTRACTION via backend API ----------------------------------
 async function extractSingleFile(entry){
   if(!entry){toast('File not found','err');return;}
@@ -2644,10 +2708,19 @@ async function extractSingleFile(entry){
 
     entry.status='Extracted';
     entry.invoices=invoices;
+    entry.savedInvoiceNos=entry.savedInvoiceNos||new Set();
     renderFileList();
-    appendExtractedRows(invoices,entry.name);
+    await appendExtractedRows(invoices,entry.name);
     updateExtractionStats();
-    hydrateFromServer().catch(err=>console.warn('Refresh after extraction failed:',err));
+    try{
+      updatePurchaseValidationFileStatus();
+      buildValidationPanel(invoices);
+    }catch(panelErr){
+      console.warn('Purchase validation status update failed:',panelErr);
+    }
+    if(invoices.length<=250){
+      hydrateFromServer().catch(err=>console.warn('Refresh after extraction failed:',err));
+    }
 
     setTimeout(()=>{ep.style.display='none';ef.style.width='0%';},600);
     toast(`Extracted ${invoices.length} invoice(s) from ${entry.name} ?`,'ok');
@@ -2661,21 +2734,32 @@ async function extractSingleFile(entry){
     ep.style.display='none';
     entry.status='Error';
     renderFileList();
+    updatePurchaseValidationFileStatus();
     toast('Extraction failed: '+err.message,'err');
     console.error(err);
   }
 }
 
-function appendExtractedRows(invoices,filename){
+async function appendExtractedRows(invoices,filename){
   const tbody=document.getElementById('ext-tbody');
   if(!tbody)return;
   if(tbody.querySelector('td[colspan]'))tbody.innerHTML='';
-  invoices.forEach(inv=>{
-    // check if row already exists (by invoice_no)
-    if([...tbody.querySelectorAll('tr[data-inv] td.mono')].some(td=>td.textContent===inv.invoice_no)){
+  if(!Array.isArray(invoices)||!invoices.length){
+    tbody.innerHTML=`<tr><td colspan="30" style="color:var(--red);text-align:center">No data extracted from ${escapeHtml(filename||'uploaded file')}.</td></tr>`;
+    return;
+  }
+  const existingInvoiceNos=new Set([...tbody.querySelectorAll('tr[data-inv]')].map(row=>row.dataset.invoiceNo||'').filter(Boolean));
+  let fragment=document.createDocumentFragment();
+  let appended=0;
+  const previewInvoices=invoices.slice(0,PURCHASE_AI_PREVIEW_LIMIT);
+  for(const [invoiceIndex,inv] of previewInvoices.entries()){
+    const invoiceNo=String(inv.invoice_no||'');
+    if(existingInvoiceNos.has(invoiceNo)){
       toast(`Duplicate in current purchase AI upload: ${inv.invoice_no}`,'warn');
-      return;
+      continue;
     }
+    existingInvoiceNos.add(invoiceNo);
+    const invoiceUid=`${Date.now()}-${invoiceIndex}-${Math.random().toString(36).slice(2,8)}`;
     const validation=validatePurchaseAiInvoice(inv);
     const confCls=inv.confidence>=90?'b-g':inv.confidence>=70?'b-a':'b-r';
     const stCls=validation.valid?'b-g':'b-a';
@@ -2690,12 +2774,13 @@ function appendExtractedRows(invoices,filename){
       const row=document.createElement('tr');
       row.setAttribute('data-inv',JSON.stringify(inv));
       row.dataset.invoiceNo=inv.invoice_no||'';
+      row.dataset.invoiceUid=invoiceUid;
       row.dataset.lineIndex=String(index);
       row.dataset.validation=validation.valid?'valid':'review';
       row.innerHTML=`
         <td><input type="checkbox" class="purchase-ai-select" ${validation.valid?'checked':''} aria-label="Select ${escapeHtml(inv.invoice_no)} line ${index+1}"></td>
-        <td class="purchase-ai-details" style="color:var(--text3);font-size:12px">${escapeHtml(validation.issues.join('; ')||purchaseAiRawDetails(line)||'Ready to save')}</td>
-        <td data-action-col="1">${purchaseAiUploadActionsHtml()}</td>
+        <td class="purchase-ai-details" style="color:var(--text3);font-size:12px">${escapeHtml(index===0?(validation.issues.join('; ')||purchaseAiRawDetails(line)||'Ready to save'):'')}</td>
+        <td data-action-col="1">${index===0?purchaseAiUploadActionsHtml():''}</td>
         <td class="mono">${escapeHtml(inv.invoice_no)}</td>
         <td>${escapeHtml(inv.date||'')}</td>
         <td>${escapeHtml(inv.supplier||'')}</td>
@@ -2723,10 +2808,27 @@ function appendExtractedRows(invoices,filename){
         <td>${escapeHtml(inv.notes||'')}</td>
         <td class="mono">${fmt(Math.max(0,total-paid))}</td>
         <td class="purchase-ai-validation"><span class="b ${stCls}">${validation.valid?'Valid':'Review'}</span></td>`;
-      tbody.insertBefore(row,tbody.firstChild);
+      fragment.appendChild(row);
+      appended++;
     });
-  });
+    if(appended&&appended%100===0){
+      tbody.insertBefore(fragment,tbody.firstChild);
+      fragment=document.createDocumentFragment();
+      await yieldToBrowser();
+    }
+  }
+  if(fragment.childNodes.length)tbody.insertBefore(fragment,tbody.firstChild);
+  if(invoices.length>previewInvoices.length){
+    const row=document.createElement('tr');
+    row.dataset.previewSummary='1';
+    row.innerHTML=`<td colspan="30" style="color:var(--text3);text-align:center">Showing ${previewInvoices.length.toLocaleString('en-AE')} of ${invoices.length.toLocaleString('en-AE')} extracted invoices. Save All will save the full upload.</td>`;
+    tbody.appendChild(row);
+  }
   revalidatePurchaseAiRows();
+}
+
+function yieldToBrowser(){
+  return new Promise(resolve=>setTimeout(resolve,0));
 }
 
 function purchaseAiProductName(line={}){
@@ -2786,50 +2888,164 @@ function discountAmountFromExtractedInvoice(inv){
   return inv.discount_type==='Percentage'?net*(value/100):inv.discount_type==='Fixed'?value:0;
 }
 
-function storeExtractedPurchaseRecords(){
-  const rows=[...document.querySelectorAll('#ext-tbody tr[data-inv]')]
+async function storeExtractedPurchaseRecords(){
+  const rows=[...document.querySelectorAll('#ext-tbody tr[data-inv]')];
+  const visibleInvoiceNos=new Set(rows.map(row=>String(row.dataset.invoiceNo||'')));
+  const skippedOrUnchecked=new Set(rows
+    .filter(row=>row.dataset.skipped==='1'||!row.querySelector('.purchase-ai-select')?.checked)
+    .map(row=>String(row.dataset.invoiceNo||'')));
+  const selectedInvoices=new Map();
+  rows
     .filter(row=>row.dataset.skipped!=='1')
-    .filter(row=>row.querySelector('.purchase-ai-select')?.checked);
-  if(rows.length===0){toast('No extracted purchase invoices to store','warn');return;}
+    .filter(row=>row.querySelector('.purchase-ai-select')?.checked)
+    .forEach(row=>{
+      try{
+        const inv=JSON.parse(row.dataset.inv||'{}');
+        const invoiceNo=String(row.dataset.invoiceNo||inv.invoice_no||'');
+        if(invoiceNo&&!selectedInvoices.has(invoiceNo))selectedInvoices.set(invoiceNo,inv);
+      }catch{}
+    });
+  uploadedFiles.forEach(file=>{
+    const saved=file.savedInvoiceNos instanceof Set?file.savedInvoiceNos:new Set(file.savedInvoiceNos||[]);
+    (file.invoices||[]).forEach(inv=>{
+      const invoiceNo=String(inv.invoice_no||'');
+      if(!invoiceNo||saved.has(invoiceNo)||skippedOrUnchecked.has(invoiceNo))return;
+      if(!visibleInvoiceNos.has(invoiceNo)||!selectedInvoices.has(invoiceNo))selectedInvoices.set(invoiceNo,inv);
+    });
+  });
+  if(selectedInvoices.size===0){toast('No extracted purchase invoices to store','warn');return;}
   let stored=0;
   let updated=0;
   let existing=0;
-  let blocked=0;
-  const selectedByInvoice=new Map();
-  rows.forEach(row=>{
-    const invoiceNo=row.dataset.invoiceNo||'';
-    if(!selectedByInvoice.has(invoiceNo))selectedByInvoice.set(invoiceNo,row);
-  });
-  selectedByInvoice.forEach(row=>{
-    const inv=JSON.parse(row.dataset.inv||'{}');
-    const validation=validatePurchaseAiInvoice(inv);
+  let reviewSaved=0;
+  let failed=0;
+  const recordsToSave=[];
+  const savedInvoiceNos=[];
+  const existingRows=purchaseRecordRowMap();
+  const existingRefs=new Set(existingRows.keys());
+  const aiInvoiceCounts=purchaseAiInvoiceCounts();
+  for(const inv of selectedInvoices.values()){
+    const validation=validatePurchaseAiInvoice(inv,{aiInvoiceCounts,existingPurchaseRefs:existingRefs});
     if(!validation.valid){
-      blocked++;
+      reviewSaved++;
       markPurchaseAiInvoiceRows(inv.invoice_no,'Review',validation.issues.join('; ')||'Saved with review notes');
     }
     const record=purchaseRecordFromExtractedInvoice(inv);
-    const result=upsertExtractedPurchaseRecord(record);
+    const refKey=invoiceKey(record.ref||record.invoice_no);
+    const existingRow=existingRows.get(refKey);
+    const result=existingRow
+      ? (purchaseRecordsEquivalent(purchaseRecordFromRow(existingRow),record)?'same':'updated')
+      : 'created';
     if(result==='same'){
       existing++;
+      markExtractedInvoiceUploaded(inv.invoice_no);
       markPurchaseAiInvoiceRows(inv.invoice_no,'Already Exists','Same purchase already exists in database',true);
-      return;
+      continue;
     }
     if(result==='updated')updated++;
     if(result==='created')stored++;
-    saveServer('purchaseRecords',record);
-    markPurchaseAiInvoiceRows(
-      inv.invoice_no,
-      result==='updated'?'Updated':'Saved',
-      result==='updated'?'Existing purchase updated in database':'Saved to purchase records',
-      true
-    );
-  });
+    recordsToSave.push({record,result,invoiceNo:inv.invoice_no,refKey});
+  }
+  if(recordsToSave.length){
+    try{
+      await savePurchaseRecordsInChunks(recordsToSave.map(item=>item.record));
+      recordsToSave.forEach(item=>{
+        const oldRow=existingRows.get(item.refKey);
+        if(oldRow)oldRow.remove();
+        renderPurchaseRecord(item.record,{deferRefresh:true});
+        savedInvoiceNos.push(item.invoiceNo);
+      });
+      refreshEnhancedTable(document.getElementById('purchase-record-tbody')?.closest('table'));
+      markExtractedInvoicesUploaded(savedInvoiceNos);
+      markPurchaseAiInvoicesBulk(recordsToSave.map(item=>({
+        invoiceNo:item.invoiceNo,
+        status:item.result==='updated'?'Updated':'Saved',
+        details:item.result==='updated'?'Existing purchase updated in database':'Saved to purchase records',
+        skip:true
+      })));
+    }catch(err){
+      failed=recordsToSave.length;
+      stored=0;
+      updated=0;
+      markPurchaseAiInvoicesBulk(recordsToSave.map(item=>({
+        invoiceNo:item.invoiceNo,
+        status:'Review',
+        details:'Database bulk save failed; try saving again',
+        skip:false
+      })));
+      console.warn('Purchase AI bulk save failed:',err);
+    }
+  }
   if(stored>0||updated>0){
     audit('Stored extracted purchase invoices',`${stored} added, ${updated} updated`,'Saved');
     const tab=document.querySelector('#page-purchase .tab:nth-child(5)');
     if(tab)stab(tab,'p-records');
   }
-  toast(`${stored} added, ${updated} updated, ${existing} already exist${blocked?`; ${blocked} saved with review notes`:''}`,'ok');
+  updatePurchaseValidationFileStatus();
+  toast(`${stored} added, ${updated} updated, ${existing} already exist${reviewSaved?`; ${reviewSaved} saved with review notes`:''}${failed?`; ${failed} failed to save`:''}`,'ok');
+}
+
+async function savePurchaseRecordsInChunks(records){
+  const chunkSize=500;
+  for(let index=0;index<records.length;index+=chunkSize){
+    const chunk=records.slice(index,index+chunkSize);
+    await bulkSaveServer('purchaseRecords',chunk,{throwOnError:true});
+    toast(`Saved ${Math.min(index+chunk.length,records.length)} of ${records.length} purchase rows...`,'info');
+  }
+}
+
+function purchaseRecordRowMap(){
+  const map=new Map();
+  document.querySelectorAll('#purchase-record-tbody tr:not([data-empty-state])').forEach(row=>{
+    const key=invoiceKey(row.children[0]?.textContent);
+    if(key)map.set(key,row);
+  });
+  return map;
+}
+
+function markExtractedInvoiceUploaded(invoiceNo){
+  const key=String(invoiceNo||'');
+  uploadedFiles.forEach(file=>{
+    if(!Array.isArray(file.invoices))return;
+    if(file.invoices.some(inv=>String(inv.invoice_no||'')===key)){
+      file.savedInvoiceNos=file.savedInvoiceNos instanceof Set?file.savedInvoiceNos:new Set(file.savedInvoiceNos||[]);
+      file.savedInvoiceNos.add(key);
+    }
+  });
+  renderPurchaseValidationDocumentStatus();
+}
+
+function markExtractedInvoicesUploaded(invoiceNos){
+  const keys=new Set((invoiceNos||[]).map(value=>String(value||'')));
+  uploadedFiles.forEach(file=>{
+    if(!Array.isArray(file.invoices))return;
+    const matched=file.invoices.some(inv=>keys.has(String(inv.invoice_no||'')));
+    if(!matched)return;
+    file.savedInvoiceNos=file.savedInvoiceNos instanceof Set?file.savedInvoiceNos:new Set(file.savedInvoiceNos||[]);
+    file.invoices.forEach(inv=>{
+      const key=String(inv.invoice_no||'');
+      if(keys.has(key))file.savedInvoiceNos.add(key);
+    });
+  });
+  renderPurchaseValidationDocumentStatus();
+}
+
+function markPurchaseAiInvoicesBulk(updates){
+  const updateMap=new Map((updates||[]).map(item=>[String(item.invoiceNo||''),item]));
+  document.querySelectorAll('#ext-tbody tr[data-inv]').forEach(row=>{
+    const update=updateMap.get(String(row.dataset.invoiceNo||''));
+    if(!update)return;
+    const cls=update.status==='Saved'?'b-g':update.status==='Updated'?'b-g':update.status==='Review'?'b-a':'b-gray';
+    const validationCell=row.querySelector('.purchase-ai-validation');
+    const detailsCell=row.querySelector('.purchase-ai-details');
+    if(validationCell)validationCell.innerHTML=`<span class="b ${cls}">${escapeHtml(update.status)}</span>`;
+    if(detailsCell&&Number(row.dataset.lineIndex||0)===0)detailsCell.textContent=update.details||update.status;
+    if(update.skip){
+      row.dataset.skipped='1';
+      const box=row.querySelector('.purchase-ai-select');
+      if(box)box.checked=false;
+    }
+  });
 }
 
 function upsertExtractedPurchaseRecord(record){
@@ -2913,16 +3129,25 @@ function markPurchaseAiInvoiceRows(invoiceNo,status,details,skip=false){
   });
 }
 
-function validatePurchaseAiInvoice(inv){
+function validatePurchaseAiInvoice(inv,options={}){
   const issues=[];
   const invoiceNo=String(inv.invoice_no||'').trim();
+  const invoiceKeyValue=invoiceKey(invoiceNo);
   const trn=String(inv.supplier_trn||'').replace(/\D/g,'');
   const subtotal=Number(inv.subtotal||0);
   const vat=Number(inv.vat_amount||0);
   const total=Number(inv.total||0);
   if(!invoiceNo)issues.push('Invoice number missing');
-  if(invoiceNo&&tableHasText('#purchase-record-tbody',invoiceNo))issues.push('Duplicate purchase invoice in records');
-  if(invoiceNo&&countPurchaseAiInvoiceNo(invoiceNo)>1)issues.push('Duplicate invoice number in AI upload');
+  if(invoiceNo){
+    const existsInRecords=options.existingPurchaseRefs
+      ? options.existingPurchaseRefs.has(invoiceKeyValue)
+      : tableHasText('#purchase-record-tbody',invoiceNo);
+    if(existsInRecords)issues.push('Duplicate purchase invoice in records');
+  }
+  if(invoiceNo){
+    const duplicateCount=options.aiInvoiceCounts?.get(invoiceKeyValue)??countPurchaseAiInvoiceNo(invoiceNo);
+    if(duplicateCount>1)issues.push('Duplicate invoice number in AI upload');
+  }
   if(!String(inv.supplier||'').trim())issues.push('Supplier missing');
   if(!String(inv.date||'').trim())issues.push('Date missing');
   if(trn&&trn.length!==15)issues.push('Supplier TRN must be 15 digits');
@@ -2935,9 +3160,16 @@ function validatePurchaseAiInvoice(inv){
 function countPurchaseAiInvoiceNo(invoiceNo){
   const key=invoiceKey(invoiceNo);
   if(!key)return 0;
-  return [...document.querySelectorAll('#ext-tbody tr[data-inv]')].filter(row=>{
-    try{return invoiceKey(JSON.parse(row.dataset.inv||'{}').invoice_no)===key;}catch{return false;}
-  }).length;
+  const invoiceUids=new Set();
+  [...document.querySelectorAll('#ext-tbody tr[data-inv]')].forEach((row,index)=>{
+    try{
+      if(invoiceKey(JSON.parse(row.dataset.inv||'{}').invoice_no)!==key)return;
+      invoiceUids.add(row.dataset.invoiceUid||`${row.dataset.invoiceNo||key}:${index}`);
+    }catch(err){
+      console.warn('Purchase AI duplicate check skipped a row:',err);
+    }
+  });
+  return invoiceUids.size;
 }
 
 function purchaseAiUploadActionsHtml(){
@@ -3184,7 +3416,7 @@ function updatePurchaseAiInvoiceRows(oldInvoiceNo,inv){
     row.dataset.inv=JSON.stringify(inv);
     row.dataset.validation=validation.valid?'valid':'review';
     const cells=row.children;
-    cells[1].textContent=validation.issues.join('; ')||purchaseAiRawDetails(line)||'Ready to save';
+    cells[1].textContent=index===0?(validation.issues.join('; ')||purchaseAiRawDetails(line)||'Ready to save'):'';
     cells[3].textContent=inv.invoice_no||'';
     cells[4].textContent=inv.date||'';
     cells[5].textContent=inv.supplier||'';
@@ -3243,18 +3475,55 @@ function deletePurchaseAiRow(btn){
 }
 
 function revalidatePurchaseAiRows(){
+  const aiInvoiceCounts=purchaseAiInvoiceCounts();
+  const existingPurchaseRefs=purchaseRecordRefSet();
   document.querySelectorAll('#ext-tbody tr[data-inv]').forEach(row=>{
     if(row.dataset.skipped==='1')return;
     let inv={};
     try{inv=JSON.parse(row.dataset.inv||'{}');}catch{return;}
-    const validation=validatePurchaseAiInvoice(inv);
+    const validation=validatePurchaseAiInvoice(inv,{aiInvoiceCounts,existingPurchaseRefs});
     row.dataset.validation=validation.valid?'valid':'review';
     const validationCell=row.querySelector('.purchase-ai-validation');
     const detailsCell=row.querySelector('.purchase-ai-details');
     const checkbox=row.querySelector('.purchase-ai-select');
     if(validationCell)validationCell.innerHTML=`<span class="b ${validation.valid?'b-g':'b-a'}">${validation.valid?'Valid':'Review'}</span>`;
-    if(detailsCell)detailsCell.textContent=validation.issues.join('; ')||purchaseAiRawDetails(inv.lines?.[Number(row.dataset.lineIndex||0)]||{})||'Ready to save';
+    const index=Number(row.dataset.lineIndex||0);
+    if(detailsCell)detailsCell.textContent=index===0?(validation.issues.join('; ')||purchaseAiRawDetails(inv.lines?.[index]||{})||'Ready to save'):'';
   });
+}
+
+function purchaseAiInvoiceCounts(){
+  const counts=new Map();
+  uploadedFiles.forEach(file=>{
+    (file.invoices||[]).forEach((inv,index)=>{
+      const key=invoiceKey(inv.invoice_no);
+      if(!key)return;
+      const entry=counts.get(key)||new Set();
+      entry.add(`${file.id||file.name}:${index}`);
+      counts.set(key,entry);
+    });
+  });
+  if(counts.size){
+    return new Map([...counts.entries()].map(([key,set])=>[key,set.size]));
+  }
+  document.querySelectorAll('#ext-tbody tr[data-inv]').forEach((row,index)=>{
+    try{
+      const inv=JSON.parse(row.dataset.inv||'{}');
+      const key=invoiceKey(inv.invoice_no);
+      if(!key)return;
+      const uid=row.dataset.invoiceUid||`${row.dataset.invoiceNo||key}:${index}`;
+      const entry=counts.get(key)||new Set();
+      entry.add(uid);
+      counts.set(key,entry);
+    }catch{}
+  });
+  return new Map([...counts.entries()].map(([key,set])=>[key,set.size]));
+}
+
+function purchaseRecordRefSet(){
+  return new Set([...document.querySelectorAll('#purchase-record-tbody tr:not([data-empty-state]) td:first-child')]
+    .map(td=>invoiceKey(td.textContent))
+    .filter(Boolean));
 }
 
 function updateExtractionStats(){
@@ -3269,58 +3538,53 @@ function updateExtractionStats(){
 }
 
 function buildValidationPanel(invoices){
-  const panel=document.getElementById('p-validate');
-  // clear old dynamic issues (keep last green success banner as template)
-  panel.querySelectorAll('.val-dynamic').forEach(e=>e.remove());
-  const card=panel.querySelector('.card');
+  renderPurchaseValidationDocumentStatus();
+}
 
-  const errors=invoices.filter(i=>i.status==='Error');
-  const reviews=invoices.filter(i=>i.status==='Review');
-  const valid=invoices.filter(i=>i.status==='Valid');
+function purchaseFileUploadStatus(file){
+  const invoices=Array.isArray(file.invoices)?file.invoices:[];
+  const saved=file.savedInvoiceNos instanceof Set?file.savedInvoiceNos:new Set(file.savedInvoiceNos||[]);
+  const total=invoices.length;
+  const savedCount=invoices.filter(inv=>saved.has(String(inv.invoice_no||''))).length;
+  if(total>0&&savedCount>=total)return {label:'Completed',tone:'green',badge:'b-g',summary:`${savedCount}/${total} invoices saved`};
+  if(savedCount>0)return {label:'Partial',tone:'amber',badge:'b-a',summary:`${savedCount}/${total||savedCount} invoices saved`};
+  if(file.status==='Error')return {label:'Not uploaded',tone:'red',badge:'b-r',summary:'Extraction failed, nothing saved'};
+  if(file.status==='Extracted')return {label:'Not uploaded',tone:'red',badge:'b-r',summary:`0/${total} invoices saved`};
+  if(file.status==='Ready')return {label:'Not uploaded',tone:'red',badge:'b-r',summary:'Ready for extraction, not saved'};
+  return {label:'Not uploaded',tone:'red',badge:'b-r',summary:'Not saved'};
+}
 
-  errors.forEach(inv=>{
-    const el=document.createElement('div');
-    el.className='val-dynamic';
-    el.style.cssText='background:var(--red-bg);border:1px solid var(--red-border);border-radius:10px;padding:14px 16px;margin-bottom:10px';
-    el.innerHTML=`<div style="display:flex;align-items:flex-start;gap:10px">
-      <span style="font-size:18px;flex-shrink:0">??</span>
-      <div style="flex:1">
-        <div style="font-size:13.5px;font-weight:600;margin-bottom:3px">Error - ${inv.supplier} (${inv.invoice_no})</div>
-        <div style="font-size:12px;color:var(--text3)">${inv.issues||'TRN invalid or missing'}</div>
-        <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
-          <input class="fi" style="width:200px" placeholder="Enter correct 15-digit TRN" id="fix-${inv.invoice_no.replace(/[^a-z0-9]/gi,'_')}">
-          <button class="btn btn-danger btn-sm" onclick="fixTRN('${inv.invoice_no}',this)">Fix & Re-validate</button>
-        </div>
-      </div></div>`;
-    card.insertBefore(el,card.firstChild);
-  });
-
-  reviews.forEach(inv=>{
-    const expected=(inv.subtotal*0.05).toFixed(2);
-    const el=document.createElement('div');
-    el.className='val-dynamic';
-    el.style.cssText='background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:10px;padding:14px 16px;margin-bottom:10px';
-    el.innerHTML=`<div style="display:flex;align-items:flex-start;gap:10px">
-      <span style="font-size:18px;flex-shrink:0">??</span>
-      <div style="flex:1">
-        <div style="font-size:13.5px;font-weight:600;margin-bottom:3px">VAT Mismatch - ${inv.supplier} (${inv.invoice_no})</div>
-        <div style="font-size:12px;color:var(--text3)">${inv.issues||'Extracted VAT AED '+inv.vat_amount+' ? 5% of AED '+inv.subtotal+' = AED '+expected}</div>
-        <div style="margin-top:10px;display:flex;gap:8px">
-          <button class="btn btn-g btn-sm" onclick="resolveReview(this,'keep')">Keep extracted (AED ${inv.vat_amount})</button>
-          <button class="btn btn-g btn-sm" onclick="resolveReview(this,'calc')">Use calculated (AED ${expected})</button>
-        </div>
-      </div></div>`;
-    card.insertBefore(el,card.firstChild);
-  });
-
-  // update the green banner count
-  const greenBanner=card.querySelector('[style*="green-bg"]');
-  if(greenBanner){
-    const gTitle=greenBanner.querySelector('div div:first-child');
-    const gSub=greenBanner.querySelector('div div:last-child');
-    if(gTitle)gTitle.textContent=valid.length+' invoices passed all checks';
-    if(gSub)gSub.textContent='TRN, VAT rate, date, duplicate scan - all clear';
+function renderPurchaseValidationDocumentStatus(){
+  const target=document.getElementById('purchase-validation-doc-status');
+  if(!target)return;
+  const files=uploadedFiles.filter(file=>['Ready','Queued','Extracted','Error'].includes(file.status));
+  if(!files.length){
+    target.innerHTML=`<div style="background:var(--red-bg);border:1px solid var(--red-border);border-radius:10px;padding:14px 16px">
+      <div style="font-size:13.5px;font-weight:600;margin-bottom:3px">No uploaded documents yet</div>
+      <div style="font-size:12px;color:var(--text3)">Upload and extract purchase files to see document status here.</div>
+    </div>`;
+    return;
   }
+  const toneStyle={
+    green:'background:var(--green-bg);border:1px solid var(--green-border)',
+    amber:'background:var(--amber-bg);border:1px solid var(--amber-border)',
+    red:'background:var(--red-bg);border:1px solid var(--red-border)'
+  };
+  target.innerHTML=files.map(file=>{
+    const status=purchaseFileUploadStatus(file);
+    const invoices=Array.isArray(file.invoices)?file.invoices:[];
+    const reviewCount=invoices.filter(inv=>!validatePurchaseAiInvoice(inv).valid).length;
+    return `<div style="${toneStyle[status.tone]};border-radius:10px;padding:14px 16px;margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span style="font-size:18px;flex-shrink:0">${status.tone==='green'?'✓':status.tone==='amber'?'!':'×'}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(file.name)}</div>
+          <div style="font-size:12px;color:var(--text3)">${escapeHtml(status.summary)}${reviewCount?` - ${reviewCount} row(s) have review notes`:''}</div>
+        </div>
+        <span class="b ${status.badge}">${escapeHtml(status.label)}</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function fixTRN(invNo,btn){
@@ -3343,8 +3607,12 @@ function resolveReview(btn,choice){
 
 function runOCR(){
   // Extract ALL ready files
-  const ready=uploadedFiles.filter(f=>f.status==='Ready'||f.status==='Queued');
+  let ready=uploadedFiles.filter(f=>f.status==='Ready'||f.status==='Queued');
+  if(ready.length===0){
+    ready=uploadedFiles.filter(f=>f.status==='Extracted'||f.status==='Error').slice(-1);
+  }
   if(ready.length===0){toast('No new files to extract. Upload files first.','warn');return;}
+  ready.forEach(file=>{file.status='Ready';});
   ready.forEach((f,i)=>setTimeout(()=>extractSingleFile(f),i*500));
 }
 
@@ -4712,6 +4980,7 @@ function tableControlsTemplate(){
   return `
     <div class="tbl-search-wrap">
       <input class="fi tbl-search" placeholder="Search table">
+      <span class="b b-gray tbl-info">0 records</span>
     </div>
     <div class="tbl-pager">
       <label class="tbl-size-label">Rows to display
@@ -5039,6 +5308,14 @@ function getTableRows(table){
   return [...table.querySelectorAll(':scope > tr')].filter(row=>!row.closest('thead'));
 }
 
+function getTableDataRows(table){
+  return getTableRows(table).filter(row=>
+    row.dataset.emptyState!=='1' &&
+    row.dataset.previewSummary!=='1' &&
+    !row.querySelector('td[colspan]')
+  );
+}
+
 function refreshEnhancedTable(table){
   if(!table)return;
   if(skipTableTools(table)){
@@ -5054,8 +5331,9 @@ function refreshEnhancedTable(table){
     return;
   }
   const rows=getTableRows(table);
+  const dataRows=getTableDataRows(table);
   const query=state.query;
-  const matched=rows.filter(row=>!query||row.textContent.toLowerCase().includes(query));
+  const matched=dataRows.filter(row=>!query||row.textContent.toLowerCase().includes(query));
   const pageSize=state.pageSize==='all'?matched.length||1:state.pageSize;
   const totalPages=Math.max(1,Math.ceil(matched.length/pageSize));
   state.page=Math.min(Math.max(1,state.page),totalPages);
@@ -5074,12 +5352,14 @@ function refreshEnhancedTable(table){
   state.prev.title=state.page<=1?'Already showing the first rows':'Show previous rows';
   state.next.title=state.page>=totalPages?`${matched.length} records loaded; no more rows`:'Show next rows';
   if(state.info){
-    state.info.textContent=matched.length
-      ? `Showing ${pageRows.length} rows (${start+1}-${Math.min(end,matched.length)} of ${matched.length})`
-      : 'Showing 0 rows';
+    const total=dataRows.length;
+    state.info.textContent=total
+      ? `DB records: ${total.toLocaleString('en-AE')} | Showing ${pageRows.length.toLocaleString('en-AE')} (${matched.length?`${(start+1).toLocaleString('en-AE')}-${Math.min(end,matched.length).toLocaleString('en-AE')} of ${matched.length.toLocaleString('en-AE')}`:'0 matched'})`
+      : 'DB records: 0';
   }
   table.dataset.visibleRows=String(pageRows.length);
   table.dataset.totalRows=String(matched.length);
+  table.dataset.dbRows=String(dataRows.length);
 }
 
 // -- ROW DETAIL VIEWS --------------------------------------------

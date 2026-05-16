@@ -561,6 +561,7 @@
         <div><div class="card-title">AI Upload Validation</div><div class="card-sub">Review updated purchase details, fix validation issues, then save selected rows</div></div>
         <div class="flx"><button class="btn btn-g btn-sm" onclick="togglePurchaseAiSelection(true)">Select All</button><button class="btn btn-g btn-sm" onclick="runOCR()">Run Extraction</button><button class="btn btn-p btn-sm" onclick="storeExtractedPurchaseRecords()">Save All</button></div>
       </div>
+      <div id="pur-validation-file-status" class="g3 mb16"></div>
       <table class="tbl" data-delete-actions-bound="skip">
         <thead><tr><th style="width:42px"><input type="checkbox" aria-label="Select all purchase AI invoices" onchange="togglePurchaseAiSelection(this.checked)"></th><th>Details</th><th>Actions</th><th>Invoice No.</th><th>Purchase Date</th><th>Supplier</th><th>Address</th><th>Pay Term</th><th>Product Name</th><th>Purchase Qty</th><th>Unit</th><th>Unit Cost Before Discount</th><th>Discount %</th><th>Unit Cost Before Tax</th><th>Line Total</th><th>Profit Margin %</th><th>Selling Price Inc. Tax</th><th>Discount Type</th><th>Discount Amount</th><th>Purchase Tax</th><th>Shipping Details</th><th>Shipping Charges</th><th>Paid Amount</th><th>Paid On</th><th>Payment Method</th><th>Payment Account</th><th>Payment Note</th><th>Notes</th><th>Payment Due</th><th>Validation</th></tr></thead>
         <tbody id="ext-tbody">
@@ -581,36 +582,11 @@
 
   <div class="tab-body" id="p-validate">
     <div class="card mb12">
-      <div style="background:var(--red-bg);border:1px solid var(--red-border);border-radius:10px;padding:14px 16px;margin-bottom:10px">
-        <div style="display:flex;align-items:flex-start;gap:10px">
-          <span style="font-size:18px;flex-shrink:0">🚨</span>
-          <div style="flex:1">
-            <div style="font-size:13.5px;font-weight:600;margin-bottom:3px">Invalid TRN — AD Paints LLC (PUR-2024-0218)</div>
-            <div style="font-size:12px;color:var(--text3)">TRN "1009876543" has 10 digits. Must be exactly 15 digits.</div>
-            <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
-              <input class="fi" style="width:200px" placeholder="Enter correct 15-digit TRN">
-              <button class="btn btn-danger btn-sm" onclick="toast('TRN corrected and re-validated ✓','ok')">Fix & Validate</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div style="background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:10px;padding:14px 16px;margin-bottom:10px">
-        <div style="display:flex;align-items:flex-start;gap:10px">
-          <span style="font-size:18px;flex-shrink:0">⚠️</span>
-          <div style="flex:1">
-            <div style="font-size:13.5px;font-weight:600;margin-bottom:3px">VAT Mismatch — UAE Paints Co. (PUR-2024-0220)</div>
-            <div style="font-size:12px;color:var(--text3)">Extracted VAT AED 295 ≠ 5% of AED 5,600 = AED 280. Difference: AED 15</div>
-            <div style="margin-top:10px;display:flex;gap:8px">
-              <button class="btn btn-g btn-sm" onclick="toast('Using extracted amount','ok')">Keep AED 295</button>
-              <button class="btn btn-g btn-sm" onclick="toast('Using calculated amount','ok')">Use AED 280 (calculated)</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:10px;padding:14px 16px">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="font-size:18px">✅</span>
-          <div><div style="font-size:13.5px;font-weight:600">45 invoices passed all checks</div><div style="font-size:12px;color:var(--text3)">TRN, VAT rate, date, duplicate scan — all clear</div></div>
+      <div class="card-hd"><div><div class="card-title">Uploaded Document Status</div><div class="card-sub">Completed files are green, partial saves are yellow, and unsaved/failed files are red</div></div></div>
+      <div id="purchase-validation-doc-status">
+        <div style="background:var(--red-bg);border:1px solid var(--red-border);border-radius:10px;padding:14px 16px">
+          <div style="font-size:13.5px;font-weight:600;margin-bottom:3px">No uploaded documents yet</div>
+          <div style="font-size:12px;color:var(--text3)">Upload and extract purchase files to see document status here.</div>
         </div>
       </div>
     </div>

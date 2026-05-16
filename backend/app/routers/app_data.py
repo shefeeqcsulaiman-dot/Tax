@@ -133,6 +133,57 @@ async def app_data_action(
         db.commit()
         return {"ok": True, "saved": True, "id": saved.id}
 
+    if action == "bulk-save":
+        collection = str(payload.get("collection", "app_actions"))
+        records = payload.get("records", [])
+        if not isinstance(records, list):
+            records = []
+        normalized_records = [record if isinstance(record, dict) else {"value": record} for record in records]
+        keys = [key for key in (record_key(collection, record) for record in normalized_records) if key]
+        existing_by_key = {
+            item.record_key: item
+            for item in db.query(AppDataRecord)
+            .filter(
+                AppDataRecord.company_id == current_user.company_id,
+                AppDataRecord.collection == collection,
+                AppDataRecord.record_key.in_(keys),
+            )
+            .all()
+        } if keys else {}
+        saved_count = 0
+        updated_count = 0
+        created_count = 0
+        for record in normalized_records:
+            key = record_key(collection, record)
+            payload_json = json.dumps(record, ensure_ascii=False, default=str)
+            existing = existing_by_key.get(key) if key else None
+            if existing:
+                existing.payload = payload_json
+                saved = existing
+                updated_count += 1
+            else:
+                saved = AppDataRecord(
+                    company_id=current_user.company_id,
+                    collection=collection,
+                    record_key=key,
+                    payload=payload_json,
+                )
+                db.add(saved)
+                if key:
+                    existing_by_key[key] = saved
+                created_count += 1
+            sync_domain_model(db, current_user, collection, record)
+            saved_count += 1
+        log_action(
+            db,
+            current_user,
+            collection,
+            "records_bulk_saved",
+            {"count": saved_count, "created": created_count, "updated": updated_count},
+        )
+        db.commit()
+        return {"ok": True, "saved": saved_count, "created": created_count, "updated": updated_count}
+
     if action == "delete":
         collection = str(payload.get("collection", "app_actions"))
         record = payload.get("record", {})
