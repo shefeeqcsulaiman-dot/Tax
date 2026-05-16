@@ -1712,12 +1712,12 @@
     <div class="card">
       <div class="card-hd"><div class="card-title">Current Stock Levels</div><button class="btn btn-p" onclick="openInventoryItemModal()">+ Add Item</button></div>
       <table class="tbl">
-        <thead><tr><th>Item Code</th><th>Item Name</th><th>Category</th><th>Available</th><th>Reserved</th><th>Unit</th><th>Reorder Level</th><th>Status</th><th></th></tr></thead>
-        <tbody>
-          <tr><td class="mono">ITM-001</td><td>Steel Rods 12mm</td><td><span class="b b-gray">Materials</span></td><td class="mono">500</td><td class="mono">100</td><td>Ton</td><td class="mono">50</td><td><span class="b b-g">OK</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
-          <tr><td class="mono">ITM-002</td><td>Packaging Box A</td><td><span class="b b-gray">Supplies</span></td><td class="mono">20</td><td class="mono">5</td><td>Pcs</td><td class="mono">50</td><td><span class="b b-a">Low</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
-          <tr><td class="mono">ITM-003</td><td>Industrial Oil 5L</td><td><span class="b b-gray">Supplies</span></td><td class="mono">0</td><td class="mono">0</td><td>Unit</td><td class="mono">20</td><td><span class="b b-r">Out</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
-          <tr><td class="mono">ITM-004</td><td>Safety Gloves</td><td><span class="b b-gray">PPE</span></td><td class="mono">200</td><td class="mono">50</td><td>Pairs</td><td class="mono">100</td><td><span class="b b-g">OK</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
+        <thead><tr><th>Item Code</th><th>Item Name</th><th>Category</th><th>Current Stock</th><th>Unit</th><th>Reorder Level</th><th>Status</th><th></th></tr></thead>
+        <tbody id="stock-level-tbody">
+          <tr><td class="mono">ITM-001</td><td>Steel Rods 12mm</td><td><span class="b b-gray">Materials</span></td><td class="mono">500</td><td>Ton</td><td class="mono">50</td><td><span class="b b-g">OK</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
+          <tr><td class="mono">ITM-002</td><td>Packaging Box A</td><td><span class="b b-gray">Supplies</span></td><td class="mono">20</td><td>Pcs</td><td class="mono">50</td><td><span class="b b-a">Low</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
+          <tr><td class="mono">ITM-003</td><td>Industrial Oil 5L</td><td><span class="b b-gray">Supplies</span></td><td class="mono">0</td><td>Unit</td><td class="mono">20</td><td><span class="b b-r">Out</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
+          <tr><td class="mono">ITM-004</td><td>Safety Gloves</td><td><span class="b b-gray">PPE</span></td><td class="mono">200</td><td>Pairs</td><td class="mono">100</td><td><span class="b b-g">OK</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
         </tbody>
       </table>
     </div>

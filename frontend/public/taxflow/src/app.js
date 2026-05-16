@@ -15,12 +15,26 @@ META.corporate={t:'Corporate Accounting',s:'Corporate tax - Assets - Accruals - 
 META.reports={t:'Reports',s:'VAT - P&L - Balance Sheet - Trial Balance',a:'Export PDF',ao:()=>exportActiveReportPdf()};
 META.exception={t:'Exception Center',s:'Failed postings - duplicates - VAT/OCR - stock and payroll issues',a:'Refresh',ao:()=>loadExceptionCenter()};
 
+let isHydratingFromServer=false;
+const tableRefreshTimers=new WeakMap();
+
 function scheduleIdleTask(fn,timeout=800){
   if('requestIdleCallback' in window){
     window.requestIdleCallback(fn,{timeout});
   }else{
     setTimeout(fn,0);
   }
+}
+
+function scheduleTableRefresh(table,delay=120){
+  if(!table)return;
+  const existing=tableRefreshTimers.get(table);
+  if(existing)clearTimeout(existing);
+  const timer=setTimeout(()=>{
+    tableRefreshTimers.delete(table);
+    refreshEnhancedTable(table);
+  },isHydratingFromServer?Math.max(delay,350):delay);
+  tableRefreshTimers.set(table,timer);
 }
 
 function runPageWarmup(page){
@@ -553,8 +567,14 @@ function saveInventoryItem(){
   if(tbody&&!hasFirstCellValue(tbody,code)){
     removeEmptyState(tbody);
     const row=document.createElement('tr');
+    row.dataset.reorderLevel=reorderLevel;
+    row.dataset.available=0;
+    row.dataset.reserved=0;
+    row.dataset.cost=cost;
+    row.dataset.supplier=supplier;
     row.innerHTML=`<td class="mono">${escapeHtml(code)}</td><td>${escapeHtml(name)}</td><td>Stock Item</td><td>${escapeHtml(category)}</td><td>${escapeHtml(unit)}</td><td>Main Store</td><td><span class="b ${tracking==='No'?'b-gray':'b-g'}">${escapeHtml(tracking)}</span></td><td><span class="b b-b">5%</span></td><td><span class="b ${status==='Active'?'b-g':'b-gray'}">${escapeHtml(status)}</span></td>`;
     tbody.prepend(row);
+    syncStockLevelsFromProducts();
   }
   saveServer('products',{code,name,category,unit,cost,vat:'Standard 5%',supplier_name:supplier,reorder_level:reorderLevel,status});
   syncStockMappingFromItems();
@@ -1543,7 +1563,7 @@ function renderCustomerRecord(customer){
   tbody.prepend(row);
 }
 
-function renderProductRecord(product){
+function renderProductRecord(product,options={}){
   const tbody=document.getElementById('prod-tbody');
   if(!tbody||!product?.name||hasFirstCellValue(tbody,product.code))return;
   const vatText=String(product.vat||'').includes('0')&&!String(product.vat||'').includes('5')?'0% Zero':String(product.vat||'').includes('Exempt')?'Exempt':'5%';
@@ -1552,13 +1572,123 @@ function renderProductRecord(product){
   row.dataset.serverRecord='products';
   row.dataset.cost=product.cost??0;
   row.dataset.supplier=product.supplier_name||product.supplier||'';
+  row.dataset.reorderLevel=product.reorder_level??product.reorderLevel??0;
+  row.dataset.available=product.available??product.quantity??product.stock_on_hand??product.opening_stock??0;
+  row.dataset.reserved=product.reserved??product.reserved_quantity??0;
   row.innerHTML=`<td class="mono">${escapeHtml(product.code||'PRD')}</td><td>${escapeHtml(product.name)}</td><td>Stock Item</td><td>${escapeHtml(product.category||'Materials')}</td><td>${escapeHtml(product.unit||'Each')}</td><td>Main Store</td><td><span class="b b-g">Yes</span></td><td><span class="b ${vatClass}">${escapeHtml(vatText)}</span></td><td><span class="b b-g">Active</span></td>`;
   removeEmptyState(tbody);
   tbody.prepend(row);
+  if(!options.deferRefresh&&!isHydratingFromServer)refreshEnhancedTable(tbody.closest('table'));
+  if(!options.deferStockSync&&!isHydratingFromServer)syncStockLevelsFromProducts();
+  if(!options.deferMappingSync&&!isHydratingFromServer)syncStockMappingFromItems();
+  if(!options.deferSuggestions&&!isHydratingFromServer){
+    refreshInvoiceProductSuggestions();
+    refreshPurchaseProductSuggestions();
+  }
+}
+
+function syncStockLevelsFromProducts(){
+  const tbody=document.getElementById('stock-level-tbody');
+  if(!tbody)return;
+  const stockByKey=new Map();
+  [...document.querySelectorAll('#prod-tbody tr:not([data-empty-state])')]
+    .map(row=>productStockLevelFromRow(row))
+    .filter(item=>item.code||item.name)
+    .forEach(item=>{
+      addStockItemAliases(stockByKey,item);
+    });
+  purchaseStockItems().forEach(item=>{
+    const existing=stockByKey.get(stockItemKey(item.code))||stockByKey.get(stockItemKey(item.name));
+    if(existing){
+      existing.available=Number(existing.available||0)+Number(item.available||0);
+      if(!existing.unit&&item.unit)existing.unit=item.unit;
+    }else{
+      addStockItemAliases(stockByKey,item);
+    }
+  });
+  const products=[...new Set(stockByKey.values())];
+  tbody.innerHTML='';
+  if(!products.length){
+    emptyTableMessage(tbody,'No stock items in database yet.');
+    updateStockLevelStats([]);
+    return;
+  }
+  products.forEach(item=>tbody.appendChild(renderStockLevelRow(item)));
   refreshEnhancedTable(tbody.closest('table'));
-  syncStockMappingFromItems();
-  refreshInvoiceProductSuggestions();
-  refreshPurchaseProductSuggestions();
+  updateStockLevelStats(products);
+}
+
+function productStockLevelFromRow(row){
+  const cells=row.children;
+  const available=Number(row.dataset.available||0);
+  const reorderLevel=Number(row.dataset.reorderLevel||0);
+  return {
+    code:cells[0]?.textContent.trim()||'',
+    name:cells[1]?.textContent.trim()||'',
+    category:cells[3]?.textContent.trim()||'Uncategorized',
+    available,
+    unit:cells[4]?.textContent.trim()||'Each',
+    reorderLevel
+  };
+}
+
+function purchaseStockItems(){
+  const items=new Map();
+  document.querySelectorAll('#purchase-record-tbody tr:not([data-empty-state])').forEach(row=>{
+    const record=purchaseRecordFromRow(row);
+    const lines=Array.isArray(record?.lines)?record.lines:[];
+    lines.forEach(line=>{
+      const name=purchaseAiProductName(line)||line.name||line.description||'Purchase item';
+      const code=String(line.sku||line.code||name).trim();
+      const key=stockItemKey(code,name);
+      if(!key)return;
+      const quantity=parseAmount(line.quantity||line.qty||0);
+      if(!quantity)return;
+      const existing=items.get(key)||{
+        code,
+        name,
+        category:line.category||'Purchases',
+        available:0,
+        unit:line.unit||line.unit_of_measure||line.uom||'PCS',
+        reorderLevel:0
+      };
+      existing.available+=quantity;
+      items.set(key,existing);
+    });
+  });
+  return [...items.values()];
+}
+
+function addStockItemAliases(map,item){
+  [item.code,item.name].forEach(value=>{
+    const key=stockItemKey(value);
+    if(key)map.set(key,item);
+  });
+}
+
+function stockItemKey(value){
+  return String(value||'').trim().toLowerCase();
+}
+
+function renderStockLevelRow(item){
+  const row=document.createElement('tr');
+  const status=item.available<=0?'Out':item.reorderLevel&&item.available<=item.reorderLevel?'Low':'OK';
+  const cls=status==='Out'?'b-r':status==='Low'?'b-a':'b-g';
+  row.dataset.itemCode=item.code;
+  row.innerHTML=`<td class="mono">${escapeHtml(item.code)}</td><td>${escapeHtml(item.name)}</td><td><span class="b b-gray">${escapeHtml(item.category)}</span></td><td class="mono">${Number(item.available||0).toLocaleString('en-AE')}</td><td>${escapeHtml(item.unit)}</td><td class="mono">${Number(item.reorderLevel||0).toLocaleString('en-AE')}</td><td><span class="b ${cls}">${status}</span></td><td><button class="btn btn-g btn-sm" onclick="openRowDetail(this,'Stock Level Detail','Current Stock Levels')">View</button></td>`;
+  return row;
+}
+
+function updateStockLevelStats(products){
+  const stats=document.querySelectorAll('#inv-stock .g4 .stat .stat-val');
+  const total=products.length;
+  const inStock=products.filter(item=>Number(item.available||0)>0).length;
+  const low=products.filter(item=>Number(item.available||0)>0&&Number(item.reorderLevel||0)>0&&Number(item.available||0)<=Number(item.reorderLevel||0)).length;
+  const out=products.filter(item=>Number(item.available||0)<=0).length;
+  if(stats[0])stats[0].textContent=total.toLocaleString('en-AE');
+  if(stats[1])stats[1].textContent=inStock.toLocaleString('en-AE');
+  if(stats[2])stats[2].textContent=low.toLocaleString('en-AE');
+  if(stats[3])stats[3].textContent=out.toLocaleString('en-AE');
 }
 
 function syncProductMasterOptions(){
@@ -1635,10 +1765,14 @@ function renderBillRecord(bill){
 function renderVendorRecord(vendor){
   const tbody=document.getElementById('vendor-tbody');
   if(!tbody||!vendor?.name||hasFirstCellValue(tbody,vendor.name))return;
+  const trn=String(vendor.trn||'').replace(/\D/g,'');
+  if(trn&&[...tbody.querySelectorAll('tr:not([data-empty-state]) td:nth-child(2)')]
+    .some(td=>String(td.textContent||'').replace(/\D/g,'')===trn))return;
   const row=document.createElement('tr');
   row.dataset.serverRecord='vendors';
   row.dataset.address=vendor.address||'';
-  row.innerHTML=`<td>${escapeHtml(vendor.name)}</td><td class="mono">${escapeHtml(vendor.trn||'Not registered')}</td><td>${escapeHtml(vendor.category||'Services')}</td><td>${escapeHtml(vendor.email||'-')}</td><td>${escapeHtml(vendor.address||'-')}</td><td class="mono">0.00</td><td><span class="b b-g">Active</span></td>`;
+  row.dataset.vendorTrn=trn;
+  row.innerHTML=`<td>${escapeHtml(vendor.name)}</td><td class="mono">${escapeHtml(trn||'Not registered')}</td><td>${escapeHtml(vendor.category||'Services')}</td><td>${escapeHtml(vendor.email||'-')}</td><td>${escapeHtml(vendor.address||'-')}</td><td class="mono">0.00</td><td><span class="b b-g">Active</span></td>`;
   removeEmptyState(tbody);
   tbody.prepend(row);
   syncSupplierOptions(vendor.name);
@@ -1704,7 +1838,8 @@ function renderPurchaseRecord(purchase,options={}){
   row.innerHTML=`<td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(purchase.supplier||'-')}</td><td>${escapeHtml(purchase.date||'-')}</td><td>${escapeHtml(purchase.location||'-')}</td><td class="mono">${Number(purchase.items||0)}</td><td class="mono">${Number(purchase.net_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.tax_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.shipping||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.total||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.paid||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.due||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td>`;
   removeEmptyState(tbody);
   tbody.prepend(row);
-  if(!options.deferRefresh)refreshEnhancedTable(tbody.closest('table'));
+  if(!options.deferRefresh&&!isHydratingFromServer)refreshEnhancedTable(tbody.closest('table'));
+  if(!options.deferStockSync&&!isHydratingFromServer)syncStockLevelsFromProducts();
 }
 
 function renderAccountRecord(account){
@@ -1721,19 +1856,24 @@ function renderAccountRecord(account){
 function hydrateFromServer(){
   return apiRequest('bootstrap',{}, {method:'GET'}).then(({data})=>{
     if(!data)return;
-    if(data.company)applyCompanyToUi(data.company);
-    (data.products||[]).reverse().forEach(renderProductRecord);
-    (data.salesCategories||[]).reverse().forEach(renderSalesCategoryRecord);
-    (data.salesUnits||[]).reverse().forEach(renderSalesUnitRecord);
-    (data.customers||[]).reverse().forEach(renderCustomerRecord);
-    (data.salesInvoices||[]).reverse().forEach(inv=>addSalesInvoiceRow(inv,{persist:false}));
-    (data.quotations||[]).reverse().forEach(renderQuotationRecord);
-    (data.accounts||[]).reverse().forEach(renderAccountRecord);
-    (data.ledger||[]).reverse().forEach(line=>postLedgerLine(line,{persist:false}));
-    (data.bills||[]).reverse().forEach(renderBillRecord);
-    (data.vendors||[]).reverse().forEach(renderVendorRecord);
-    (data.payments||[]).reverse().forEach(renderPaymentRecord);
-    (data.purchaseRecords||[]).reverse().forEach(renderPurchaseRecord);
+    isHydratingFromServer=true;
+    try{
+      if(data.company)applyCompanyToUi(data.company);
+      (data.products||[]).reverse().forEach(product=>renderProductRecord(product,{deferRefresh:true,deferStockSync:true,deferMappingSync:true,deferSuggestions:true}));
+      (data.salesCategories||[]).reverse().forEach(renderSalesCategoryRecord);
+      (data.salesUnits||[]).reverse().forEach(renderSalesUnitRecord);
+      (data.customers||[]).reverse().forEach(renderCustomerRecord);
+      (data.salesInvoices||[]).reverse().forEach(inv=>addSalesInvoiceRow(inv,{persist:false}));
+      (data.quotations||[]).reverse().forEach(renderQuotationRecord);
+      (data.accounts||[]).reverse().forEach(renderAccountRecord);
+      (data.ledger||[]).reverse().forEach(line=>postLedgerLine(line,{persist:false}));
+      (data.bills||[]).reverse().forEach(renderBillRecord);
+      (data.vendors||[]).reverse().forEach(renderVendorRecord);
+      (data.payments||[]).reverse().forEach(renderPaymentRecord);
+      (data.purchaseRecords||[]).reverse().forEach(purchase=>renderPurchaseRecord(purchase,{deferRefresh:true,deferStockSync:true}));
+    }finally{
+      isHydratingFromServer=false;
+    }
     const totalLoaded=[
       data.products,
       data.customers,
@@ -1758,6 +1898,11 @@ function hydrateFromServer(){
     syncProductMasterOptions();
     syncSupplierOptions();
     syncInventoryItemOptions();
+    refreshEnhancedTable(document.getElementById('prod-tbody')?.closest('table'));
+    refreshEnhancedTable(document.getElementById('purchase-record-tbody')?.closest('table'));
+    syncStockLevelsFromProducts();
+    syncStockMappingFromItems();
+    refreshInvoiceProductSuggestions();
     refreshPurchaseProductSuggestions();
     loadStockMappingsFromServer();
     filterLedger();
@@ -2948,14 +3093,24 @@ async function storeExtractedPurchaseRecords(){
   }
   if(recordsToSave.length){
     try{
+      try{
+        const vendorResult=await saveVendorsFromExtractedPurchases([...selectedInvoices.values()]);
+        if(vendorResult.created){
+          toast(`${vendorResult.created} vendor(s) added from purchase upload`,'ok');
+        }
+      }catch(vendorErr){
+        toast('Vendor master save failed; purchase records will still be saved','warn');
+        console.warn('Purchase AI vendor sync failed:',vendorErr);
+      }
       await savePurchaseRecordsInChunks(recordsToSave.map(item=>item.record));
       recordsToSave.forEach(item=>{
         const oldRow=existingRows.get(item.refKey);
         if(oldRow)oldRow.remove();
-        renderPurchaseRecord(item.record,{deferRefresh:true});
+        renderPurchaseRecord(item.record,{deferRefresh:true,deferStockSync:true});
         savedInvoiceNos.push(item.invoiceNo);
       });
       refreshEnhancedTable(document.getElementById('purchase-record-tbody')?.closest('table'));
+      syncStockLevelsFromProducts();
       markExtractedInvoicesUploaded(savedInvoiceNos);
       markPurchaseAiInvoicesBulk(recordsToSave.map(item=>({
         invoiceNo:item.invoiceNo,
@@ -2983,6 +3138,68 @@ async function storeExtractedPurchaseRecords(){
   }
   updatePurchaseValidationFileStatus();
   toast(`${stored} added, ${updated} updated, ${existing} already exist${reviewSaved?`; ${reviewSaved} saved with review notes`:''}${failed?`; ${failed} failed to save`:''}`,'ok');
+}
+
+async function saveVendorsFromExtractedPurchases(invoices){
+  const records=buildVendorRecordsFromExtractedPurchases(invoices);
+  if(!records.length)return {created:0,existing:0};
+  await saveVendorRecordsInChunks(records);
+  records.forEach(record=>renderVendorRecord(record));
+  syncSupplierOptions();
+  refreshEnhancedTable(document.getElementById('vendor-tbody')?.closest('table'));
+  return {created:records.length,existing:0};
+}
+
+function buildVendorRecordsFromExtractedPurchases(invoices){
+  const existing=vendorDuplicateIndex();
+  const pendingNames=new Set();
+  const pendingTrns=new Set();
+  const records=[];
+  (invoices||[]).forEach(inv=>{
+    const name=String(inv.supplier||'').trim();
+    if(!name||name.toLowerCase()==='supplier')return;
+    const trn=String(inv.supplier_trn||'').replace(/\D/g,'');
+    const nameKey=vendorNameKey(name);
+    if(existing.names.has(nameKey)||pendingNames.has(nameKey))return;
+    if(trn&&(existing.trns.has(trn)||pendingTrns.has(trn)))return;
+    pendingNames.add(nameKey);
+    if(trn)pendingTrns.add(trn);
+    records.push({
+      name,
+      trn,
+      category:'Purchase Supplier',
+      email:'',
+      phone:'',
+      address:inv.address||'',
+      source:'AI Purchase Upload',
+      status:'Active'
+    });
+  });
+  return records;
+}
+
+function vendorDuplicateIndex(){
+  const names=new Set();
+  const trns=new Set();
+  document.querySelectorAll('#vendor-tbody tr:not([data-empty-state])').forEach(row=>{
+    const name=vendorNameKey(row.children[0]?.textContent);
+    const trn=String(row.dataset.vendorTrn||row.children[1]?.textContent||'').replace(/\D/g,'');
+    if(name)names.add(name);
+    if(trn)trns.add(trn);
+  });
+  return {names,trns};
+}
+
+function vendorNameKey(value){
+  return String(value||'').trim().toLowerCase().replace(/\s+/g,' ');
+}
+
+async function saveVendorRecordsInChunks(records){
+  const chunkSize=500;
+  for(let index=0;index<records.length;index+=chunkSize){
+    const chunk=records.slice(index,index+chunkSize);
+    await bulkSaveServer('vendors',chunk,{throwOnError:true});
+  }
 }
 
 async function savePurchaseRecordsInChunks(records){
@@ -5090,7 +5307,7 @@ function enhanceTable(table){
   if(tbody){
     const observer=new MutationObserver(()=>{
       addTableDeleteActions(table);
-      refreshEnhancedTable(table);
+      scheduleTableRefresh(table);
     });
     observer.observe(tbody,{childList:true,subtree:true});
   }
