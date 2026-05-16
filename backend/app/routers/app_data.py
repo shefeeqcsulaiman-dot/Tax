@@ -3,9 +3,14 @@ import csv
 import html
 import io
 import json
+import shutil
+import subprocess
+import tempfile
 import re
+import zlib
 import zipfile
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
 
@@ -54,6 +59,7 @@ def record_key(collection: str, record: dict[str, Any]) -> str | None:
         "salesCategories": "name",
         "salesUnits": "code",
         "purchaseRecords": "ref",
+        "purchaseDocuments": "id",
         "app_actions": "id",
     }
     field = keys.get(collection)
@@ -511,13 +517,10 @@ def ingest_purchase_document(db: Session, current_user: User, file: dict[str, An
             rows = parse_xlsx_rows(content)
         elif ext == "xls":
             rows = parse_excel_html_rows(content)
-        elif ext in {"pdf", "jpg", "jpeg", "png"}:
-            return [
-                purchase_extraction_error(
-                    name,
-                    "OCR is not configured. Upload CSV/XLSX now, or configure OCR for PDF and image extraction.",
-                )
-            ]
+        elif ext == "pdf":
+            rows = parse_pdf_purchase_rows(content)
+        elif ext in {"jpg", "jpeg", "png"}:
+            rows = parse_image_purchase_rows(content, ext)
         else:
             return [purchase_extraction_error(name, f"Unsupported purchase upload format: .{ext or 'unknown'}")]
     except Exception as exc:
@@ -686,7 +689,301 @@ def parse_excel_html_rows(content: bytes) -> list[dict[str, Any]]:
     return rows
 
 
+def parse_pdf_purchase_rows(content: bytes) -> list[dict[str, Any]]:
+    text = extract_pdf_text(content)
+    if not text:
+        return []
+    return purchase_rows_from_document_text(text)
+
+
+def parse_image_purchase_rows(content: bytes, ext: str) -> list[dict[str, Any]]:
+    text = extract_image_text_with_tesseract(content, ext)
+    if not text:
+        return []
+    return purchase_rows_from_document_text(text)
+
+
+def extract_image_text_with_tesseract(content: bytes, ext: str) -> str:
+    tesseract = find_tesseract_executable()
+    if not tesseract:
+        return ""
+    suffix = "." + ("jpg" if ext == "jpeg" else ext)
+    with tempfile.TemporaryDirectory() as tmp:
+        image_path = Path(tmp) / ("upload" + suffix)
+        output_base = Path(tmp) / "ocr"
+        image_path.write_bytes(content)
+        result = subprocess.run(
+            [tesseract, str(image_path), str(output_base)],
+            capture_output=True,
+            text=True,
+            timeout=45,
+            check=False,
+        )
+        if result.returncode != 0:
+            return ""
+        try:
+            return (output_base.with_suffix(".txt")).read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return ""
+
+
+def find_tesseract_executable() -> str | None:
+    found = shutil.which("tesseract")
+    if found:
+        return found
+    candidates = [
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+    ]
+    for candidate in candidates:
+        if Path(candidate).exists():
+            return candidate
+    return None
+
+
+def extract_pdf_text(content: bytes) -> str:
+    chunks: list[str] = []
+    for match in re.finditer(rb"stream\r?\n(.*?)\r?\nendstream", content, flags=re.DOTALL):
+        stream = match.group(1)
+        header = content[max(0, match.start() - 300):match.start()]
+        if b"FlateDecode" in header:
+            try:
+                stream = zlib.decompress(stream)
+            except Exception:
+                continue
+        text = extract_pdf_text_from_stream(stream)
+        if text:
+            chunks.append(text)
+    if not chunks:
+        chunks.append(extract_pdf_literal_text(content))
+    return "\n".join(chunks).strip()
+
+
+def extract_pdf_text_from_stream(stream: bytes) -> str:
+    data = stream.decode("latin-1", errors="ignore")
+    values: list[str] = []
+    for array in re.findall(r"\[(.*?)\]\s*TJ", data, flags=re.DOTALL):
+        values.extend(decode_pdf_string(value) for value in re.findall(r"\((?:\\.|[^\\()])*\)", array))
+        values.append("\n")
+    for value in re.findall(r"(\((?:\\.|[^\\()])*\))\s*Tj", data):
+        values.append(decode_pdf_string(value))
+        values.append("\n")
+    for value in re.findall(r"<([0-9A-Fa-f\s]+)>\s*Tj", data):
+        try:
+            raw = bytes.fromhex(re.sub(r"\s+", "", value))
+            values.append(raw.decode("utf-16-be", errors="ignore") or raw.decode("latin-1", errors="ignore"))
+            values.append("\n")
+        except ValueError:
+            continue
+    return " ".join(part for part in values if part).strip()
+
+
+def extract_pdf_literal_text(content: bytes) -> str:
+    data = content.decode("latin-1", errors="ignore")
+    values = [decode_pdf_string(value) for value in re.findall(r"\((?:\\.|[^\\()])*\)", data)]
+    return " ".join(value for value in values if meaningful_document_token(value))
+
+
+def decode_pdf_string(value: str) -> str:
+    if value.startswith("(") and value.endswith(")"):
+        value = value[1:-1]
+    replacements = {"n": "\n", "r": "\n", "t": "\t", "b": "", "f": "", "\\": "\\", "(": "(", ")": ")"}
+    def replace_escape(match: re.Match[str]) -> str:
+        token = match.group(1)
+        if token.isdigit():
+            try:
+                return chr(int(token[:3], 8))
+            except ValueError:
+                return ""
+        return replacements.get(token, token)
+    return re.sub(r"\\([0-7]{1,3}|.)", replace_escape, value).strip()
+
+
+def meaningful_document_token(value: str) -> bool:
+    text = str(value or "").strip()
+    return len(text) > 1 and any(ch.isalpha() for ch in text)
+
+
+def purchase_rows_from_document_text(text: str) -> list[dict[str, Any]]:
+    lines = normalize_document_lines(text)
+    lines = [line for line in lines if line]
+    if not lines:
+        lines = [re.sub(r"\s+", " ", text).strip()]
+    invoice_no = find_document_value(lines, (r"invoice\s*(?:no|number|#)?[:\s-]*([A-Z0-9][A-Z0-9\-\/]{2,})", r"bill\s*(?:no|number|#)?[:\s-]*([A-Z0-9][A-Z0-9\-\/]{2,})"))
+    date = find_document_value(lines, (r"(?:invoice\s*)?date[:\s-]*([0-9]{1,2}[\/\-.][0-9]{1,2}[\/\-.][0-9]{2,4})", r"date[:\s-]*([0-9]{4}[\/\-.][0-9]{1,2}[\/\-.][0-9]{1,2})"))
+    supplier = find_supplier_name(lines)
+    trn = find_document_value(lines, (r"\bTRN[:\s-]*([0-9]{10,20})", r"tax\s+registration\s+(?:number|no)[:\s-]*([0-9]{10,20})"))
+    total = find_money_after_label(lines, ("grand total", "invoice total", "total amount", "net payable", "amount due", "total"))
+    vat = find_money_after_label(lines, ("vat", "tax amount", "tax"))
+    subtotal = find_money_after_label(lines, ("subtotal", "sub total", "taxable amount", "taxable value", "net amount"))
+    item_rows = purchase_item_rows_from_lines(lines, invoice_no, date, supplier, trn)
+    if item_rows:
+        return item_rows
+    if not invoice_no and not supplier and not total:
+        return []
+    return [normalize_purchase_row({
+        "invoice_no": invoice_no or "PDF-INVOICE",
+        "date": date,
+        "supplier": supplier or "Supplier",
+        "supplier_trn": trn,
+        "product": "Extracted purchase invoice",
+        "quantity": 1,
+        "unit": "PCS",
+        "unit_cost": subtotal or total,
+        "vat_amount": vat,
+        "line_total": subtotal or max(Decimal("0"), total - vat),
+        "tax_type": "VAT 5%" if vat else "None",
+    })]
+
+
+def normalize_document_lines(text: str) -> list[str]:
+    lines = [re.sub(r"\s+", " ", line).strip() for line in text.splitlines()]
+    lines = [line for line in lines if line]
+    if len(lines) > 1:
+        return lines
+    compact = re.sub(r"\s+", " ", text).strip()
+    if not compact:
+        return []
+    labels = (
+        "invoice no",
+        "invoice number",
+        "bill no",
+        "date",
+        "supplier",
+        "vendor",
+        "seller",
+        "trn",
+        "subtotal",
+        "sub total",
+        "vat",
+        "tax amount",
+        "total",
+        "amount due",
+        "description",
+        "product",
+        "item",
+    )
+    pattern = r"\s+(?=(?:" + "|".join(re.escape(label) for label in labels) + r")\b)"
+    return [line.strip(" :-") for line in re.split(pattern, compact, flags=re.IGNORECASE) if line and line.strip(" :-")]
+
+
+def find_document_value(lines: list[str], patterns: tuple[str, ...]) -> str:
+    for line in lines[:80]:
+        for pattern in patterns:
+            match = re.search(pattern, line, flags=re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
+    return ""
+
+
+def find_supplier_name(lines: list[str]) -> str:
+    for line in lines[:30]:
+        match = re.search(r"^(?:supplier|vendor|seller)(?:\s+name)?[:\s-]+(.+)", line, flags=re.IGNORECASE)
+        if match:
+            return clean_document_label_value(match.group(1))
+    for line in lines[:8]:
+        tax_invoice = re.search(r"\btax\s+invoice\b", line, flags=re.IGNORECASE)
+        if tax_invoice:
+            prefix = clean_document_label_value(line[:tax_invoice.start()])
+            if prefix and any(ch.isalpha() for ch in prefix):
+                return prefix[:120]
+        if (
+            not re.search(r"\b(invoice|tax|vat|trn|date|total|bill|description|qty|quantity|amount|rate|price)\b", line, flags=re.IGNORECASE)
+            and not re.search(r"[0-9][0-9,]*\.[0-9]{2}", line)
+            and any(ch.isalpha() for ch in line)
+        ):
+            return line[:120]
+    return ""
+
+
+def clean_document_label_value(value: str) -> str:
+    cleaned = re.split(
+        r"\b(invoice\s*(?:no|number)?|bill\s*(?:no|number)?|date|trn|tax\s+registration|subtotal|sub\s+total|vat|tax\s+amount|total|amount\s+due)\b",
+        str(value or ""),
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+    return re.sub(r"\s+", " ", cleaned).strip(" :-")
+
+
+def find_money_after_label(lines: list[str], labels: tuple[str, ...]) -> Decimal:
+    for label in labels:
+        pattern = re.compile(rf"{re.escape(label)}[^\d\-]*([0-9][0-9,]*\.?[0-9]*)", flags=re.IGNORECASE)
+        for line in reversed(lines):
+            match = pattern.search(line)
+            if match:
+                return decimal_value(match.group(1))
+    return Decimal("0")
+
+
+def purchase_item_rows_from_lines(lines: list[str], invoice_no: str, date: str, supplier: str, trn: str) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    pending_description = ""
+    item_section_started = False
+    for line in lines:
+        lower = line.lower()
+        has_item_header = re.search(r"\b(description|item|product|particulars).{0,40}\b(qty|quantity|rate|price|amount|total)\b", lower)
+        if has_item_header:
+            item_section_started = True
+            if not re.search(r"(?<![A-Z0-9])([0-9][0-9,]*\.[0-9]{2})(?![A-Z0-9])", line):
+                continue
+            line = re.sub(r"\b(description|item|product|particulars|qty|quantity|rate|price|amount|total|unit)\b", " ", line, flags=re.IGNORECASE)
+        if is_document_summary_line(line):
+            continue
+        money = re.findall(r"(?<![A-Z0-9])([0-9][0-9,]*\.[0-9]{2})(?![A-Z0-9])", line)
+        if not money:
+            if item_section_started and looks_like_item_description(line):
+                pending_description = line
+            continue
+        qty_match = re.search(r"(?:^|\s)([0-9]+(?:\.[0-9]+)?)\s*(?:pcs|nos|qty|each|ea|unit|units|kg|ltr|mtr)?\b", line, flags=re.IGNORECASE)
+        description = re.sub(r"\b[0-9][0-9,]*\.[0-9]{2}\b", " ", line)
+        description = re.sub(r"\b(?:AED|VAT|TOTAL|SUBTOTAL|TAX|QTY|PCS|NOS)\b", " ", description, flags=re.IGNORECASE)
+        description = re.sub(r"\s+", " ", description).strip(" :-")
+        if pending_description and (not description or len(description) < 4 or description.replace(".", "").isdigit()):
+            description = pending_description
+        if not description or re.search(r"\b(total|subtotal|vat|tax|amount due|balance|invoice|date|trn)\b", description, flags=re.IGNORECASE):
+            continue
+        qty = decimal_value(qty_match.group(1) if qty_match else 1) or Decimal("1")
+        line_total = decimal_value(money[-1])
+        if line_total <= 0:
+            continue
+        unit_cost = line_total / qty if qty else line_total
+        rows.append(normalize_purchase_row({
+            "invoice_no": invoice_no or "PDF-INVOICE",
+            "date": date,
+            "supplier": supplier or "Supplier",
+            "supplier_trn": trn,
+            "product": description[:180],
+            "quantity": qty,
+            "unit": "PCS",
+            "unit_cost": unit_cost,
+            "line_total": line_total,
+            "tax_type": "VAT 5%",
+        }))
+        pending_description = ""
+        if len(rows) >= 200:
+            break
+    return rows
+
+
+def is_document_summary_line(line: str) -> bool:
+    return bool(re.search(r"\b(grand\s+total|invoice\s+total|subtotal|sub\s+total|vat|tax\s+amount|amount\s+due|balance|paid|change|round\s*off)\b", line, flags=re.IGNORECASE))
+
+
+def looks_like_item_description(line: str) -> bool:
+    text = line.strip()
+    if len(text) < 3 or len(text) > 180:
+        return False
+    if re.search(r"\b(invoice|supplier|vendor|seller|trn|date|total|subtotal|vat|tax)\b", text, flags=re.IGNORECASE):
+        return False
+    return any(ch.isalpha() for ch in text)
+
+
 def purchase_excel_debug_hint(content: bytes, ext: str) -> str:
+    if ext == "pdf":
+        return ". Text-based PDFs are supported; scanned PDFs need OCR plus a PDF image renderer on the server."
+    if ext in {"jpg", "jpeg", "png"}:
+        return ". Image extraction needs Tesseract OCR installed on the server."
     try:
         if ext in {"xlsx", "xlsm"}:
             with zipfile.ZipFile(io.BytesIO(content)) as workbook:

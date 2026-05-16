@@ -609,6 +609,7 @@ function chkSettingsTRN(inp){
 
 // -- UPLOAD: store real files --------------------------------------
 const uploadedFiles = []; // {name, size, type, base64, category, period, status}
+const purchaseDocumentIds = new Set();
 const PURCHASE_AI_PREVIEW_LIMIT = 500;
 
 const APP_CONFIG={
@@ -1871,6 +1872,7 @@ function hydrateFromServer(){
       (data.vendors||[]).reverse().forEach(renderVendorRecord);
       (data.payments||[]).reverse().forEach(renderPaymentRecord);
       (data.purchaseRecords||[]).reverse().forEach(purchase=>renderPurchaseRecord(purchase,{deferRefresh:true,deferStockSync:true}));
+      loadPurchaseDocumentsFromServer(data.purchaseDocuments||[],data.purchaseRecords||[]);
     }finally{
       isHydratingFromServer=false;
     }
@@ -2709,7 +2711,9 @@ function readAndAddFile(file){
   reader.onload=function(e){
     const base64=e.target.result; // full data URL
     entry.base64=base64;
+    entry.uploadedAt=entry.uploadedAt||new Date().toISOString();
     entry.status='Queued';
+    persistPurchaseDocumentRecord(entry);
     animateUpload(file.name,file.size,entry);
   };
   reader.onerror=function(){
@@ -2732,6 +2736,7 @@ function animateUpload(name,size,entry){
       setTimeout(()=>{
         pg.style.display='none';fill.style.width='0%';
         entry.status='Ready';
+        persistPurchaseDocumentRecord(entry);
         renderFileList();
         updatePurchaseValidationFileStatus();
         updateFileCount();
@@ -2789,6 +2794,116 @@ function renderFileList(){
 function updateFileCount(){
   const badge=document.getElementById('file-count-badge');
   if(badge) badge.textContent=(3+uploadedFiles.length)+' files';
+}
+
+function loadPurchaseDocumentsFromServer(records,purchaseRecords=[]){
+  (records||[]).forEach(record=>{
+    const file=normalizePurchaseDocumentRecord(record);
+    if(!file.id||purchaseDocumentIds.has(file.id))return;
+    purchaseDocumentIds.add(file.id);
+    uploadedFiles.push(file);
+  });
+  addPurchaseRecordHistoryDocuments(purchaseRecords);
+  updatePurchaseValidationFileStatus();
+  renderFileList();
+  updateFileCount();
+}
+
+function addPurchaseRecordHistoryDocuments(purchaseRecords=[]){
+  (purchaseRecords||[]).forEach(record=>{
+    const ref=String(record?.ref||record?.invoice_no||record?.reference||'').trim();
+    if(!ref)return;
+    const id=`purchase-record-${ref}`.replace(/[^a-z0-9_.-]/gi,'-').slice(0,120);
+    if(purchaseDocumentIds.has(id))return;
+    purchaseDocumentIds.add(id);
+    uploadedFiles.push({
+      id,
+      name:record.document_name||record.source_file||`Purchase ${ref}`,
+      size:0,
+      type:'',
+      base64:'',
+      category:'Purchase Records',
+      period:record.date||'',
+      status:'Extracted',
+      invoices:[{
+        invoice_no:ref,
+        date:record.date||'',
+        supplier:record.supplier||'',
+        supplier_trn:record.supplier_trn||'',
+        subtotal:record.net_amount||0,
+        vat_amount:record.tax_amount||0,
+        total:record.total||0,
+        status:'Valid',
+        confidence:100,
+        lines:Array.isArray(record.lines)?record.lines:[]
+      }],
+      savedInvoiceNos:new Set([ref]),
+      uploadedAt:record.createdAt||record.date||''
+    });
+  });
+}
+
+function normalizePurchaseDocumentRecord(record){
+  const saved=record?.savedInvoiceNos instanceof Set?record.savedInvoiceNos:new Set(record?.savedInvoiceNos||[]);
+  return {
+    id:String(record?.id||purchaseDocumentId(record)||('DOC'+Date.now()+Math.random().toString(36).slice(2,6))),
+    name:record?.name||'uploaded-document',
+    size:Number(record?.size||0),
+    type:record?.type||'',
+    base64:record?.base64||'',
+    category:record?.category||'Purchase Invoices',
+    period:record?.period||'',
+    status:record?.status||'Ready',
+    invoices:Array.isArray(record?.invoices)?record.invoices:[],
+    savedInvoiceNos:saved,
+    uploadedAt:record?.uploadedAt||record?.createdAt||new Date().toISOString(),
+    extractedAt:record?.extractedAt||''
+  };
+}
+
+function purchaseDocumentId(file){
+  return String(file?.id||`${file?.name||'document'}-${file?.size||0}-${file?.uploadedAt||file?.period||''}`)
+    .replace(/[^a-z0-9_.-]/gi,'-')
+    .slice(0,120);
+}
+
+function purchaseDocumentRecordFromFile(file){
+  const saved=file.savedInvoiceNos instanceof Set?[...file.savedInvoiceNos]:(file.savedInvoiceNos||[]);
+  return {
+    id:purchaseDocumentId(file),
+    name:file.name,
+    size:file.size||0,
+    type:file.type||'',
+    base64:file.base64||'',
+    category:file.category||'Purchase Invoices',
+    period:file.period||'',
+    status:file.status||'Ready',
+    invoices:Array.isArray(file.invoices)?file.invoices:[],
+    savedInvoiceNos:saved,
+    uploadedAt:file.uploadedAt||new Date().toISOString(),
+    extractedAt:file.extractedAt||''
+  };
+}
+
+function persistPurchaseDocumentRecord(file){
+  if(!file)return;
+  file.id=purchaseDocumentId(file);
+  purchaseDocumentIds.add(file.id);
+  saveServer('purchaseDocuments',purchaseDocumentRecordFromFile(file));
+}
+
+function downloadUploadedPurchaseFile(id){
+  const file=uploadedFiles.find(item=>String(item.id)===String(id));
+  if(!file||!file.base64){
+    toast('Original file is not available for download','warn');
+    return;
+  }
+  const link=document.createElement('a');
+  link.href=file.base64;
+  link.download=file.name||'purchase-document';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 
 function updatePurchaseValidationFileStatus(){
@@ -2850,10 +2965,13 @@ async function extractSingleFile(entry){
 
   try{
     const invoices=await requestInvoiceExtraction(entry);
+    const extractionFailed=isExtractionErrorResult(invoices);
 
-    entry.status='Extracted';
+    entry.status=extractionFailed?'Error':'Extracted';
     entry.invoices=invoices;
     entry.savedInvoiceNos=entry.savedInvoiceNos||new Set();
+    entry.extractedAt=new Date().toISOString();
+    persistPurchaseDocumentRecord(entry);
     renderFileList();
     await appendExtractedRows(invoices,entry.name);
     updateExtractionStats();
@@ -2868,7 +2986,9 @@ async function extractSingleFile(entry){
     }
 
     setTimeout(()=>{ep.style.display='none';ef.style.width='0%';},600);
-    toast(`Extracted ${invoices.length} invoice(s) from ${entry.name} ?`,'ok');
+    toast(extractionFailed
+      ? `Extraction needs review for ${entry.name}`
+      : `Extracted ${invoices.length} invoice(s) from ${entry.name} ?`, extractionFailed?'warn':'ok');
 
     if(invoices.some(i=>!validatePurchaseAiInvoice(i).valid)){
       toast('Validation issues found - review required','warn');
@@ -2878,11 +2998,20 @@ async function extractSingleFile(entry){
     clearInterval(ticker);
     ep.style.display='none';
     entry.status='Error';
+    persistPurchaseDocumentRecord(entry);
     renderFileList();
     updatePurchaseValidationFileStatus();
     toast('Extraction failed: '+err.message,'err');
     console.error(err);
   }
+}
+
+function isExtractionErrorResult(invoices){
+  return Array.isArray(invoices)&&invoices.length>0&&invoices.every(inv=>
+    String(inv?.status||'').toLowerCase()==='error'&&
+    Number(inv?.confidence||0)<=0&&
+    (!Array.isArray(inv?.lines)||inv.lines.length===0)
+  );
 }
 
 async function appendExtractedRows(invoices,filename){
@@ -3227,6 +3356,7 @@ function markExtractedInvoiceUploaded(invoiceNo){
     if(file.invoices.some(inv=>String(inv.invoice_no||'')===key)){
       file.savedInvoiceNos=file.savedInvoiceNos instanceof Set?file.savedInvoiceNos:new Set(file.savedInvoiceNos||[]);
       file.savedInvoiceNos.add(key);
+      persistPurchaseDocumentRecord(file);
     }
   });
   renderPurchaseValidationDocumentStatus();
@@ -3243,6 +3373,7 @@ function markExtractedInvoicesUploaded(invoiceNos){
       const key=String(inv.invoice_no||'');
       if(keys.has(key))file.savedInvoiceNos.add(key);
     });
+    persistPurchaseDocumentRecord(file);
   });
   renderPurchaseValidationDocumentStatus();
 }
@@ -3774,7 +3905,7 @@ function purchaseFileUploadStatus(file){
 function renderPurchaseValidationDocumentStatus(){
   const target=document.getElementById('purchase-validation-doc-status');
   if(!target)return;
-  const files=uploadedFiles.filter(file=>['Ready','Queued','Extracted','Error'].includes(file.status));
+  const files=uploadedFiles.filter(file=>['Reading','Ready','Queued','Extracting','Extracted','Error'].includes(file.status));
   if(!files.length){
     target.innerHTML=`<div style="background:var(--red-bg);border:1px solid var(--red-border);border-radius:10px;padding:14px 16px">
       <div style="font-size:13.5px;font-weight:600;margin-bottom:3px">No uploaded documents yet</div>
@@ -3791,14 +3922,19 @@ function renderPurchaseValidationDocumentStatus(){
     const status=purchaseFileUploadStatus(file);
     const invoices=Array.isArray(file.invoices)?file.invoices:[];
     const reviewCount=invoices.filter(inv=>!validatePurchaseAiInvoice(inv).valid).length;
+    const downloadDisabled=file.base64?'':' disabled';
+    const uploadedAt=file.uploadedAt?new Date(file.uploadedAt).toLocaleString('en-AE'):'';
     return `<div style="${toneStyle[status.tone]};border-radius:10px;padding:14px 16px;margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;gap:10px">
         <span style="font-size:18px;flex-shrink:0">${status.tone==='green'?'✓':status.tone==='amber'?'!':'×'}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:13.5px;font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(file.name)}</div>
-          <div style="font-size:12px;color:var(--text3)">${escapeHtml(status.summary)}${reviewCount?` - ${reviewCount} row(s) have review notes`:''}</div>
+          <div style="font-size:12px;color:var(--text3)">${escapeHtml(status.summary)}${reviewCount?` - ${reviewCount} row(s) have review notes`:''}${uploadedAt?` - Uploaded ${escapeHtml(uploadedAt)}`:''}</div>
         </div>
-        <span class="b ${status.badge}">${escapeHtml(status.label)}</span>
+        <div class="flx" style="flex-shrink:0">
+          <button class="btn btn-g btn-sm" type="button"${downloadDisabled} onclick="downloadUploadedPurchaseFile('${escapeHtml(String(file.id))}')">Download</button>
+          <span class="b ${status.badge}">${escapeHtml(status.label)}</span>
+        </div>
       </div>
     </div>`;
   }).join('');
