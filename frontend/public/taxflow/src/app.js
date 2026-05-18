@@ -17,6 +17,12 @@ META.exception={t:'Exception Center',s:'Failed postings - duplicates - VAT/OCR -
 
 let isHydratingFromServer=false;
 const tableRefreshTimers=new WeakMap();
+const purchaseRecordCache=new Map();
+const PURCHASE_PAGE_SIZE=100;
+let purchaseRecordsTotal=0;
+let purchaseRecordsOffset=0;
+let purchaseRecordsLoading=false;
+let purchaseRecordsLoaded=false;
 
 function scheduleIdleTask(fn,timeout=800){
   if('requestIdleCallback' in window){
@@ -143,6 +149,11 @@ function stab(el,target){
   const t=document.getElementById(target);
   if(t)t.classList.add('on');
   if(target==='inv-mapping')loadStockMappingsFromServer();
+  if(target==='p-records')ensurePurchaseRecordsLoaded();
+  if(target==='p-manual'){
+    bindManualPurchaseCalculator();
+    setManualPurchaseDefaults();
+  }
   updateBackButton();
 }
 
@@ -1635,8 +1646,10 @@ function productStockLevelFromRow(row){
 
 function purchaseStockItems(){
   const items=new Map();
-  document.querySelectorAll('#purchase-record-tbody tr:not([data-empty-state])').forEach(row=>{
-    const record=purchaseRecordFromRow(row);
+  const sourceRecords=purchaseRecordCache.size
+    ? [...purchaseRecordCache.values()]
+    : [...document.querySelectorAll('#purchase-record-tbody tr:not([data-empty-state])')].map(purchaseRecordFromRow);
+  sourceRecords.forEach(record=>{
     const lines=Array.isArray(record?.lines)?record.lines:[];
     lines.forEach(line=>{
       const name=purchaseAiProductName(line)||line.name||line.description||'Purchase item';
@@ -1825,22 +1838,227 @@ function renderPaymentRecord(payment){
   tbody.prepend(row);
 }
 
-function renderPurchaseRecord(purchase,options={}){
-  const tbody=document.getElementById('purchase-record-tbody');
+function buildPurchaseRecordRow(purchase){
   const ref=purchase?.ref||purchase?.invoice_no||purchase?.reference;
-  if(!tbody||!ref||hasFirstCellValue(tbody,ref))return;
+  if(!ref)return null;
+  purchaseRecordCache.set(String(ref),{...purchase,ref});
   const row=document.createElement('tr');
   row.dataset.serverRecord='purchaseRecords';
-  row.dataset.purchaseRecord=JSON.stringify({...purchase,ref});
+  row.dataset.purchaseRef=String(ref);
   const status=purchase.status||'Draft';
   const statusClass=status==='Paid'?'b-g':status==='Received'?'b-b':status.includes('Payment')?'b-a':'b-gray';
   const source=String(purchase.source||'Manual');
   const sourceClass=source.toLowerCase().includes('ai')?'b-p':'b-gray';
   row.innerHTML=`<td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(purchase.supplier||'-')}</td><td>${escapeHtml(purchase.date||'-')}</td><td>${escapeHtml(purchase.location||'-')}</td><td class="mono">${Number(purchase.items||0)}</td><td class="mono">${Number(purchase.net_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.tax_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.shipping||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.total||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.paid||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.due||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td>`;
+  return row;
+}
+
+function renderPurchaseRecord(purchase,options={}){
+  const tbody=document.getElementById('purchase-record-tbody');
+  const ref=purchase?.ref||purchase?.invoice_no||purchase?.reference;
+  if(!tbody||!ref||hasFirstCellValue(tbody,ref))return;
+  const row=buildPurchaseRecordRow(purchase);
+  if(!row)return;
   removeEmptyState(tbody);
   tbody.prepend(row);
   if(!options.deferRefresh&&!isHydratingFromServer)refreshEnhancedTable(tbody.closest('table'));
   if(!options.deferStockSync&&!isHydratingFromServer)syncStockLevelsFromProducts();
+}
+
+function updatePurchaseRecordControls(total=purchaseRecordCache.size,visible=0){
+  const count=document.getElementById('purchase-record-count');
+  const loadMore=document.getElementById('purchase-load-more-btn');
+  const showRecent=document.getElementById('purchase-show-recent-btn');
+  const shown=visible||document.querySelectorAll('#purchase-record-tbody tr:not([data-empty-state])').length;
+  if(count){
+    count.textContent=purchaseRecordsLoading
+      ? 'Loading purchase records...'
+      : total
+      ? `Showing ${shown.toLocaleString('en-AE')} of ${total.toLocaleString('en-AE')} database records`
+      : 'No purchase records in database yet.';
+  }
+  if(loadMore){
+    loadMore.disabled=purchaseRecordsLoading||shown>=total;
+    loadMore.textContent=purchaseRecordsLoading?'Loading...':shown>=total?'All Loaded':'Load More';
+  }
+  if(showRecent)showRecent.disabled=purchaseRecordsLoading||shown<=PURCHASE_PAGE_SIZE;
+}
+
+function renderPurchaseRecordWindow(){
+  const tbody=document.getElementById('purchase-record-tbody');
+  if(!tbody)return {rendered:0,failed:0,total:purchaseRecordCache.size};
+  const records=[...purchaseRecordCache.values()];
+  const fragment=document.createDocumentFragment();
+  let rendered=0;
+  let failed=0;
+  records.forEach(purchase=>{
+    try{
+      const row=buildPurchaseRecordRow(purchase);
+      if(!row)return;
+      fragment.appendChild(row);
+      rendered++;
+    }catch(err){
+      failed++;
+      console.warn('Could not render purchase record:',err,purchase);
+    }
+  });
+  tbody.innerHTML='';
+  if(rendered)tbody.appendChild(fragment);
+  else emptyTableMessage(tbody,'No purchase records in database yet.');
+  const total=purchaseRecordsTotal||records.length;
+  window.__taxflowPurchaseRecordTotal=total;
+  window.__taxflowPurchaseRecordVisible=rendered;
+  updatePurchaseRecordControls(total,rendered);
+  refreshEnhancedTable(tbody.closest('table'));
+  return {rendered,failed,total};
+}
+
+function renderPurchaseRecordList(records=[]){
+  records.forEach(purchase=>{
+    const ref=String(purchase?.ref||purchase?.invoice_no||purchase?.reference||'').trim();
+    if(ref)purchaseRecordCache.set(ref,{...purchase,ref});
+  });
+  return renderPurchaseRecordWindow();
+}
+
+async function fetchPurchaseRecordsPage({reset=false}={}){
+  if(purchaseRecordsLoading)return {records:[],total:purchaseRecordsTotal,has_more:false};
+  purchaseRecordsLoading=true;
+  updatePurchaseRecordControls(purchaseRecordsTotal,purchaseRecordCache.size);
+  try{
+    if(reset){
+      purchaseRecordCache.clear();
+      purchaseRecordsOffset=0;
+      purchaseRecordsLoaded=false;
+    }
+    const response=await authenticatedFetch(`${apiBaseUrl()}/app-data/records/purchaseRecords?limit=${PURCHASE_PAGE_SIZE}&offset=${purchaseRecordsOffset}`);
+    if(!response.ok)throw new Error('Purchase records API returned '+response.status);
+    const data=await response.json();
+    const records=Array.isArray(data.records)?data.records:[];
+    purchaseRecordsTotal=Number(data.total||records.length||0);
+    records.forEach(record=>{
+      const ref=String(record?.ref||record?.invoice_no||record?.reference||'').trim();
+      if(ref)purchaseRecordCache.set(ref,{...record,ref});
+    });
+    purchaseRecordsOffset+=records.length;
+    purchaseRecordsLoaded=true;
+    renderPurchaseRecordWindow();
+    return data;
+  }catch(err){
+    console.warn('Purchase records page load failed:',err);
+    toast('Purchase records could not load. Check backend connection.','warn');
+    return {records:[],total:purchaseRecordsTotal,has_more:false};
+  }finally{
+    purchaseRecordsLoading=false;
+    updatePurchaseRecordControls(purchaseRecordsTotal,purchaseRecordCache.size);
+  }
+}
+
+function ensurePurchaseRecordsLoaded(){
+  if(purchaseRecordsLoaded||purchaseRecordsLoading){
+    updatePurchaseRecordControls(purchaseRecordsTotal,purchaseRecordCache.size);
+    return;
+  }
+  fetchPurchaseRecordsPage();
+}
+
+function loadMorePurchaseRecords(){
+  if(purchaseRecordsLoading)return;
+  if(purchaseRecordsLoaded&&purchaseRecordCache.size>=purchaseRecordsTotal){
+    toast('All purchase records are loaded','info');
+    return;
+  }
+  fetchPurchaseRecordsPage().then(data=>{
+    const count=Array.isArray(data.records)?data.records.length:0;
+    if(count)toast(`Loaded ${count.toLocaleString('en-AE')} more purchase records`,'ok');
+  });
+}
+
+function showRecentPurchaseRecords(){
+  fetchPurchaseRecordsPage({reset:true}).then(data=>{
+    const count=Array.isArray(data.records)?data.records.length:purchaseRecordCache.size;
+    if(count)toast(`Showing latest ${count.toLocaleString('en-AE')} purchase records`,'info');
+  });
+}
+
+function addFourPurchaseRecords(){
+  const today=new Date().toISOString().split('T')[0];
+  const stamp=Date.now().toString().slice(-6);
+  const records=[
+    {
+      ref:`PUR-ADD-${stamp}-1`,
+      supplier:'Office Mart',
+      date:today,
+      location:'Dubai HQ',
+      items:2,
+      net_amount:1480,
+      tax_amount:74,
+      shipping:35,
+      total:1589,
+      paid:1589,
+      due:0,
+      source:'Manual',
+      status:'Paid',
+      lines:[{sku:'PAPER-A4',product:'A4 Paper Box',unit:'BOX',quantity:8,unit_cost:185,line_total:1480}]
+    },
+    {
+      ref:`PUR-ADD-${stamp}-2`,
+      supplier:'Global Tech',
+      date:today,
+      location:'Main Warehouse',
+      items:1,
+      net_amount:3200,
+      tax_amount:160,
+      shipping:0,
+      total:3360,
+      paid:1600,
+      due:1760,
+      source:'Manual',
+      status:'Pending Payment',
+      lines:[{sku:'MON-24',product:'24 Inch Monitor',unit:'PCS',quantity:4,unit_cost:800,line_total:3200}]
+    },
+    {
+      ref:`PUR-ADD-${stamp}-3`,
+      supplier:'Fast Ship Corp',
+      date:today,
+      location:'Dubai HQ',
+      items:1,
+      net_amount:650,
+      tax_amount:32.5,
+      shipping:90,
+      total:772.5,
+      paid:0,
+      due:772.5,
+      source:'Manual',
+      status:'Pending Payment',
+      lines:[{sku:'SHIP-STD',product:'Inbound Freight',unit:'JOB',quantity:1,unit_cost:650,line_total:650}]
+    },
+    {
+      ref:`PUR-ADD-${stamp}-4`,
+      supplier:'Industrial Solutions',
+      date:today,
+      location:'Main Warehouse',
+      items:3,
+      net_amount:2190,
+      tax_amount:109.5,
+      shipping:45,
+      total:2344.5,
+      paid:2344.5,
+      due:0,
+      source:'Manual',
+      status:'Paid',
+      lines:[{sku:'SAFETY-KIT',product:'Safety Kit',unit:'PCS',quantity:6,unit_cost:365,line_total:2190}]
+    }
+  ];
+  records.forEach(record=>{
+    purchaseRecordCache.set(record.ref,record);
+    saveServer('purchaseRecords',record);
+  });
+  purchaseRecordsTotal+=records.length;
+  purchaseRecordsOffset+=records.length;
+  renderPurchaseRecordWindow();
+  syncStockLevelsFromProducts();
+  toast('4 purchase records added','ok');
 }
 
 function renderAccountRecord(account){
@@ -1854,25 +2072,41 @@ function renderAccountRecord(account){
   tbody.appendChild(row);
 }
 
+function renderRecordList(records,renderRecord,label){
+  let rendered=0;
+  let failed=0;
+  (records||[]).slice().reverse().forEach(record=>{
+    try{
+      renderRecord(record);
+      rendered++;
+    }catch(err){
+      failed++;
+      console.warn(`Could not render ${label} record:`,err,record);
+    }
+  });
+  return {rendered,failed};
+}
+
 function hydrateFromServer(){
   return apiRequest('bootstrap',{}, {method:'GET'}).then(({data})=>{
     if(!data)return;
     isHydratingFromServer=true;
+    const renderStats={};
     try{
       if(data.company)applyCompanyToUi(data.company);
-      (data.products||[]).reverse().forEach(product=>renderProductRecord(product,{deferRefresh:true,deferStockSync:true,deferMappingSync:true,deferSuggestions:true}));
-      (data.salesCategories||[]).reverse().forEach(renderSalesCategoryRecord);
-      (data.salesUnits||[]).reverse().forEach(renderSalesUnitRecord);
-      (data.customers||[]).reverse().forEach(renderCustomerRecord);
-      (data.salesInvoices||[]).reverse().forEach(inv=>addSalesInvoiceRow(inv,{persist:false}));
-      (data.quotations||[]).reverse().forEach(renderQuotationRecord);
-      (data.accounts||[]).reverse().forEach(renderAccountRecord);
-      (data.ledger||[]).reverse().forEach(line=>postLedgerLine(line,{persist:false}));
-      (data.bills||[]).reverse().forEach(renderBillRecord);
-      (data.vendors||[]).reverse().forEach(renderVendorRecord);
-      (data.payments||[]).reverse().forEach(renderPaymentRecord);
-      (data.purchaseRecords||[]).reverse().forEach(purchase=>renderPurchaseRecord(purchase,{deferRefresh:true,deferStockSync:true}));
-      loadPurchaseDocumentsFromServer(data.purchaseDocuments||[],data.purchaseRecords||[]);
+      renderStats.products=renderRecordList(data.products,product=>renderProductRecord(product,{deferRefresh:true,deferStockSync:true,deferMappingSync:true,deferSuggestions:true}),'product');
+      renderStats.salesCategories=renderRecordList(data.salesCategories,renderSalesCategoryRecord,'sales category');
+      renderStats.salesUnits=renderRecordList(data.salesUnits,renderSalesUnitRecord,'sales unit');
+      renderStats.customers=renderRecordList(data.customers,renderCustomerRecord,'customer');
+      renderStats.salesInvoices=renderRecordList(data.salesInvoices,inv=>addSalesInvoiceRow(inv,{persist:false}),'sales invoice');
+      renderStats.quotations=renderRecordList(data.quotations,renderQuotationRecord,'quotation');
+      renderStats.accounts=renderRecordList(data.accounts,renderAccountRecord,'account');
+      renderStats.ledger=renderRecordList(data.ledger,line=>postLedgerLine(line,{persist:false}),'ledger');
+      renderStats.bills=renderRecordList(data.bills,renderBillRecord,'bill');
+      renderStats.vendors=renderRecordList(data.vendors,renderVendorRecord,'vendor');
+      renderStats.payments=renderRecordList(data.payments,renderPaymentRecord,'payment');
+      renderStats.purchaseRecords={rendered:0,failed:0,total:0,lazy:true};
+      loadPurchaseDocumentsFromServer(data.purchaseDocuments||[],[]);
     }finally{
       isHydratingFromServer=false;
     }
@@ -1884,9 +2118,9 @@ function hydrateFromServer(){
       data.bills,
       data.vendors,
       data.payments,
-      data.purchaseRecords
+      []
     ].reduce((sum,rows)=>sum+(Array.isArray(rows)?rows.length:0),0);
-    window.__taxflowLastDbLoad={at:new Date().toISOString(),totalLoaded};
+    window.__taxflowLastDbLoad={at:new Date().toISOString(),totalLoaded,renderStats};
     console.info(`TaxFlow DB tables loaded: ${totalLoaded} records`);
     if(totalLoaded>0)toast(`Database tables loaded: ${totalLoaded} records`,'ok');
     if(data.invoiceLayout){
@@ -1908,6 +2142,8 @@ function hydrateFromServer(){
     refreshPurchaseProductSuggestions();
     loadStockMappingsFromServer();
     filterLedger();
+    refreshActivePageTables();
+    refreshInitializedTables();
     scheduleIdleTask(()=>{
       revalidateSalesAiRows();
       bindDetailViews();
@@ -3538,62 +3774,83 @@ function ensurePurchaseAiEditModal(){
   overlay.id='m-purchase-ai-edit';
   overlay.onclick=e=>closeOvBg(e,'m-purchase-ai-edit');
   overlay.innerHTML=`
-    <div class="modal modal-lg">
-      <div class="modal-title">Edit Extracted Purchase</div>
-      <div class="modal-sub" id="pai-edit-sub">Correct extracted invoice and item details</div>
-      <div class="fr3">
-        <div class="fg"><label class="fl">Invoice No.</label><input class="fi mono" id="pai-invoice"></div>
-        <div class="fg"><label class="fl">Purchase Date</label><input class="fi" id="pai-date"></div>
-        <div class="fg"><label class="fl">Supplier</label><input class="fi" id="pai-supplier"></div>
+    <div class="modal modal-xl purchase-edit-modal">
+      <div class="purchase-edit-top">
+        <div>
+          <div class="modal-title">Edit Extracted Purchase</div>
+          <div class="modal-sub" id="pai-edit-sub">Correct the extracted supplier invoice before saving</div>
+        </div>
+        <span class="b b-b">Invoice View</span>
       </div>
-      <div class="fr3">
-        <div class="fg"><label class="fl">Address</label><input class="fi" id="pai-address"></div>
-        <div class="fg"><label class="fl">Pay Term</label><select class="fi" id="pai-term"><option value="">Please Select</option><option>Due on receipt</option><option>Net 15</option><option>Net 30</option><option>Net 45</option></select></div>
-        <div class="fg"><label class="fl">Product Name</label><input class="fi" id="pai-product"></div>
-      </div>
-      <div class="fr3">
-        <div class="fg"><label class="fl">Category</label><input class="fi" id="pai-category"></div>
-        <div class="fg"><label class="fl">Purchase Quantity</label><input class="fi mono" id="pai-qty" oninput="calcPurchaseAiEditLine()"></div>
-        <div class="fg"><label class="fl">Unit of Measure</label><input class="fi mono" id="pai-unit"></div>
-      </div>
-      <div class="fr3">
-        <div class="fg"><label class="fl">Unit Cost Before Discount</label><input class="fi mono" id="pai-cost" oninput="calcPurchaseAiEditLine()"></div>
-        <div class="fg"><label class="fl">Discount %</label><input class="fi mono" id="pai-line-discount" oninput="calcPurchaseAiEditLine()"></div>
-        <div class="fg"><label class="fl">Unit Cost Before Tax</label><input class="fi mono" id="pai-cost-before-tax" readonly></div>
-      </div>
-      <div class="fr3">
-        <div class="fg"><label class="fl">Line Total</label><input class="fi mono" id="pai-line-total" oninput="calcPurchaseAiEditInvoice()"></div>
-        <div class="fg"><label class="fl">Profit Margin %</label><input class="fi mono" id="pai-margin" oninput="calcPurchaseAiEditLine()"></div>
-        <div class="fg"><label class="fl">Unit Selling Price Inc. Tax</label><input class="fi mono" id="pai-selling" readonly></div>
-      </div>
-      <div class="fr3">
-        <div class="fg"><label class="fl">Discount Type</label><select class="fi" id="pai-discount-type" onchange="calcPurchaseAiEditInvoice()"><option>None</option><option>Fixed</option><option>Percentage</option></select></div>
-        <div class="fg"><label class="fl">Discount Amount</label><input class="fi mono" id="pai-discount-value" oninput="calcPurchaseAiEditInvoice()"></div>
-        <div class="fg"><label class="fl">Purchase Tax</label><select class="fi" id="pai-tax-type" onchange="calcPurchaseAiEditInvoice()"><option>None</option><option>VAT 5%</option><option>Reverse Charge 5%</option><option>Exempt</option></select></div>
-      </div>
-      <div class="fr3">
-        <div class="fg"><label class="fl">Purchase Tax Amount</label><input class="fi mono" id="pai-vat" oninput="calcPurchaseAiEditInvoice()"></div>
-        <div class="fg"><label class="fl">Shipping Details</label><input class="fi" id="pai-shipping-details"></div>
-        <div class="fg"><label class="fl">Shipping Charges</label><input class="fi mono" id="pai-shipping" oninput="calcPurchaseAiEditInvoice()"></div>
-      </div>
-      <div class="fr3">
-        <div class="fg"><label class="fl">Purchase Total</label><input class="fi mono" id="pai-total" readonly></div>
-        <div class="fg"><label class="fl">Paid Amount</label><input class="fi mono" id="pai-paid" oninput="calcPurchaseAiEditInvoice()"></div>
-        <div class="fg"><label class="fl">Payment Due</label><input class="fi mono" id="pai-due" readonly></div>
-      </div>
-      <div class="fr3">
-        <div class="fg"><label class="fl">Paid On</label><input class="fi" id="pai-paid-on"></div>
-        <div class="fg"><label class="fl">Payment Method</label><select class="fi" id="pai-pay-method"><option>Cash</option><option>Bank Transfer</option><option>Card</option><option>Cheque</option><option>Online</option></select></div>
-        <div class="fg"><label class="fl">Payment Account</label><input class="fi" id="pai-pay-account"></div>
-      </div>
-      <div class="fr2">
-        <div class="fg"><label class="fl">Payment Note</label><input class="fi" id="pai-pay-note"></div>
-        <div class="fg"><label class="fl">Additional Notes</label><input class="fi" id="pai-notes"></div>
-      </div>
-      <div class="fr3">
-        <div class="fg"><label class="fl">Confidence %</label><input class="fi mono" id="pai-confidence" type="number" min="0" max="100"></div>
-        <div class="fg"><label class="fl">Status</label><select class="fi" id="pai-status"><option>Valid</option><option>Review</option><option>Error</option></select></div>
-        <div class="fg"><label class="fl">Issues</label><input class="fi" id="pai-issues"></div>
+      <div class="purchase-invoice-sheet">
+        <div class="purchase-invoice-head">
+          <div>
+            <div class="purchase-invoice-kicker">Supplier Invoice</div>
+            <input class="purchase-invoice-title mono" id="pai-invoice" placeholder="Invoice No.">
+          </div>
+          <div class="purchase-invoice-meta">
+            <label>Purchase Date<input class="fi" id="pai-date"></label>
+            <label>Pay Term<select class="fi" id="pai-term"><option value="">Please Select</option><option>Due on receipt</option><option>Net 15</option><option>Net 30</option><option>Net 45</option></select></label>
+          </div>
+        </div>
+        <div class="purchase-party-grid">
+          <div class="purchase-party-box">
+            <div class="section-hd">Supplier</div>
+            <input class="fi" id="pai-supplier" placeholder="Supplier name">
+            <textarea class="fi" id="pai-address" rows="3" placeholder="Supplier address"></textarea>
+          </div>
+          <div class="purchase-party-box">
+            <div class="section-hd">Payment</div>
+            <div class="fr3">
+              <input class="fi mono" id="pai-paid" placeholder="Paid amount" oninput="calcPurchaseAiEditInvoice()">
+              <input class="fi" id="pai-paid-on" placeholder="Paid on">
+              <select class="fi" id="pai-pay-method"><option>Cash</option><option>Bank Transfer</option><option>Card</option><option>Cheque</option><option>Online</option></select>
+            </div>
+            <div class="fr2">
+              <input class="fi" id="pai-pay-account" placeholder="Payment account">
+              <input class="fi" id="pai-pay-note" placeholder="Payment note">
+            </div>
+          </div>
+        </div>
+        <div class="purchase-lines-head">
+          <div class="section-hd">Items</div>
+          <button class="btn btn-g btn-sm" type="button" onclick="addPurchaseAiEditLine()">+ Add line</button>
+        </div>
+        <div class="purchase-edit-table-wrap">
+          <table class="tbl purchase-edit-lines">
+            <thead><tr><th>#</th><th>Product</th><th>Category</th><th>Qty</th><th>Unit</th><th>Unit Cost</th><th>Disc %</th><th>Before Tax</th><th>Line Total</th><th>Margin %</th><th>Selling Inc. Tax</th><th></th></tr></thead>
+            <tbody id="pai-lines"></tbody>
+          </table>
+        </div>
+        <div class="purchase-invoice-bottom">
+          <div>
+            <div class="section-hd">Notes & Validation</div>
+            <textarea class="fi" id="pai-notes" rows="4" placeholder="Additional notes"></textarea>
+            <div class="fr3">
+              <input class="fi mono" id="pai-confidence" type="number" min="0" max="100" placeholder="Confidence %">
+              <select class="fi" id="pai-status"><option>Valid</option><option>Review</option><option>Error</option></select>
+              <input class="fi" id="pai-issues" placeholder="Issues">
+            </div>
+          </div>
+          <div class="purchase-summary-box">
+            <div class="fr2">
+              <select class="fi" id="pai-discount-type" onchange="calcPurchaseAiEditInvoice()"><option>None</option><option>Fixed</option><option>Percentage</option></select>
+              <input class="fi mono" id="pai-discount-value" placeholder="Discount" oninput="calcPurchaseAiEditInvoice()">
+            </div>
+            <div class="fr2">
+              <select class="fi" id="pai-tax-type" onchange="calcPurchaseAiEditInvoice(true)"><option>None</option><option>VAT 5%</option><option>Reverse Charge 5%</option><option>Exempt</option></select>
+              <input class="fi mono" id="pai-vat" placeholder="Tax amount" oninput="calcPurchaseAiEditInvoice()">
+            </div>
+            <input class="fi" id="pai-shipping-details" placeholder="Shipping details">
+            <input class="fi mono" id="pai-shipping" placeholder="Shipping charges" oninput="calcPurchaseAiEditInvoice()">
+            <div class="tot-row"><span>Net Amount</span><span class="mono" id="pai-net-label">0.00</span></div>
+            <div class="tot-row"><span>Discount (-)</span><span class="mono" id="pai-discount-label">0.00</span></div>
+            <div class="tot-row"><span>Purchase Tax (+)</span><span class="mono" id="pai-tax-label">0.00</span></div>
+            <div class="tot-row"><span>Shipping (+)</span><span class="mono" id="pai-shipping-label">0.00</span></div>
+            <div class="tot-final"><span>Purchase Total</span><input class="fi mono" id="pai-total" readonly></div>
+            <div class="tot-row"><span>Payment Due</span><input class="fi mono" id="pai-due" readonly></div>
+          </div>
+        </div>
       </div>
       <div class="modal-foot">
         <button class="btn btn-g" onclick="closeM('m-purchase-ai-edit')">Cancel</button>
@@ -3611,24 +3868,16 @@ function openPurchaseAiEdit(btn){
   purchaseAiEditRow=row;
   let inv={};
   try{inv=JSON.parse(row.dataset.inv||'{}');}catch{return;}
-  const lineIndex=Number(row.dataset.lineIndex||0);
-  const line=Array.isArray(inv.lines)?(inv.lines[lineIndex]||{}):{};
   ensurePurchaseAiEditModal();
   document.getElementById('pai-invoice').value=inv.invoice_no||'';
   document.getElementById('pai-date').value=inv.date||'';
   document.getElementById('pai-supplier').value=inv.supplier||'';
   document.getElementById('pai-address').value=inv.address||'';
   document.getElementById('pai-term').value=inv.pay_term||'';
-  document.getElementById('pai-product').value=purchaseAiProductName(line);
-  document.getElementById('pai-category').value=line.category||'';
-  document.getElementById('pai-unit').value=line.unit||line.unit_of_measure||line.uom||'PCS';
-  document.getElementById('pai-qty').value=line.quantity||line.qty||0;
-  document.getElementById('pai-cost').value=line.unit_cost||line.cost||line.unitCost||0;
-  document.getElementById('pai-line-discount').value=line.discount_percent||line.discountPct||0;
-  document.getElementById('pai-cost-before-tax').value=line.unit_cost_before_tax||line.unit_cost||line.cost||0;
-  document.getElementById('pai-line-total').value=line.line_total||line.amount||0;
-  document.getElementById('pai-margin').value=line.profit_margin||line.margin||0;
-  document.getElementById('pai-selling').value=line.selling_price_inc_tax||line.selling_price||0;
+  const body=document.getElementById('pai-lines');
+  if(body)body.innerHTML='';
+  const lines=Array.isArray(inv.lines)&&inv.lines.length?inv.lines:[{}];
+  lines.forEach(line=>addPurchaseAiEditLine(line));
   document.getElementById('pai-discount-type').value=inv.discount_type||'None';
   document.getElementById('pai-discount-value').value=inv.discount_value||inv.discount||0;
   document.getElementById('pai-tax-type').value=inv.tax_type||((Number(inv.vat_amount||0)>0)?'VAT 5%':'None');
@@ -3646,25 +3895,63 @@ function openPurchaseAiEdit(btn){
   document.getElementById('pai-confidence').value=inv.confidence||90;
   document.getElementById('pai-status').value=inv.status||'Valid';
   document.getElementById('pai-issues').value=inv.issues||'';
-  document.getElementById('pai-edit-sub').textContent=`${inv.invoice_no||'Purchase'} - line ${lineIndex+1}`;
+  document.getElementById('pai-edit-sub').textContent=`${inv.invoice_no||'Purchase'} - ${lines.length} line(s)`;
   calcPurchaseAiEditInvoice();
   showM('m-purchase-ai-edit');
 }
 
-function calcPurchaseAiEditLine(){
-  const qty=parseAmount(document.getElementById('pai-qty')?.value);
-  const cost=parseAmount(document.getElementById('pai-cost')?.value);
-  const discountPct=parseAmount(document.getElementById('pai-line-discount')?.value);
-  const beforeTax=cost*(1-(discountPct/100));
-  const margin=parseAmount(document.getElementById('pai-margin')?.value);
-  document.getElementById('pai-cost-before-tax').value=beforeTax.toFixed(2);
-  document.getElementById('pai-line-total').value=(qty*beforeTax).toFixed(2);
-  document.getElementById('pai-selling').value=(beforeTax*(1+margin/100)*1.05).toFixed(2);
+function addPurchaseAiEditLine(line={}){
+  const body=document.getElementById('pai-lines');
+  if(!body)return;
+  const row=document.createElement('tr');
+  row.innerHTML=`
+    <td class="mono pai-line-no">1</td>
+    <td><input class="fi pai-product" value="${escapeHtml(purchaseAiProductName(line))}" placeholder="Product name"></td>
+    <td><input class="fi pai-category" value="${escapeHtml(line.category||'')}" placeholder="Category"></td>
+    <td><input class="fi mono pai-qty" value="${escapeHtml(line.quantity||line.qty||0)}" oninput="calcPurchaseAiEditLine(this)"></td>
+    <td><input class="fi mono pai-unit" value="${escapeHtml(line.unit||line.unit_of_measure||line.uom||'PCS')}"></td>
+    <td><input class="fi mono pai-cost" value="${escapeHtml(line.unit_cost||line.cost||line.unitCost||0)}" oninput="calcPurchaseAiEditLine(this)"></td>
+    <td><input class="fi mono pai-line-discount" value="${escapeHtml(line.discount_percent||line.discountPct||0)}" oninput="calcPurchaseAiEditLine(this)"></td>
+    <td><input class="fi mono pai-cost-before-tax" value="${escapeHtml(line.unit_cost_before_tax||line.unit_cost||line.cost||0)}" readonly></td>
+    <td><input class="fi mono pai-line-total" value="${escapeHtml(line.line_total||line.amount||0)}" oninput="calcPurchaseAiEditInvoice()"></td>
+    <td><input class="fi mono pai-margin" value="${escapeHtml(line.profit_margin||line.margin||0)}" oninput="calcPurchaseAiEditLine(this)"></td>
+    <td><input class="fi mono pai-selling" value="${escapeHtml(line.selling_price_inc_tax||line.selling_price||0)}" readonly></td>
+    <td><button class="icon-btn danger" type="button" title="Remove line" onclick="removePurchaseAiEditLine(this)">${deleteIconSvg()}</button></td>`;
+  body.appendChild(row);
+  calcPurchaseAiEditLine(row);
+}
+
+function removePurchaseAiEditLine(btn){
+  const row=btn.closest('tr');
+  row?.remove();
+  if(!document.querySelector('#pai-lines tr'))addPurchaseAiEditLine();
   calcPurchaseAiEditInvoice();
 }
 
-function calcPurchaseAiEditInvoice(){
-  const lineTotal=parseAmount(document.getElementById('pai-line-total')?.value);
+function calcPurchaseAiEditLine(source){
+  const row=source?.closest?.('tr')||source;
+  if(!row)return;
+  const qty=parseAmount(row.querySelector('.pai-qty')?.value);
+  const cost=parseAmount(row.querySelector('.pai-cost')?.value);
+  const discountPct=parseAmount(row.querySelector('.pai-line-discount')?.value);
+  const beforeTax=cost*(1-(discountPct/100));
+  const margin=parseAmount(row.querySelector('.pai-margin')?.value);
+  const beforeTaxField=row.querySelector('.pai-cost-before-tax');
+  const totalField=row.querySelector('.pai-line-total');
+  const sellingField=row.querySelector('.pai-selling');
+  if(beforeTaxField)beforeTaxField.value=beforeTax.toFixed(2);
+  if(totalField)totalField.value=(qty*beforeTax).toFixed(2);
+  if(sellingField)sellingField.value=(beforeTax*(1+margin/100)*1.05).toFixed(2);
+  calcPurchaseAiEditInvoice();
+}
+
+function calcPurchaseAiEditInvoice(forceTaxRecalc=false){
+  document.querySelectorAll('#pai-lines tr').forEach((row,index)=>{
+    const lineNo=row.querySelector('.pai-line-no');
+    if(lineNo)lineNo.textContent=String(index+1);
+  });
+  const lineTotal=[...document.querySelectorAll('#pai-lines .pai-line-total')]
+    .reduce((sum,input)=>sum+parseAmount(input.value),0);
   const discountType=document.getElementById('pai-discount-type')?.value||'None';
   const discountValue=parseAmount(document.getElementById('pai-discount-value')?.value);
   const discount=discountType==='Percentage'?lineTotal*(discountValue/100):discountType==='Fixed'?discountValue:0;
@@ -3672,15 +3959,37 @@ function calcPurchaseAiEditInvoice(){
   const taxType=document.getElementById('pai-tax-type')?.value||'None';
   const calculatedVat=taxType.includes('5%')&&!taxType.toLowerCase().includes('exempt')?taxable*.05:0;
   const vatField=document.getElementById('pai-vat');
-  if(vatField&&document.activeElement!==vatField)vatField.value=calculatedVat.toFixed(2);
+  if(vatField&&(forceTaxRecalc||document.activeElement!==vatField))vatField.value=calculatedVat.toFixed(2);
   const vat=parseAmount(vatField?.value);
   const shipping=parseAmount(document.getElementById('pai-shipping')?.value);
   const paid=parseAmount(document.getElementById('pai-paid')?.value);
   const gross=taxable+vat+shipping;
+  setText('pai-net-label',lineTotal.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  setText('pai-discount-label',discount.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  setText('pai-tax-label',vat.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  setText('pai-shipping-label',shipping.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
   const total=document.getElementById('pai-total');
   if(total)total.value=gross.toFixed(2);
   const due=document.getElementById('pai-due');
   if(due)due.value=Math.max(0,gross-paid).toFixed(2);
+  return {subtotal:lineTotal,discount,tax:vat,shipping,total:gross,paid,due:Math.max(0,gross-paid)};
+}
+
+function collectPurchaseAiEditLines(){
+  return [...document.querySelectorAll('#pai-lines tr')]
+    .map(row=>({
+      product:row.querySelector('.pai-product')?.value.trim()||'Purchase item',
+      category:row.querySelector('.pai-category')?.value.trim()||'',
+      unit:row.querySelector('.pai-unit')?.value.trim()||'PCS',
+      quantity:parseAmount(row.querySelector('.pai-qty')?.value),
+      unit_cost:parseAmount(row.querySelector('.pai-cost')?.value),
+      discount_percent:parseAmount(row.querySelector('.pai-line-discount')?.value),
+      unit_cost_before_tax:parseAmount(row.querySelector('.pai-cost-before-tax')?.value),
+      line_total:parseAmount(row.querySelector('.pai-line-total')?.value),
+      profit_margin:parseAmount(row.querySelector('.pai-margin')?.value),
+      selling_price_inc_tax:parseAmount(row.querySelector('.pai-selling')?.value)
+    }))
+    .filter(line=>line.product||line.quantity||line.unit_cost||line.line_total);
 }
 
 function savePurchaseAiEdit(next=false){
@@ -3688,22 +3997,11 @@ function savePurchaseAiEdit(next=false){
   let inv={};
   try{inv=JSON.parse(purchaseAiEditRow.dataset.inv||'{}');}catch{return;}
   const oldInvoiceNo=inv.invoice_no||purchaseAiEditRow.dataset.invoiceNo||'';
-  const lineIndex=Number(purchaseAiEditRow.dataset.lineIndex||0);
-  const lines=Array.isArray(inv.lines)?inv.lines:[{}];
-  lines[lineIndex]={
-    ...(lines[lineIndex]||{}),
-    product:document.getElementById('pai-product').value.trim(),
-    category:document.getElementById('pai-category').value.trim(),
-    unit:document.getElementById('pai-unit').value.trim()||'PCS',
-    quantity:parseAmount(document.getElementById('pai-qty').value),
-    unit_cost:parseAmount(document.getElementById('pai-cost').value),
-    discount_percent:parseAmount(document.getElementById('pai-line-discount').value),
-    unit_cost_before_tax:parseAmount(document.getElementById('pai-cost-before-tax').value),
-    line_total:parseAmount(document.getElementById('pai-line-total').value),
-    profit_margin:parseAmount(document.getElementById('pai-margin').value),
-    selling_price_inc_tax:parseAmount(document.getElementById('pai-selling').value)
-  };
-  const subtotal=lines.reduce((sum,line)=>sum+parseAmount(line.line_total||line.amount),0);
+  const oldInvoiceUid=purchaseAiEditRow.dataset.invoiceUid||`${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  const lines=collectPurchaseAiEditLines();
+  if(!lines.length){toast('Add at least one purchase item','warn');return;}
+  const totals=calcPurchaseAiEditInvoice();
+  const subtotal=totals.subtotal;
   const paid=parseAmount(document.getElementById('pai-paid').value);
   const total=parseAmount(document.getElementById('pai-total').value);
   inv={
@@ -3735,7 +4033,8 @@ function savePurchaseAiEdit(next=false){
     issues:document.getElementById('pai-issues').value.trim(),
     lines
   };
-  updatePurchaseAiInvoiceRows(oldInvoiceNo,inv);
+  replacePurchaseAiInvoiceRows(oldInvoiceNo,inv,oldInvoiceUid);
+  updateUploadedPurchaseInvoice(oldInvoiceNo,inv);
   revalidatePurchaseAiRows();
   toast('Extracted purchase updated','ok');
   const current=purchaseAiEditRow;
@@ -3745,6 +4044,79 @@ function savePurchaseAiEdit(next=false){
       .find(row=>row.dataset.skipped!=='1'&&row!==current);
     if(nextRow)setTimeout(()=>openPurchaseAiEdit(nextRow.querySelector('.row-actions .icon-btn')),80);
   }
+}
+
+function updateUploadedPurchaseInvoice(oldInvoiceNo,inv){
+  const oldKey=String(oldInvoiceNo||'');
+  uploadedFiles.forEach(file=>{
+    if(!Array.isArray(file.invoices))return;
+    const index=file.invoices.findIndex(item=>String(item.invoice_no||'')===oldKey);
+    if(index>=0)file.invoices[index]=inv;
+  });
+}
+
+function replacePurchaseAiInvoiceRows(oldInvoiceNo,inv,invoiceUid){
+  const tbody=document.getElementById('ext-tbody');
+  if(!tbody)return;
+  const oldRows=[...tbody.querySelectorAll('#ext-tbody tr[data-inv]')]
+    .filter(row=>(row.dataset.invoiceNo||'')===String(oldInvoiceNo||''));
+  const anchor=oldRows[0]||purchaseAiEditRow;
+  const rows=buildPurchaseAiInvoiceRows(inv,invoiceUid);
+  rows.forEach(row=>tbody.insertBefore(row,anchor));
+  oldRows.forEach(row=>row.remove());
+  purchaseAiEditRow=rows[0]||null;
+}
+
+function buildPurchaseAiInvoiceRows(inv,invoiceUid){
+  const validation=validatePurchaseAiInvoice(inv);
+  const stCls=validation.valid?'b-g':'b-a';
+  const fmt=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const lines=Array.isArray(inv.lines)&&inv.lines.length?inv.lines:[{}];
+  return lines.map((line,index)=>{
+    const lineTotal=parseAmount(line.line_total||line.amount);
+    const vat=index===0?parseAmount(inv.vat_amount||inv.tax_amount):0;
+    const paid=index===0?parseAmount(inv.paid):0;
+    const shipping=index===0?parseAmount(inv.shipping):0;
+    const total=index===0?parseAmount(inv.total):(lineTotal+vat);
+    const row=document.createElement('tr');
+    row.setAttribute('data-inv',JSON.stringify(inv));
+    row.dataset.invoiceNo=inv.invoice_no||'';
+    row.dataset.invoiceUid=invoiceUid||`${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    row.dataset.lineIndex=String(index);
+    row.dataset.validation=validation.valid?'valid':'review';
+    row.innerHTML=`
+      <td><input type="checkbox" class="purchase-ai-select" ${validation.valid?'checked':''} aria-label="Select ${escapeHtml(inv.invoice_no)} line ${index+1}"></td>
+      <td class="purchase-ai-details" style="color:var(--text3);font-size:12px">${escapeHtml(index===0?(validation.issues.join('; ')||purchaseAiRawDetails(line)||'Ready to save'):'')}</td>
+      <td data-action-col="1">${index===0?purchaseAiUploadActionsHtml():''}</td>
+      <td class="mono">${escapeHtml(inv.invoice_no)}</td>
+      <td>${escapeHtml(inv.date||'')}</td>
+      <td>${escapeHtml(inv.supplier||'')}</td>
+      <td>${escapeHtml(inv.address||'')}</td>
+      <td>${escapeHtml(inv.pay_term||'')}</td>
+      <td>${escapeHtml(purchaseAiProductName(line))}</td>
+      <td class="mono">${fmt(line.quantity||line.qty||0)}</td>
+      <td>${escapeHtml(line.unit||line.unit_of_measure||line.uom||'PCS')}</td>
+      <td class="mono">${fmt(line.unit_cost||line.cost||line.unitCost||0)}</td>
+      <td class="mono">${fmt(line.discount_percent||line.discountPct||0)}</td>
+      <td class="mono">${fmt(line.unit_cost_before_tax||line.unit_cost||line.cost||0)}</td>
+      <td class="mono">${fmt(line.line_total||line.amount||0)}</td>
+      <td class="mono">${fmt(line.profit_margin||line.margin||0)}</td>
+      <td class="mono">${fmt(line.selling_price_inc_tax||line.selling_price||0)}</td>
+      <td>${escapeHtml(inv.discount_type||'None')}</td>
+      <td class="mono">${fmt(inv.discount_value||inv.discount||0)}</td>
+      <td class="mono">${fmt(vat)}</td>
+      <td>${escapeHtml(inv.shipping_details||'')}</td>
+      <td class="mono">${fmt(shipping)}</td>
+      <td class="mono">${fmt(paid)}</td>
+      <td>${escapeHtml(inv.paid_on||'')}</td>
+      <td>${escapeHtml(inv.payment_method||'Cash')}</td>
+      <td>${escapeHtml(inv.payment_account||'None')}</td>
+      <td>${escapeHtml(inv.payment_note||'')}</td>
+      <td>${escapeHtml(inv.notes||'')}</td>
+      <td class="mono">${fmt(Math.max(0,total-paid))}</td>
+      <td class="purchase-ai-validation"><span class="b ${stCls}">${validation.valid?'Valid':'Review'}</span></td>`;
+    return row;
+  });
 }
 
 function updatePurchaseAiInvoiceRows(oldInvoiceNo,inv){
@@ -3980,6 +4352,7 @@ function setText(id,value){
 }
 
 function setManualPurchaseDefaults(){
+  bindManualPurchaseCalculator();
   const now=formatInputDateTime();
   ['mp-date','mp-paid-on'].forEach(id=>{
     const field=document.getElementById(id);
@@ -3992,6 +4365,31 @@ function setManualPurchaseDefaults(){
     return;
   }
   calcManualPurchase();
+}
+
+function bindManualPurchaseCalculator(){
+  const page=document.getElementById('p-manual');
+  if(!page||page.dataset.purchaseCalcBound==='1')return;
+  page.dataset.purchaseCalcBound='1';
+  page.addEventListener('input',event=>{
+    if(event.target.matches('.mp-qty,.mp-cost,.mp-discount-pct,.mp-margin,.mp-expense-amount,#mp-discount,#mp-shipping,#mp-pay-amount')){
+      calcManualPurchase();
+    }
+  });
+  page.addEventListener('change',event=>{
+    if(event.target.matches('.mp-product')){
+      applyPurchaseProductSuggestion(event.target);
+      calcManualPurchase();
+      return;
+    }
+    if(event.target.matches('.mp-unit,#mp-discount-type,#mp-tax,#mp-pay-method,#mp-pay-account')){
+      calcManualPurchase();
+    }
+    if(event.target.matches('#mp-supplier')){
+      applySupplierAddress();
+      calcManualPurchase();
+    }
+  });
 }
 
 function removeInitialBlankPurchaseLine(){
@@ -4016,13 +4414,21 @@ function addManualPurchaseLine(){
   row.innerHTML=`<td class="line-no-cell"><span class="line-no">1</span></td><td><input class="fi mp-product" list="purchase-product-options" placeholder="Product name" onfocus="refreshPurchaseProductSuggestions()" onchange="applyPurchaseProductSuggestion(this)"></td><td><input class="fi mono mp-qty" value="1" oninput="calcManualPurchase()"></td><td><select class="fi mp-unit">${unitOptionsHtml('PCS')}</select></td><td><input class="fi mono mp-cost" value="0.00" oninput="calcManualPurchase()"></td><td><input class="fi mono mp-discount-pct" value="0" oninput="calcManualPurchase()"></td><td class="mono mp-before-tax">0.00</td><td class="mono mp-line-total">0.00</td><td><input class="fi mono mp-margin" value="0" oninput="calcManualPurchase()"></td><td class="mono mp-selling">0.00</td><td><button class="icon-btn danger" type="button" onclick="removeManualPurchaseLine(this)" title="Remove line">${deleteIconSvg()}</button></td>`;
   tbody.appendChild(row);
   calcManualPurchase();
-  refreshEnhancedTable(tbody.closest('table'));
+}
+
+function importManualPurchaseProducts(){
+  const fileInput=document.getElementById('mp-file');
+  if(fileInput?.files?.length){
+    toast(`${fileInput.files.length} attached file(s) ready for purchase import`,'info');
+    return;
+  }
+  toast('Choose a purchase document first, then import products','info');
+  fileInput?.click();
 }
 
 function removeManualPurchaseLine(btn){
   btn.closest('tr')?.remove();
   calcManualPurchase();
-  refreshEnhancedTable(document.getElementById('mp-lines')?.closest('table'));
 }
 
 function manualPurchaseLineHasValue(row){
@@ -4049,6 +4455,30 @@ function collectManualPurchaseLines(){
       line_total:parseAmount(row.querySelector('.mp-line-total')?.textContent),
       selling_price_inc_tax:parseAmount(row.querySelector('.mp-selling')?.textContent)
     }));
+}
+
+function addManualPurchaseExpense(expense={}){
+  const box=document.getElementById('mp-expenses');
+  if(!box)return;
+  const row=document.createElement('div');
+  row.className='inv-item mp-expense-row';
+  row.innerHTML=`<input class="fi mp-expense-name" placeholder="Expense name" value="${escapeHtml(expense.name||'')}"><input class="fi mono mp-expense-amount" placeholder="0.00" value="${escapeHtml(expense.amount||'')}" oninput="calcManualPurchase()"><button class="btn btn-g" style="padding:4px 8px" onclick="removeManualPurchaseExpense(this)">x</button>`;
+  box.appendChild(row);
+  calcManualPurchase();
+}
+
+function removeManualPurchaseExpense(btn){
+  btn.closest('.mp-expense-row')?.remove();
+  calcManualPurchase();
+}
+
+function collectManualPurchaseExpenses(){
+  return [...document.querySelectorAll('#mp-expenses .mp-expense-row')]
+    .map(row=>({
+      name:(row.querySelector('.mp-expense-name')?.value||'Additional expense').trim(),
+      amount:parseAmount(row.querySelector('.mp-expense-amount')?.value)
+    }))
+    .filter(expense=>expense.amount>0);
 }
 
 function purchaseProductRecords(){
@@ -4125,7 +4555,7 @@ function calcManualPurchase(){
   let activeItems=0;
   rows.forEach((row,index)=>{
     const lineNo=row.querySelector('.line-no')||row.children[0];
-    lineNo.textContent=String(index+1);
+    if(lineNo)lineNo.textContent=String(index+1);
     const qty=parseAmount(row.querySelector('.mp-qty')?.value);
     const cost=parseAmount(row.querySelector('.mp-cost')?.value);
     const discountPct=parseAmount(row.querySelector('.mp-discount-pct')?.value);
@@ -4133,9 +4563,12 @@ function calcManualPurchase(){
     const beforeTax=cost*(1-(discountPct/100));
     const lineTotal=qty*beforeTax;
     const selling=beforeTax*(1+(margin/100))*1.05;
-    row.querySelector('.mp-before-tax').textContent=beforeTax.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
-    row.querySelector('.mp-line-total').textContent=lineTotal.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
-    row.querySelector('.mp-selling').textContent=selling.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const beforeTaxCell=row.querySelector('.mp-before-tax');
+    const lineTotalCell=row.querySelector('.mp-line-total');
+    const sellingCell=row.querySelector('.mp-selling');
+    if(beforeTaxCell)beforeTaxCell.textContent=beforeTax.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+    if(lineTotalCell)lineTotalCell.textContent=lineTotal.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+    if(sellingCell)sellingCell.textContent=selling.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
     if(manualPurchaseLineHasValue(row)){
       activeItems+=1;
       net+=lineTotal;
@@ -4148,7 +4581,8 @@ function calcManualPurchase(){
   const taxType=document.getElementById('mp-tax')?.value||'None';
   const tax=taxType.includes('5%')&&!taxType.toLowerCase().includes('exempt')?taxable*.05:0;
   const shipping=parseAmount(document.getElementById('mp-shipping')?.value);
-  const total=taxable+tax+shipping;
+  const extraExpenses=collectManualPurchaseExpenses().reduce((sum,expense)=>sum+Number(expense.amount||0),0);
+  const total=taxable+tax+shipping+extraExpenses;
   const paid=parseAmount(document.getElementById('mp-pay-amount')?.value);
   const due=Math.max(0,total-paid);
   setText('mp-total-items',String(activeItems));
@@ -4158,7 +4592,7 @@ function calcManualPurchase(){
   setText('mp-purchase-total',total.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
   setText('mp-grand-total',total.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
   setText('mp-payment-due',due.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
-  return {items:activeItems,net,discount,tax,shipping,total,paid,due};
+  return {items:activeItems,net,discount,tax,shipping,extraExpenses,total,paid,due};
 }
 
 function resetManualPurchase(){
@@ -4170,6 +4604,8 @@ function resetManualPurchase(){
   document.querySelectorAll('#p-manual select').forEach(select=>select.selectedIndex=0);
   const tbody=document.getElementById('mp-lines');
   if(tbody)tbody.innerHTML='';
+  const expenses=document.getElementById('mp-expenses');
+  if(expenses)expenses.innerHTML='';
   const ref=document.getElementById('mp-ref');
   if(ref)ref.disabled=false;
   setText('mp-form-title','Add Purchase');
@@ -4216,6 +4652,8 @@ async function saveManualPurchase(){
     discount:totals.discount,
     tax_amount:totals.tax,
     shipping:totals.shipping,
+    additional_expenses:collectManualPurchaseExpenses(),
+    additional_expense_amount:totals.extraExpenses,
     total:totals.total,
     paid:totals.paid,
     due:totals.due,
@@ -4236,6 +4674,7 @@ async function saveManualPurchase(){
     [...document.querySelectorAll('#purchase-record-tbody tr')].find(row=>row.children[0]?.textContent.trim()===manualPurchaseEditingRef)?.remove();
   }
   renderPurchaseRecord(record);
+  purchaseRecordsTotal=Math.max(purchaseRecordsTotal,purchaseRecordCache.size);
   audit(manualPurchaseEditingRef?'Updated manual purchase':'Added manual purchase',ref,'Saved');
   saveServer('purchaseRecords',record,{throwOnError:true})
     .then(()=>toast(wasEditing?'Purchase updated in database':'Purchase saved to database','ok'))
@@ -4243,11 +4682,14 @@ async function saveManualPurchase(){
   manualPurchaseEditingRef='';
   const refField=document.getElementById('mp-ref');
   if(refField)refField.disabled=false;
+  updatePurchaseRecordControls(purchaseRecordsTotal,purchaseRecordCache.size);
   stab(document.querySelector('#page-purchase .tab:nth-child(5)'),'p-records');
 }
 
 function purchaseRecordFromRow(row){
   if(!row)return null;
+  const cached=purchaseRecordCache.get(row.dataset.purchaseRef||row.children[0]?.textContent.trim());
+  if(cached)return cached;
   if(row.dataset.purchaseRecord){
     try{return JSON.parse(row.dataset.purchaseRecord);}catch(err){console.warn('Purchase row data parse failed:',err);}
   }
@@ -4301,6 +4743,9 @@ function editPurchaseRecord(btn){
   setFieldValue(document.getElementById('mp-notes'),purchase.notes||'');
   setFieldValue(document.getElementById('mp-shipping-details'),purchase.shipping_details||'');
   setFieldValue(document.getElementById('mp-shipping'),purchase.shipping||0);
+  const expensesBox=document.getElementById('mp-expenses');
+  if(expensesBox)expensesBox.innerHTML='';
+  (purchase.additional_expenses||[]).forEach(addManualPurchaseExpense);
   setFieldValue(document.getElementById('mp-pay-amount'),purchase.paid||0);
   setFieldValue(document.getElementById('mp-paid-on'),purchase.paid_on||'');
   setSelectValue(document.getElementById('mp-pay-method'),purchase.payment_method||'Cash');
@@ -4478,10 +4923,12 @@ function saveProd(){
   const row=document.createElement('tr');
   const vatText=vat.includes('0')&&!vat.includes('5')?'0% Zero':vat.includes('Exempt')?'Exempt':'5%';
   const vatClass=vatText==='5%'?'b-b':'b-t';
-  row.innerHTML=`<td class="mono">${escapeHtml(code)}</td><td>${escapeHtml(name)}</td><td><span class="b b-gray">${escapeHtml(category)}</span></td><td>${escapeHtml(unit)}</td><td class="mono">${price.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td><span class="b ${vatClass}">${escapeHtml(vatText)}</span></td><td><span class="b b-g">Active</span></td><td><button class="btn btn-g btn-sm" onclick="editProd(this.closest('tr').querySelector('td').textContent)">Edit</button></td>`;
+  row.dataset.cost=String(price);
+  row.innerHTML=`<td class="mono">${escapeHtml(code)}</td><td>${escapeHtml(name)}</td><td>Stock Item</td><td>${escapeHtml(category)}</td><td>${escapeHtml(unit)}</td><td>Main Store</td><td><span class="b b-g">Yes</span></td><td><span class="b ${vatClass}">${escapeHtml(vatText)}</span></td><td><span class="b b-g">Active</span></td>`;
   tbody.prepend(row);
   saveServer('products',{code,name,category,unit,price,vat});
   refreshInvoiceProductSuggestions();
+  refreshPurchaseProductSuggestions();
 
   closeM('m-product');
   if(shouldFillInvoice&&targetLine){
@@ -6368,9 +6815,9 @@ function initApp(){
   syncProductMasterOptions();
   setManualPurchaseDefaults();
   syncCompanyFromDatabase();
+  enhancePageTables('page-dashboard');
   syncDashboardFromDatabase().catch(err=>console.warn('Dashboard sync failed during init:',err));
   hydrateFromServer().catch(err=>console.warn('Database hydrate failed during init:',err));
-  enhancePageTables('page-dashboard');
   scheduleIdleTask(()=>{
     updateAccountSelectors();
     recalcJournal();
@@ -6384,5 +6831,3 @@ function initApp(){
 }
 
 initApp();
-
-

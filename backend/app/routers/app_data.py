@@ -14,7 +14,8 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -78,6 +79,45 @@ def serialize(record: AppDataRecord) -> dict[str, Any]:
         return {}
 
 
+@router.get("/records/{collection}")
+def list_collection_records(
+    collection: str,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    total = (
+        db.query(func.count(AppDataRecord.id))
+        .filter(
+            AppDataRecord.company_id == current_user.company_id,
+            AppDataRecord.collection == collection,
+        )
+        .scalar()
+        or 0
+    )
+    rows = (
+        db.query(AppDataRecord)
+        .filter(
+            AppDataRecord.company_id == current_user.company_id,
+            AppDataRecord.collection == collection,
+        )
+        .order_by(AppDataRecord.created_at.desc(), AppDataRecord.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return {
+        "ok": True,
+        "collection": collection,
+        "records": [serialize(row) for row in rows],
+        "limit": limit,
+        "offset": offset,
+        "total": total,
+        "has_more": offset + len(rows) < total,
+    }
+
+
 @router.get("")
 def bootstrap(
     db: Session = Depends(get_db),
@@ -91,6 +131,8 @@ def bootstrap(
     )
     grouped: dict[str, list[dict[str, Any]]] = {}
     for item in records:
+        if item.collection == "purchaseRecords":
+            continue
         grouped.setdefault(item.collection, []).append(serialize(item))
 
     audit_rows = (

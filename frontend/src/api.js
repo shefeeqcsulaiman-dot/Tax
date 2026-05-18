@@ -1,4 +1,10 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+function defaultApiBaseUrl() {
+  const currentHost = window.location.hostname || "127.0.0.1";
+  const host = ["localhost", "::1", ""].includes(currentHost) ? "127.0.0.1" : currentHost;
+  return `http://${host}:8000/api/v1`;
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || defaultApiBaseUrl();
 
 export function getToken() {
   return localStorage.getItem("taxflow_token");

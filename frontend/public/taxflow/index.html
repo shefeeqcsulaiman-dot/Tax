@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TaxFlow UAE — Business Management Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" href="src/styles.css" as="style">
+<link rel="preload" href="src/app.js" as="script">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="src/styles.css">
 </head>
@@ -610,7 +614,7 @@
     <div class="card mb16">
       <div class="card-hd">
         <div><div class="card-title">Purchase Products</div><div class="card-sub">Add product lines and TaxFlow will calculate item totals automatically</div></div>
-        <div class="flx"><button class="btn btn-g btn-sm" onclick="toast('Product import ready','info')">Import Products</button><button class="btn btn-p btn-sm" onclick="addManualPurchaseLine()">+ Add Product</button></div>
+        <div class="flx"><button class="btn btn-g btn-sm" onclick="importManualPurchaseProducts()">Import Products</button><button class="btn btn-p btn-sm" onclick="addManualPurchaseLine()">+ Add Product</button></div>
       </div>
       <table class="tbl" data-delete-actions-bound="skip" data-no-table-tools="1">
         <thead><tr><th class="line-no-head">#</th><th>Product Name</th><th>Purchase Quantity</th><th>Unit of Measure</th><th>Unit Cost Before Discount</th><th>Discount %</th><th>Unit Cost Before Tax</th><th>Line Total</th><th>Profit Margin %</th><th>Unit Selling Price Inc. Tax</th><th></th></tr></thead>
@@ -646,7 +650,8 @@
         <div class="fg"><label class="fl">Shipping Details</label><input class="fi" id="mp-shipping-details"></div>
         <div class="fg"><label class="fl">(+) Additional Shipping Charges</label><input class="fi mono" id="mp-shipping" value="0" oninput="calcManualPurchase()"></div>
       </div>
-      <div class="flx-b"><button class="btn btn-g btn-sm" onclick="toast('Additional expense row added','info')">+ Add additional expenses</button><div><strong>Purchase Total:</strong> <span class="mono" id="mp-grand-total">0.00</span></div></div>
+      <div class="flx-b"><button class="btn btn-g btn-sm" onclick="addManualPurchaseExpense()">+ Add additional expenses</button><div><strong>Purchase Total:</strong> <span class="mono" id="mp-grand-total">0.00</span></div></div>
+      <div id="mp-expenses" class="mt12"></div>
     </div>
 
     <div class="card">
@@ -665,7 +670,18 @@
 
   <div class="tab-body" id="p-records">
     <div class="card">
-      <div class="card-hd"><div class="card-title">Purchase Records</div><button class="btn btn-p btn-sm" onclick="stab(document.querySelector('#page-purchase .tab:nth-child(4)'),'p-manual')">+ Manual Entry</button></div>
+      <div class="card-hd">
+        <div>
+          <div class="card-title">Purchase Records</div>
+          <div class="card-sub" id="purchase-record-count">Loading purchase records...</div>
+        </div>
+        <div class="flx">
+          <button class="btn btn-g btn-sm" id="purchase-show-recent-btn" type="button" onclick="showRecentPurchaseRecords()">Show Recent</button>
+          <button class="btn btn-g btn-sm" id="purchase-load-more-btn" type="button" onclick="loadMorePurchaseRecords()">Load More</button>
+          <button class="btn btn-g btn-sm" type="button" onclick="addFourPurchaseRecords()">Add 4 Data</button>
+          <button class="btn btn-p btn-sm" type="button" onclick="stab(document.querySelector('#page-purchase .tab:nth-child(4)'),'p-manual')">+ Manual Entry</button>
+        </div>
+      </div>
       <table class="tbl">
         <thead><tr><th>Ref No.</th><th>Supplier</th><th>Date</th><th>Location</th><th>Items</th><th>Net Amount</th><th>Tax</th><th>Shipping</th><th>Total</th><th>Paid</th><th>Due</th><th>Source</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="purchase-record-tbody">
@@ -4678,4 +4694,3 @@ period_locks ─< audit_logs
 <script src="src/app.js" defer></script>
 </body>
 </html>
-

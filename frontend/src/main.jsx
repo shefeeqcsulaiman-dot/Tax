@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { api, clearToken, getToken, setToken } from "./api";
 import "./styles.css";
 
+const TAXFLOW_LEGACY_VERSION = "20260517-invoice-edit";
+
 function App() {
   const [tokenReady, setTokenReady] = useState(Boolean(getToken()));
   const [error, setError] = useState("");
@@ -41,6 +43,7 @@ function App() {
 
 function TaxFlowLegacyApp({ onLogout }) {
   const mountedRef = useRef(false);
+  const [loadMessage, setLoadMessage] = useState("Preparing TaxFlow...");
 
   useEffect(() => {
     if (mountedRef.current) return;
@@ -48,15 +51,19 @@ function TaxFlowLegacyApp({ onLogout }) {
     let cancelled = false;
 
     async function mountOriginalDesign() {
-      const response = await fetch(`/taxflow/index.html?v=${Date.now()}`, { cache: "no-store" });
+      setLoadMessage("Loading workspace...");
+      preloadTaxFlowAssets();
+      const response = await fetch(versionedTaxFlowUrl("/taxflow/index.html"), { cache: "default" });
+      if (!response.ok) throw new Error(`TaxFlow shell returned ${response.status}`);
       const html = await response.text();
       if (cancelled) return;
 
+      setLoadMessage("Building interface...");
       const doc = new DOMParser().parseFromString(html, "text/html");
       document.body.className = doc.body.className || "theme-light";
       document.title = doc.title || "TaxFlow UAE - Business Management Platform";
       ensureStylesheet("taxflow-fonts", "https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap");
-      ensureStylesheet("taxflow-original-css", `/taxflow/src/styles.css?v=${Date.now()}`);
+      ensureStylesheet("taxflow-original-css", versionedTaxFlowUrl("/taxflow/src/styles.css"));
 
       document.body.innerHTML = doc.body.innerHTML
         .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -65,17 +72,15 @@ function TaxFlowLegacyApp({ onLogout }) {
       window.__taxflowLogout = onLogout;
       const localApiHost = ["localhost", "::1", ""].includes(window.location.hostname) ? "127.0.0.1" : window.location.hostname;
       window.TAXFLOW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || `http://${localApiHost}:8000/api/v1`;
-      await loadScriptFresh(`/taxflow/src/app.js?v=${Date.now()}`);
+      setLoadMessage("Starting app...");
+      await loadScriptOnce("taxflow-original-js", versionedTaxFlowUrl("/taxflow/src/app.js"));
       patchLegacyLogout(onLogout);
       patchBackendBridge();
       if (!window.__taxflowAppInitialized) window.initApp?.();
       window.go?.("dashboard");
-      try {
+      window.setTimeout?.(() => {
         window.forceDbRefresh?.();
-        window.setTimeout?.(() => window.forceDbRefresh?.(), 700);
-      } catch (refreshError) {
-        console.warn("TaxFlow database refresh failed after mount:", refreshError);
-      }
+      }, 250);
       window.toast?.("TaxFlow app loaded", "ok");
     }
 
@@ -88,7 +93,27 @@ function TaxFlowLegacyApp({ onLogout }) {
     };
   }, [onLogout]);
 
-  return null;
+  return (
+    <main className="taxflow-loader" aria-live="polite">
+      <div className="taxflow-loader-box">
+        <div className="loader-brand">Tax<span>Flow</span></div>
+        <div className="loader-bar"><span /></div>
+        <p>{loadMessage}</p>
+      </div>
+    </main>
+  );
+}
+
+function preloadTaxFlowAssets() {
+  ensureResourceHint("taxflow-fonts-preconnect", "preconnect", "https://fonts.googleapis.com");
+  ensureResourceHint("taxflow-fonts-static-preconnect", "preconnect", "https://fonts.gstatic.com", true);
+  ensureResourceHint("taxflow-html-prefetch", "prefetch", versionedTaxFlowUrl("/taxflow/index.html"));
+  ensureResourceHint("taxflow-css-preload", "preload", versionedTaxFlowUrl("/taxflow/src/styles.css"), false, "style");
+  ensureResourceHint("taxflow-js-preload", "preload", versionedTaxFlowUrl("/taxflow/src/app.js"), false, "script");
+}
+
+function versionedTaxFlowUrl(path) {
+  return `${path}?v=${TAXFLOW_LEGACY_VERSION}`;
 }
 
 function ensureStylesheet(id, href) {
@@ -104,11 +129,37 @@ function ensureStylesheet(id, href) {
   document.head.appendChild(link);
 }
 
-function loadScriptFresh(src) {
+function ensureResourceHint(id, rel, href, crossOrigin = false, as) {
+  if (document.getElementById(id)) return;
+  const link = document.createElement("link");
+  link.id = id;
+  link.rel = rel;
+  link.href = href;
+  if (as) link.as = as;
+  if (crossOrigin) link.crossOrigin = "";
+  document.head.appendChild(link);
+}
+
+function loadScriptOnce(id, src) {
   return new Promise((resolve, reject) => {
+    const existing = document.getElementById(id);
+    if (existing) {
+      if (existing.dataset.loaded === "true") {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", resolve, { once: true });
+      existing.addEventListener("error", () => reject(new Error(`Failed to load ${src}`)), { once: true });
+      return;
+    }
     const script = document.createElement("script");
+    script.id = id;
     script.src = src;
-    script.onload = resolve;
+    script.defer = true;
+    script.onload = () => {
+      script.dataset.loaded = "true";
+      resolve();
+    };
     script.onerror = () => reject(new Error(`Failed to load ${src}`));
     document.body.appendChild(script);
   });

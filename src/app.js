@@ -10,6 +10,14 @@ META.notifications={t:'Notifications',s:'Email - WhatsApp - SMS - Push - In-app 
 META.rota={t:'Rota Planning',s:'Shift setup - Weekly rota - Coverage - Swap requests',a:'Publish Rota',ao:()=>publishRota()};
 META.accounting={t:'Accounting',s:'Chart - Journal - Ledger - Tax - Closing',a:'+ Journal Entry',ao:()=>{go('accounting');setTimeout(()=>stab(document.querySelectorAll('#page-accounting .tab')[1],'acc-journal'),50)}};
 
+function scheduleIdleTask(fn,timeout=800){
+  if('requestIdleCallback' in window){
+    window.requestIdleCallback(fn,{timeout});
+  }else{
+    setTimeout(fn,0);
+  }
+}
+
 function go(page){
   if(page==='company'){
     go('settings');
@@ -2091,12 +2099,12 @@ function initApp(){
   setInvoiceLayoutFields();
   updateInvoiceLayoutPreview();
   hydrateFromServer();
-  updateAccountSelectors();
-  recalcJournal();
-  recalcPayroll();
-  calcGratuity();
+  scheduleIdleTask(()=>{
+    updateAccountSelectors();
+    recalcJournal();
+    recalcPayroll();
+    calcGratuity();
+  },900);
 }
 
 initApp();
-
-
