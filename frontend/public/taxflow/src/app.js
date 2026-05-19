@@ -126,6 +126,13 @@ function go(page){
   document.querySelectorAll('.nav').forEach(n=>n.classList.remove('on'));
   target.classList.add('on');
   document.querySelectorAll('.nav').forEach(n=>{if((n.getAttribute('onclick')||'').includes("'"+page+"'"))n.classList.add('on');});
+  if(page==='corporate'){
+    const corpPage=document.getElementById('page-corporate');
+    corpPage?.querySelectorAll('.tab').forEach(tab=>tab.classList.remove('on'));
+    corpPage?.querySelectorAll('.tab-body').forEach(body=>body.classList.remove('on'));
+    corpPage?.querySelector('.tab')?.classList.add('on');
+    document.getElementById('corp-tax')?.classList.add('on');
+  }
   const m=META[page];
   document.getElementById('ptitle').textContent=m.t;
   document.getElementById('psub').textContent=m.s;
@@ -135,6 +142,7 @@ function go(page){
   if(page==='reports')syncReportsFromDatabase();
   if(page==='exception')loadExceptionCenter();
   if(page==='inventory')ensurePurchaseRecordsLoadedForStock();
+  if(page==='accounting')loadAccountingFromDb();
   runPageWarmup(page);
   updateBackButton();
 }
@@ -153,6 +161,8 @@ function stab(el,target){
   if(target==='inv-mapping')loadStockMappingsFromServer();
   if(target==='inv-stock')ensurePurchaseRecordsLoadedForStock();
   if(target==='p-records')ensurePurchaseRecordsLoaded();
+  if(target==='acc-journal')prepareJournalForm();
+  if(target==='acc-ledger')loadAccountingFromDb();
   if(target==='p-manual'){
     bindManualPurchaseCalculator();
     setManualPurchaseDefaults();
@@ -1291,10 +1301,8 @@ function renderDatabaseDashboardSummary(data){
     {label:'Source Transactions',count:counts.source_transaction_count,page:'purchase',tab:'p-records',icon:'SRC',tone:'amber',copy:'Sales, purchase, and payment sources'},
     {label:'Tax Codes',count:counts.tax_code_count,page:'settings',tab:'set-tax',icon:'VAT',tone:'green',copy:'VAT setup and tax rules'},
     {label:'Tax Lines',count:counts.tax_line_count,page:'reports',tab:'rep-vat',icon:'TAX',tone:'red',copy:'VAT report lines'},
-    {label:'Warehouses',count:counts.warehouse_count,page:'inventory',tab:'inv-stock',icon:'WH',tone:'teal',copy:'Warehouse stock dashboard'},
     {label:'Inventory Mappings',count:counts.inventory_mapping_count,page:'inventory',tab:'inv-mapping',icon:'SKU',tone:'accent',copy:'Product and stock mappings'},
     {label:'Employees',count:counts.employee_count,page:'staff',tab:'staff-list',icon:'HR',tone:'purple',copy:'Staff management'},
-    {label:'Jobs',count:counts.job_count,page:'notifications',icon:'JOB',tone:'amber',copy:'Background jobs and alerts'},
     {label:'Documents',count:counts.document_count,page:'documents',icon:'DOC',tone:'green',copy:'Uploaded files and attachments'},
     {label:'Audit Logs',count:counts.audit_count,page:'settings',tab:'set-backup',icon:'LOG',tone:'red',copy:'Backup and audit trail'}
   ];
@@ -2399,10 +2407,12 @@ function addFourPurchaseRecords(){
 function renderAccountRecord(account){
   const tbody=document.getElementById('account-tbody');
   if(!tbody||!account?.code||hasFirstCellValue(tbody,account.code))return;
-  const typeClass={Asset:'b-t',Liability:'b-r',Revenue:'b-g',Expense:'b-p',Equity:'b-b'}[account.type]||'b-gray';
+  const type=titleCase(account.type||'Asset');
+  const typeClass={Asset:'b-t',Liability:'b-r',Revenue:'b-g',Expense:'b-p',Equity:'b-b'}[type]||'b-gray';
   const row=document.createElement('tr');
   row.dataset.serverRecord='accounts';
-  row.innerHTML=`<td class="mono">${escapeHtml(account.code)}</td><td>${escapeHtml(account.name)}</td><td><span class="b ${typeClass}">${escapeHtml(account.type||'Asset')}</span></td><td>${escapeHtml(account.category||'Current')}</td><td class="mono">0.00</td><td><span class="b b-g">Active</span></td><td><button class="btn btn-g btn-sm" onclick="viewAccountLedger(this)">View</button></td>`;
+  row.dataset.accountId=account.id||'';
+  row.innerHTML=`<td class="mono">${escapeHtml(account.code)}</td><td>${escapeHtml(account.name)}</td><td><span class="b ${typeClass}">${escapeHtml(type)}</span></td><td>${escapeHtml(account.category||'Current')}</td><td class="mono">0.00</td><td><span class="b ${account.is_active===false?'b-gray':'b-g'}">${account.is_active===false?'Inactive':'Active'}</span></td><td><button class="btn btn-g btn-sm" onclick="viewAccountLedger(this)">View</button></td>`;
   removeEmptyState(tbody);
   tbody.appendChild(row);
 }
@@ -2420,6 +2430,27 @@ function renderRecordList(records,renderRecord,label){
     }
   });
   return {rendered,failed};
+}
+
+function clearTableBody(id,message){
+  const tbody=document.getElementById(id);
+  if(!tbody)return null;
+  const cols=tbody.closest('table')?.querySelectorAll('thead th').length||1;
+  tbody.innerHTML=`<tr data-empty-state="1"><td colspan="${cols}" style="color:var(--text3);text-align:center">${escapeHtml(message)}</td></tr>`;
+  return tbody;
+}
+
+function replaceTableBody(id,records,renderRow,message){
+  const tbody=clearTableBody(id,message);
+  if(!tbody)return;
+  if(Array.isArray(records)&&records.length){
+    tbody.innerHTML=records.map(renderRow).join('');
+  }
+  refreshEnhancedTable(tbody.closest('table'));
+}
+
+function titleCase(value){
+  return String(value||'').toLowerCase().replace(/\b\w/g,ch=>ch.toUpperCase());
 }
 
 function hydrateFromServer(){
@@ -2480,6 +2511,8 @@ function hydrateFromServer(){
     refreshPurchaseProductSuggestions();
     refreshQuotationProductOptions();
     loadStockMappingsFromServer();
+    loadAccountingFromDb();
+    loadCorporateAccountingFromDb(data);
     filterLedger();
     refreshActivePageTables();
     refreshInitializedTables();
@@ -2528,13 +2561,79 @@ async function requestInvoiceExtraction(entry){
     const data=await response.json();
     const invoices=Array.isArray(data)?data:data.invoices;
     if(!Array.isArray(invoices))throw new Error('Extraction service returned an invalid payload');
-    return invoices;
+    return normalizeExtractedPurchaseInvoices(invoices,entry.name);
   }catch(err){
     if(!APP_CONFIG.extractionFallback)throw err;
     console.warn('Extraction unavailable:',err);
     toast('Extraction unavailable. No demo data was added.','warn');
     return buildFallbackExtraction(entry);
   }
+}
+
+function normalizeExtractedPurchaseInvoices(invoices=[],filename=''){
+  const grouped=new Map();
+  (invoices||[]).forEach((source,index)=>{
+    const inv={...(source||{})};
+    const fallbackNo=String(inv.invoice_no||inv.invoice_number||inv.ref||'').trim()||`${filename||'PURCHASE'}-${index+1}`;
+    const key=invoiceKey(fallbackNo);
+    if(!grouped.has(key)){
+      grouped.set(key,{
+        ...inv,
+        invoice_no:fallbackNo,
+        subtotal:Number(inv.subtotal||inv.net_amount||0),
+        vat_amount:Number(inv.vat_amount||inv.tax_amount||0),
+        total:Number(inv.total||0),
+        paid:Number(inv.paid||0),
+        shipping:Number(inv.shipping||0),
+        confidence:Number(inv.confidence||0),
+        lines:[]
+      });
+    }
+    const target=grouped.get(key);
+    ['date','supplier','supplier_trn','address','pay_term','payment_method','payment_account','payment_note','paid_on','shipping_details','notes','tax_type','discount_type','status','issues'].forEach(field=>{
+      if(!target[field]&&inv[field])target[field]=inv[field];
+    });
+    target.confidence=Math.max(Number(target.confidence||0),Number(inv.confidence||0));
+    target.subtotal=Math.max(Number(target.subtotal||0),Number(inv.subtotal||inv.net_amount||0));
+    target.vat_amount=Math.max(Number(target.vat_amount||0),Number(inv.vat_amount||inv.tax_amount||0));
+    target.total=Math.max(Number(target.total||0),Number(inv.total||0));
+    target.paid=Math.max(Number(target.paid||0),Number(inv.paid||0));
+    target.shipping=Math.max(Number(target.shipping||0),Number(inv.shipping||0));
+    const lines=Array.isArray(inv.lines)&&inv.lines.length?inv.lines:[lineFromInvoiceLike(inv)];
+    lines.filter(Boolean).forEach(line=>{
+      const product=purchaseAiProductName(line);
+      const qty=Number(line.quantity||line.qty||0);
+      const amount=Number(line.line_total||line.amount||0);
+      const duplicate=target.lines.some(existing=>
+        purchaseAiProductName(existing).toLowerCase()===product.toLowerCase()&&
+        Number(existing.quantity||existing.qty||0)===qty&&
+        Number(existing.line_total||existing.amount||0)===amount
+      );
+      if(!duplicate)target.lines.push(line);
+    });
+  });
+  return [...grouped.values()].map(inv=>{
+    const lineSubtotal=inv.lines.reduce((sum,line)=>sum+Number(line.line_total||line.amount||0),0);
+    if(lineSubtotal&&(!Number(inv.subtotal||0)||inv.lines.length>1))inv.subtotal=Math.max(Number(inv.subtotal||0),lineSubtotal);
+    if(!Number(inv.total||0))inv.total=Number(inv.subtotal||0)+Number(inv.vat_amount||0)+Number(inv.shipping||0);
+    inv.due=Math.max(0,Number(inv.total||0)-Number(inv.paid||0));
+    inv.items=inv.lines.length;
+    return inv;
+  });
+}
+
+function lineFromInvoiceLike(inv={}){
+  const product=purchaseAiProductName(inv)||'Extracted purchase item';
+  const subtotal=Number(inv.subtotal||inv.net_amount||inv.line_total||inv.amount||0);
+  if(!product&&!subtotal)return null;
+  return {
+    product,
+    quantity:Number(inv.quantity||inv.qty||1),
+    unit:inv.unit||'PCS',
+    unit_cost:Number(inv.unit_cost||inv.cost||subtotal||0),
+    line_total:subtotal||Number(inv.total||0),
+    raw:inv.raw||{}
+  };
 }
 
 const salesUploadedFiles = [];
@@ -4232,16 +4331,16 @@ async function extractSingleFile(entry){
     const extractionFailed=isExtractionErrorResult(invoices);
 
     entry.status=extractionFailed?'Error':'Extracted';
-    entry.invoices=invoices;
+    entry.invoices=normalizeExtractedPurchaseInvoices(invoices,entry.name);
     entry.savedInvoiceNos=entry.savedInvoiceNos||new Set();
     entry.extractedAt=new Date().toISOString();
     persistPurchaseDocumentRecord(entry);
     renderFileList();
-    await appendExtractedRows(invoices,entry.name);
+    await appendExtractedRows(entry.invoices,entry.name);
     updateExtractionStats();
     try{
       updatePurchaseValidationFileStatus();
-      buildValidationPanel(invoices);
+      buildValidationPanel(entry.invoices);
     }catch(panelErr){
       console.warn('Purchase validation status update failed:',panelErr);
     }
@@ -4252,9 +4351,9 @@ async function extractSingleFile(entry){
     setTimeout(()=>{ep.style.display='none';ef.style.width='0%';},600);
     toast(extractionFailed
       ? `Extraction needs review for ${entry.name}`
-      : `Extracted ${invoices.length} invoice(s) from ${entry.name} ?`, extractionFailed?'warn':'ok');
+      : `Extracted ${entry.invoices.length} invoice(s) from ${entry.name} ?`, extractionFailed?'warn':'ok');
 
-    if(invoices.some(i=>!validatePurchaseAiInvoice(i).valid)){
+    if(entry.invoices.some(i=>!validatePurchaseAiInvoice(i).valid)){
       toast('Validation issues found - review required','warn');
     }
 
@@ -6244,11 +6343,26 @@ function saveProd(){
 }
 
 // -- ACCOUNTING ---------------------------------------------------
+function accountLabelFromRow(row){
+  const cells=row?.querySelectorAll('td')||[];
+  return `${cells[1]?.textContent.trim()||'Account'} (${cells[0]?.textContent.trim()||'0000'})`;
+}
+
+function accountRowById(id){
+  return [...document.querySelectorAll('#account-tbody tr')].find(row=>row.dataset.accountId===String(id||''));
+}
+
+function accountLabelFromId(id){
+  const row=accountRowById(id);
+  return row?accountLabelFromRow(row):String(id||'Account');
+}
+
 function accountOptionsHtml(){
-  const rows=[...document.querySelectorAll('#account-tbody tr')];
+  const rows=[...document.querySelectorAll('#account-tbody tr:not([data-empty-state])')];
   return '<option>Select Account...</option>'+rows.map(row=>{
-    const cells=row.querySelectorAll('td');
-    return `<option>${escapeHtml(cells[1]?.textContent.trim()||'Account')} (${escapeHtml(cells[0]?.textContent.trim()||'0000')})</option>`;
+    const id=row.dataset.accountId||accountLabelFromRow(row);
+    const label=accountLabelFromRow(row);
+    return `<option value="${escapeHtml(id)}">${escapeHtml(label)}</option>`;
   }).join('');
 }
 
@@ -6257,7 +6371,7 @@ function addJournalLine(account='',debit='',credit=''){
   if(!wrap)return null;
   const row=document.createElement('div');
   row.className='inv-item journal-line';
-  row.innerHTML=`<select class="fi journal-account" onchange="recalcJournal()">${accountOptionsHtml()}</select><input class="fi mono journal-debit" placeholder="0.00" value="${escapeHtml(debit)}" oninput="recalcJournal()"><input class="fi mono journal-credit" placeholder="0.00" value="${escapeHtml(credit)}" oninput="recalcJournal()"><button class="btn btn-g" style="padding:4px 8px" onclick="remJournalLine(this)">?</button>`;
+  row.innerHTML=`<select class="fi journal-account" onchange="recalcJournal()">${accountOptionsHtml()}</select><input class="fi mono journal-debit" placeholder="0.00" value="${escapeHtml(debit)}" oninput="recalcJournal()"><input class="fi mono journal-credit" placeholder="0.00" value="${escapeHtml(credit)}" oninput="recalcJournal()"><button class="btn btn-g" style="padding:4px 8px" onclick="remJournalLine(this)">x</button>`;
   wrap.appendChild(row);
   if(account)row.querySelector('.journal-account').value=account;
   recalcJournal();
@@ -6265,13 +6379,46 @@ function addJournalLine(account='',debit='',credit=''){
 }
 
 function remJournalLine(btn){
+  const lines=document.querySelectorAll('#journal-lines .journal-line');
+  if(lines.length<=2){
+    const row=btn.closest('.journal-line');
+    row?.querySelectorAll('input').forEach(input=>input.value='');
+    row?.querySelector('select')&&(row.querySelector('select').value='Select Account...');
+    recalcJournal();
+    return;
+  }
   btn.closest('.journal-line')?.remove();
+  recalcJournal();
+}
+
+function nextJournalReference(){
+  return `JE-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+}
+
+function prepareJournalForm(force=false){
+  const date=document.getElementById('journal-date');
+  if(date&&(!date.value||force))date.value=new Date().toISOString().slice(0,10);
+  const ref=document.getElementById('journal-ref');
+  if(ref&&(!ref.value||force))ref.value=nextJournalReference();
+  const desc=document.getElementById('journal-desc');
+  if(desc&&force)desc.value='';
+  const wrap=document.getElementById('journal-lines');
+  if(wrap&&force){
+    wrap.innerHTML='';
+    addJournalLine();
+    addJournalLine();
+  }else if(wrap&&!wrap.querySelector('.journal-line')){
+    addJournalLine();
+    addJournalLine();
+  }
+  updateAccountSelectors();
   recalcJournal();
 }
 
 function getJournalLines(){
   return [...document.querySelectorAll('#journal-lines .journal-line')].map(row=>({
-    account:row.querySelector('.journal-account')?.value||'',
+    account_id:row.querySelector('.journal-account')?.value||'',
+    account:row.querySelector('.journal-account')?.selectedOptions?.[0]?.textContent||'',
     debit:parseAmount(row.querySelector('.journal-debit')?.value),
     credit:parseAmount(row.querySelector('.journal-credit')?.value)
   }));
@@ -6295,63 +6442,122 @@ function recalcJournal(){
 
 function saveJournalDraft(){
   recalcJournal();
-  toast('Journal draft saved','ok');
-  audit('Saved journal draft',document.getElementById('journal-ref')?.value||'Draft','Saved');
+  const ref=(document.getElementById('journal-ref')?.value||nextJournalReference()).trim();
+  const record={
+    ref,
+    date:document.getElementById('journal-date')?.value||new Date().toISOString().slice(0,10),
+    description:document.getElementById('journal-desc')?.value||'Draft journal',
+    source:document.getElementById('journal-source')?.value||'Manual',
+    status:'Draft',
+    lines:getJournalLines().filter(line=>line.account_id&&line.account!=='Select Account...'&&(line.debit||line.credit))
+  };
+  saveServer('journalDrafts',record);
+  toast('Journal draft saved to database','ok');
+  audit('Saved journal draft',ref,'Saved');
 }
 
-function postLedgerLine({date,ref,description,debit=0,credit=0,account=''},{persist=true}={}){
+function postLedgerLine({date,ref,description,debit=0,credit=0,account='',account_id=''},{persist=true}={}){
   const tbody=document.getElementById('ledger-tbody');
   if(!tbody)return;
   const balance=debit-credit;
   const fmt=n=>Number(n||0).toLocaleString('en-AE',{maximumFractionDigits:2});
   const row=document.createElement('tr');
-  row.dataset.account=account.replace(/\s*\(\d+\)\s*$/,'');
-  row.innerHTML=`<td>${escapeHtml(date)}</td><td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(description)}${account?' - '+escapeHtml(account):''}</td><td class="mono">${debit?fmt(debit):'-'}</td><td class="mono">${credit?fmt(credit):'-'}</td><td class="mono">${fmt(balance)}</td>`;
+  const label=account||accountLabelFromId(account_id);
+  row.dataset.account=label.replace(/\s*\(\d+\)\s*$/,'');
+  row.dataset.accountId=account_id||'';
+  row.innerHTML=`<td>${escapeHtml(date)}</td><td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(description)}${label?' - '+escapeHtml(label):''}</td><td class="mono">${debit?fmt(debit):'-'}</td><td class="mono">${credit?fmt(credit):'-'}</td><td class="mono">${fmt(balance)}</td>`;
+  removeEmptyState(tbody);
   tbody.prepend(row);
   if(persist)saveServer('ledger',{date,ref,description,debit,credit,account});
 }
 
-function postJournalEntry(){
+function renderJournalEntry(entry){
+  const date=(entry.entry_date||entry.created_at||'').slice(0,10)||'Today';
+  (entry.lines||[]).forEach(line=>postLedgerLine({
+    date,
+    ref:entry.entry_number||entry.ref||'JE',
+    description:line.description||entry.description||'Journal',
+    debit:Number(line.debit||0),
+    credit:Number(line.credit||0),
+    account_id:line.account_id,
+    account:line.account||accountLabelFromId(line.account_id)
+  },{persist:false}));
+}
+
+async function loadAccountingFromDb(){
+  try{
+    const accounts=await moduleApi('/accounts');
+    clearTableBody('account-tbody','No accounts in database yet.');
+    (accounts||[]).forEach(renderAccountRecord);
+    updateAccountSelectors();
+    const journals=await moduleApi('/journal');
+    clearTableBody('ledger-tbody','No journal entries in database yet.');
+    (journals||[]).slice().reverse().forEach(renderJournalEntry);
+    filterLedger();
+    refreshEnhancedTable(document.getElementById('account-tbody')?.closest('table'));
+    refreshEnhancedTable(document.getElementById('ledger-tbody')?.closest('table'));
+    prepareJournalForm();
+  }catch(err){
+    console.warn('Accounting database load failed:',err);
+  }
+}
+
+async function postJournalEntry(){
   const date=document.getElementById('journal-date')?.value||'';
   const ref=(document.getElementById('journal-ref')?.value||'').trim();
   const desc=(document.getElementById('journal-desc')?.value||'').trim();
+  const source=(document.getElementById('journal-source')?.value||'Manual').toLowerCase();
   const rawLines=getJournalLines();
-  const lines=getJournalLines().filter(line=>line.account&&line.account!=='Select Account...'&&(line.debit||line.credit));
+  const lines=getJournalLines().filter(line=>line.account_id&&line.account!=='Select Account...'&&(line.debit||line.credit));
   const totals=recalcJournal();
 
   if(!date){toast('Journal date is required','err');return;}
   if(!ref){toast('Reference number is required','err');return;}
   if(!desc){toast('Description is required','err');return;}
-  if(rawLines.some(line=>(line.debit||line.credit)&&(!line.account||line.account==='Select Account...'))){toast('Select an account for every amount line','err');return;}
+  if(rawLines.some(line=>(line.debit||line.credit)&&(!line.account_id||line.account==='Select Account...'))){toast('Select an account for every amount line','err');return;}
   if(lines.length<2){toast('Add at least two journal lines','err');return;}
   if(lines.some(line=>line.debit&&line.credit)){toast('A line cannot have both debit and credit','err');return;}
   if(Math.abs(totals.diff)>.01){toast('Journal must balance before posting','err');return;}
 
-  lines.forEach(line=>postLedgerLine({date,ref,description:desc,debit:line.debit,credit:line.credit,account:line.account}));
-  toast('Journal entry posted ?','ok');
-  audit('Posted journal entry',ref,'Posted');
-  filterLedger();
+  try{
+    const saved=await moduleApi('/journal',{method:'POST',body:{
+      entry_number:ref,
+      entry_date:new Date(date).toISOString(),
+      description:desc,
+      source_module:source,
+      lines:lines.map(line=>({account_id:line.account_id,description:desc,debit:line.debit,credit:line.credit}))
+    }});
+    renderJournalEntry(saved);
+    toast('Journal entry posted to database','ok');
+    audit('Posted journal entry',ref,'Posted');
+    prepareJournalForm(true);
+    filterLedger();
+  }catch(err){
+    console.warn('Journal post failed:',err);
+    toast('Journal could not be posted to database','err');
+  }
 }
 
-function saveAccount(){
+async function saveAccount(){
   const code=(document.getElementById('acc-code')?.value||'').trim();
   const name=(document.getElementById('acc-name')?.value||'').trim();
   const type=document.getElementById('acc-type')?.value||'Asset';
   const category=document.getElementById('acc-category')?.value||'Current';
   if(!code||!name){toast('Account code and name are required','err');return;}
-  const tbody=document.getElementById('account-tbody');
-  if(!tbody)return;
-  if([...tbody.querySelectorAll('td:first-child')].some(td=>td.textContent.trim()===code)){toast('Account code already exists','err');return;}
-  const typeClass={Asset:'b-t',Liability:'b-r',Revenue:'b-g',Expense:'b-p',Equity:'b-b'}[type]||'b-gray';
-  const row=document.createElement('tr');
-  row.innerHTML=`<td class="mono">${escapeHtml(code)}</td><td>${escapeHtml(name)}</td><td><span class="b ${typeClass}">${escapeHtml(type)}</span></td><td>${escapeHtml(category)}</td><td class="mono">0.00</td><td><span class="b b-g">Active</span></td><td><button class="btn btn-g btn-sm" onclick="viewAccountLedger(this)">View</button></td>`;
-  tbody.appendChild(row);
-  saveServer('accounts',{code,name,type,category});
-  updateAccountSelectors();
-  closeM('m-acc');
-  ['acc-code','acc-name'].forEach(id=>{const field=document.getElementById(id);if(field)field.value='';});
-  toast('Account added to chart ?','ok');
-  audit('Added account',code+' '+name,'Saved');
+  if([...document.querySelectorAll('#account-tbody td:first-child')].some(td=>td.textContent.trim()===code)){toast('Account code already exists','err');return;}
+  try{
+    const saved=await moduleApi('/accounts',{method:'POST',body:{code,name,type:type.toLowerCase(),is_active:true}});
+    renderAccountRecord({...saved,category});
+    saveServer('accounts',{code,name,type,category,id:saved.id});
+    updateAccountSelectors();
+    closeM('m-acc');
+    ['acc-code','acc-name'].forEach(id=>{const field=document.getElementById(id);if(field)field.value='';});
+    toast('Account added to database','ok');
+    audit('Added account',code+' '+name,'Saved');
+  }catch(err){
+    console.warn('Account save failed:',err);
+    toast('Account could not be saved to database','err');
+  }
 }
 
 function updateAccountSelectors(){
@@ -6385,6 +6591,242 @@ function filterLedger(){
     const account=row.dataset.account||row.querySelector('td:nth-child(3)')?.textContent||'';
     row.style.display=filter==='All Accounts'||account.includes(filter)?'':'none';
   });
+}
+
+// -- CORPORATE ACCOUNTING ----------------------------------------
+function corporateAmount(value){
+  return Number(value||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function corporateBadge(value,type='status'){
+  const text=String(value||'Draft');
+  const lower=text.toLowerCase();
+  const cls=lower.includes('ready')||lower.includes('active')||lower.includes('approved')||lower.includes('documented')||lower.includes('matched')?'b-g':
+    lower.includes('review')||lower.includes('pending')||lower.includes('draft')||lower.includes('watch')?'b-a':
+    lower.includes('hold')||lower.includes('over')?'b-r':'b-b';
+  return `<span class="b ${cls}">${escapeHtml(text)}</span>`;
+}
+
+function updateCorporateTaxStats(records=[]){
+  const latest=records[0]||{};
+  const values=[
+    latest.accounting_profit||0,
+    latest.tax_adjustments||0,
+    latest.taxable_income||0,
+    latest.tax_due||0
+  ];
+  document.querySelectorAll('#corp-tax .stat-val').forEach((el,index)=>{
+    el.textContent='AED '+corporateAmount(values[index]);
+  });
+}
+
+function renderCorporateTax(records=[]){
+  updateCorporateTaxStats(records);
+  replaceTableBody('corp-tax-tbody',records,record=>`
+    <tr><td>${escapeHtml(record.period||'Current')}</td><td class="mono">${corporateAmount(record.taxable_income||0)}</td><td>${corporateBadge(record.status||'Draft')}</td></tr>
+  `,'No corporate tax records in database yet.');
+}
+
+function renderCorporateRelatedParty(records=[]){
+  replaceTableBody('corp-tax-related-tbody',records,record=>`
+    <tr><td>${escapeHtml(record.party||record.company||'Related Party')}</td><td>${escapeHtml(record.type||'Transaction')}</td><td class="mono">${corporateAmount(record.amount||0)}</td><td>${corporateBadge(record.review||record.status||'Review')}</td></tr>
+  `,'No related party transactions in database yet.');
+  replaceTableBody('corp-related-party-tbody',records,record=>`
+    <tr><td>${escapeHtml(record.party||record.company||'Related Party')}</td><td>${escapeHtml(record.type||'Transaction')}</td><td class="mono">${corporateAmount(record.amount||0)}</td><td>${corporateBadge(record.elimination||record.review||'Pending')}</td></tr>
+  `,'No intercompany records in database yet.');
+}
+
+function renderCorporateAssets(records=[]){
+  replaceTableBody('corp-assets-tbody',records,record=>{
+    const cost=Number(record.purchase_cost||record.cost||0);
+    const dep=Number(record.accumulated_depreciation||record.depreciation||0);
+    return `<tr><td>${escapeHtml(record.asset_name||record.asset||record.name||'Asset')}</td><td>${escapeHtml(record.category||'-')}</td><td class="mono">${corporateAmount(cost)}</td><td class="mono">${corporateAmount(dep)}</td><td class="mono">${corporateAmount(cost-dep)}</td><td>${escapeHtml(record.custodian||'-')}</td></tr>`;
+  },'No fixed assets in database yet.');
+}
+
+function renderCorporateAccruals(records=[]){
+  replaceTableBody('corp-accruals-tbody',records,record=>`
+    <tr><td>${escapeHtml(record.record_type||record.type||'Accrual')}</td><td>${escapeHtml(record.reference||'-')}</td><td class="mono">${corporateAmount(record.total_amount||record.total||0)}</td><td class="mono">${corporateAmount(record.monthly_amount||record.monthly||0)}</td><td>${corporateBadge(record.status||'Active')}</td></tr>
+  `,'No accrual or prepayment records in database yet.');
+}
+
+function renderCorporateCostCenters(records=[]){
+  replaceTableBody('corp-cost-centers-tbody',records,record=>`
+    <tr><td class="mono">${escapeHtml(record.code||'-')}</td><td>${escapeHtml(record.name||'-')}</td><td>${escapeHtml(record.department||'-')}</td><td>${escapeHtml(record.branch||'-')}</td><td>${escapeHtml(record.project||'-')}</td><td>${corporateBadge(record.status||'Active')}</td></tr>
+  `,'No cost centers in database yet.');
+}
+
+function renderCorporateBudgets(records=[]){
+  replaceTableBody('corp-budget-tbody',records,record=>{
+    const budget=Number(record.annual_budget||record.budget||0);
+    const actual=Number(record.actual_amount||record.actual||0);
+    const variance=Number(record.variance_amount||(budget-actual));
+    return `<tr><td>${escapeHtml(record.cost_center||record.department||'-')}</td><td class="mono">${corporateAmount(budget)}</td><td class="mono">${corporateAmount(actual)}</td><td>${corporateBadge(`${corporateAmount(Math.abs(variance))} ${variance>=0?'under':'over'}`)}</td><td>${corporateBadge(record.approval_status||'Draft')}</td></tr>`;
+  },'No budget records in database yet.');
+}
+
+function renderCorporateCashFlow(records=[]){
+  replaceTableBody('corp-cashflow-tbody',records,record=>{
+    const receipts=Number(record.expected_receipts||record.receipts||0);
+    const payments=Number(record.expected_payments||record.payments||0);
+    return `<tr><td>${escapeHtml(record.forecast_date||record.date||'-')}</td><td class="mono">${corporateAmount(receipts)}</td><td class="mono">${corporateAmount(payments)}</td><td class="mono">${corporateAmount(record.net_cash_flow ?? (receipts-payments))}</td><td>${escapeHtml(record.method||'Direct')}</td></tr>`;
+  },'No cash flow forecasts in database yet.');
+}
+
+function renderCorporateCredit(records=[]){
+  replaceTableBody('corp-credit-tbody',records,record=>`
+    <tr><td>${escapeHtml(record.customer_name||record.customer||'-')}</td><td class="mono">${corporateAmount(record.credit_limit||0)}</td><td class="mono">${corporateAmount(record.outstanding_amount||0)}</td><td>${corporateBadge(record.credit_status||'Active')}</td><td>${escapeHtml(record.promise_to_pay||'-')}</td><td class="mono">${corporateAmount(record.bad_debt_provision||0)}</td></tr>
+  `,'No credit control records in database yet.');
+}
+
+function renderCorporateConsolidation(records=[]){
+  replaceTableBody('corp-consolidation-tbody',records,record=>`
+    <tr><td>${escapeHtml(record.subsidiary_name||record.subsidiary||'-')}</td><td>${escapeHtml(record.currency||'AED')}</td><td class="mono">${corporateAmount(record.translated_amount||0)}</td><td>${corporateBadge(record.status||'Draft')}</td></tr>
+  `,'No consolidation records in database yet.');
+}
+
+function renderCorporateApprovals(records=[]){
+  replaceTableBody('corp-approval-tbody',records,record=>`
+    <tr><td>${escapeHtml(record.module||'-')}</td><td class="mono">${corporateAmount(record.min_amount||0)} - ${corporateAmount(record.max_amount||0)}</td><td>${escapeHtml(record.department||'All')}</td><td>${escapeHtml(record.approver_role||record.approver||'-')}</td><td>${corporateBadge(record.status||'Active')}</td></tr>
+  `,'No approval matrix records in database yet.');
+}
+
+function loadCorporateAccountingFromDb(data={}){
+  renderCorporateTax(data.corporateTax||[]);
+  renderCorporateRelatedParty(data.relatedPartyTransactions||[]);
+  renderCorporateAssets(data.fixedAssets||[]);
+  renderCorporateAccruals(data.accrualsPrepayments||[]);
+  renderCorporateCostCenters(data.costCenters||[]);
+  renderCorporateBudgets(data.budgets||[]);
+  renderCorporateCashFlow(data.cashFlowForecasts||[]);
+  renderCorporateCredit(data.creditControl||[]);
+  renderCorporateConsolidation(data.consolidation||[]);
+  renderCorporateApprovals(data.approvalMatrix||[]);
+}
+
+function askCorporateFields(title,fields){
+  const record={};
+  for(const field of fields){
+    const value=window.prompt(`${title}: ${field.label}`,field.defaultValue||'');
+    if(value===null)return null;
+    record[field.key]=field.numeric?parseAmount(value):value.trim();
+  }
+  return record;
+}
+
+function saveCorporateRecord(collection,record,renderFn,message){
+  if(!record)return;
+  saveServer(collection,record,{throwOnError:true}).then(()=>{
+    renderFn([record]);
+    toast(message,'ok');
+    audit(message,collection,'Saved');
+  }).catch(err=>{
+    console.warn('Corporate record save failed:',err);
+    toast('Corporate record could not be saved to database','err');
+  });
+}
+
+function addCorporateAsset(){
+  const record=askCorporateFields('New asset',[
+    {key:'asset_code',label:'Asset code',defaultValue:'AST-'+Date.now().toString().slice(-4)},
+    {key:'asset_name',label:'Asset name'},
+    {key:'category',label:'Category',defaultValue:'Equipment'},
+    {key:'purchase_cost',label:'Cost',numeric:true},
+    {key:'accumulated_depreciation',label:'Accumulated depreciation',numeric:true,defaultValue:'0'},
+    {key:'custodian',label:'Custodian',defaultValue:'Finance'}
+  ]);
+  saveCorporateRecord('fixedAssets',record,renderCorporateAssets,'Fixed asset saved to database');
+}
+
+function addCorporateAccrual(){
+  const record=askCorporateFields('New accrual/prepayment',[
+    {key:'record_type',label:'Type',defaultValue:'Accrued Expense'},
+    {key:'reference',label:'Reference',defaultValue:'ACC-'+Date.now().toString().slice(-4)},
+    {key:'total_amount',label:'Total amount',numeric:true},
+    {key:'monthly_amount',label:'Monthly amount',numeric:true},
+    {key:'status',label:'Status',defaultValue:'Active'}
+  ]);
+  saveCorporateRecord('accrualsPrepayments',record,renderCorporateAccruals,'Accrual schedule saved to database');
+}
+
+function addCorporateCostCenter(){
+  const record=askCorporateFields('New cost center',[
+    {key:'code',label:'Code',defaultValue:'CC-'+Date.now().toString().slice(-4)},
+    {key:'name',label:'Name'},
+    {key:'department',label:'Department',defaultValue:'Finance'},
+    {key:'branch',label:'Branch',defaultValue:'Dubai HQ'},
+    {key:'project',label:'Project',defaultValue:'General'},
+    {key:'status',label:'Status',defaultValue:'Active'}
+  ]);
+  saveCorporateRecord('costCenters',record,renderCorporateCostCenters,'Cost center saved to database');
+}
+
+function addCorporateBudget(){
+  const record=askCorporateFields('New budget',[
+    {key:'fiscal_year',label:'Fiscal year',defaultValue:String(new Date().getFullYear())},
+    {key:'cost_center',label:'Cost center',defaultValue:'Finance'},
+    {key:'annual_budget',label:'Annual budget',numeric:true},
+    {key:'actual_amount',label:'Actual amount',numeric:true,defaultValue:'0'},
+    {key:'approval_status',label:'Approval status',defaultValue:'Draft'}
+  ]);
+  if(record)record.variance_amount=Number(record.annual_budget||0)-Number(record.actual_amount||0);
+  saveCorporateRecord('budgets',record,renderCorporateBudgets,'Budget saved to database');
+}
+
+function addCorporateCashFlow(){
+  const record=askCorporateFields('New cash forecast',[
+    {key:'forecast_date',label:'Forecast date',defaultValue:new Date().toISOString().slice(0,10)},
+    {key:'expected_receipts',label:'Expected receipts',numeric:true},
+    {key:'expected_payments',label:'Expected payments',numeric:true},
+    {key:'method',label:'Method',defaultValue:'Direct'}
+  ]);
+  if(record)record.net_cash_flow=Number(record.expected_receipts||0)-Number(record.expected_payments||0);
+  saveCorporateRecord('cashFlowForecasts',record,renderCorporateCashFlow,'Cash flow forecast saved to database');
+}
+
+function addCorporateCreditControl(){
+  const record=askCorporateFields('New credit review',[
+    {key:'customer_name',label:'Customer'},
+    {key:'credit_limit',label:'Credit limit',numeric:true},
+    {key:'outstanding_amount',label:'Outstanding amount',numeric:true},
+    {key:'credit_status',label:'Status',defaultValue:'Active'},
+    {key:'promise_to_pay',label:'Promise to pay date',defaultValue:''},
+    {key:'bad_debt_provision',label:'Bad debt provision',numeric:true,defaultValue:'0'}
+  ]);
+  saveCorporateRecord('creditControl',record,renderCorporateCredit,'Credit review saved to database');
+}
+
+function addCorporateRelatedParty(){
+  const record=askCorporateFields('New related party transaction',[
+    {key:'party',label:'Party'},
+    {key:'type',label:'Type',defaultValue:'Recharge'},
+    {key:'amount',label:'Amount',numeric:true},
+    {key:'review',label:'Review status',defaultValue:'TP note'}
+  ]);
+  saveCorporateRecord('relatedPartyTransactions',record,renderCorporateRelatedParty,'Related party transaction saved to database');
+}
+
+function addCorporateConsolidation(){
+  const record=askCorporateFields('New consolidation entity',[
+    {key:'group_name',label:'Group name',defaultValue:'Group'},
+    {key:'subsidiary_name',label:'Subsidiary'},
+    {key:'currency',label:'Currency',defaultValue:'AED'},
+    {key:'translated_amount',label:'Translated amount',numeric:true},
+    {key:'status',label:'Status',defaultValue:'Draft'}
+  ]);
+  saveCorporateRecord('consolidation',record,renderCorporateConsolidation,'Consolidation entity saved to database');
+}
+
+function addCorporateApprovalRule(){
+  const record=askCorporateFields('New approval rule',[
+    {key:'module',label:'Module',defaultValue:'Journal'},
+    {key:'min_amount',label:'Minimum amount',numeric:true,defaultValue:'0'},
+    {key:'max_amount',label:'Maximum amount',numeric:true},
+    {key:'department',label:'Department',defaultValue:'All'},
+    {key:'approver_role',label:'Approver role',defaultValue:'Manager'},
+    {key:'status',label:'Status',defaultValue:'Active'}
+  ]);
+  saveCorporateRecord('approvalMatrix',record,renderCorporateApprovals,'Approval rule saved to database');
 }
 
 function approveLeave(btn){const row=btn.closest('tr');row.querySelector('td:nth-child(6)').innerHTML='<span class="b b-g">Approved</span>';row.querySelector('td:last-child').innerHTML='';toast('Leave approved ?','ok');}
@@ -8181,7 +8623,6 @@ function separateCorporateAccountingModule(){
   const target=document.getElementById('corporate-accounting-bodies');
   if(!target||target.dataset.ready==='1')return;
   const idMap={
-    'acc-corp-tax':'corp-tax',
     'acc-assets':'corp-assets',
     'acc-accruals':'corp-accruals',
     'acc-cost-centers':'corp-cost-centers',
@@ -8195,7 +8636,7 @@ function separateCorporateAccountingModule(){
     const section=document.getElementById(oldId);
     if(!section)return;
     section.id=newId;
-    section.classList.toggle('on',index===0);
+    section.classList.remove('on');
     target.appendChild(section);
   });
   target.dataset.ready='1';

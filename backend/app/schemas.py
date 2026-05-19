@@ -109,6 +109,7 @@ class JournalLineIn(BaseModel):
 
 class JournalCreate(BaseModel):
     entry_number: str
+    entry_date: datetime | None = None
     description: str
     source_module: str = "manual"
     source_id: str | None = None
@@ -126,6 +127,7 @@ class JournalOut(BaseModel):
     entry_number: str
     source_module: str
     source_id: str | None
+    entry_date: datetime
     description: str
     status: str
     created_at: datetime

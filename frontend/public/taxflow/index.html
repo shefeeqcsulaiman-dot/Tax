@@ -1864,21 +1864,12 @@
     <div class="tab" onclick="stab(this,'acc-payrec')">Payments / Receipts</div>
     <div class="tab" onclick="stab(this,'acc-bankrec')">Bank Reconciliation</div>
     <div class="tab" onclick="stab(this,'acc-tax')">VAT / Tax</div>
-    <div class="tab" onclick="stab(this,'acc-corp-tax')">Corporate Tax</div>
-    <div class="tab" onclick="stab(this,'acc-assets')">Fixed Assets</div>
-    <div class="tab" onclick="stab(this,'acc-accruals')">Accruals</div>
-    <div class="tab" onclick="stab(this,'acc-cost-centers')">Cost Centers</div>
-    <div class="tab" onclick="stab(this,'acc-budget')">Budgeting</div>
-    <div class="tab" onclick="stab(this,'acc-cashflow')">Cash Flow</div>
-    <div class="tab" onclick="stab(this,'acc-credit')">Credit Control</div>
-    <div class="tab" onclick="stab(this,'acc-consolidation')">Consolidation</div>
-    <div class="tab" onclick="stab(this,'acc-approval')">Approvals</div>
     <div class="tab" onclick="stab(this,'acc-closing')">Closing Period</div>
   </div>
 
   <div class="tab-body on" id="acc-chart">
     <div class="card">
-      <div class="card-hd"><div class="card-title">Chart of Accounts</div><button class="btn btn-p" onclick="showM('m-acc')">+ Add Account</button></div>
+      <div class="card-hd"><div class="card-title">Chart of Accounts</div><div class="flx"><button class="btn btn-g btn-sm" onclick="loadAccountingFromDb()">Refresh</button><button class="btn btn-p" onclick="showM('m-acc')">+ Add Account</button></div></div>
       <table class="tbl">
         <thead><tr><th>Account Code</th><th>Account Name</th><th>Type</th><th>Category</th><th>Balance (AED)</th><th>Status</th><th></th></tr></thead>
         <tbody id="account-tbody">
@@ -1900,7 +1891,7 @@
       <div class="fr3 mb12">
         <div class="fg" style="margin:0"><label class="fl">Date</label><input class="fi" type="date" id="journal-date"></div>
         <div class="fg" style="margin:0"><label class="fl">Reference No.</label><input class="fi mono" id="journal-ref" placeholder="JE-2024-XXXX"></div>
-        <div class="fg" style="margin:0"><label class="fl">Source</label><select class="fi"><option>Manual</option><option>Sales</option><option>Purchase</option><option>Payroll</option><option>Inventory</option></select></div>
+        <div class="fg" style="margin:0"><label class="fl">Source</label><select class="fi" id="journal-source"><option>Manual</option><option>Sales</option><option>Purchase</option><option>Payroll</option><option>Inventory</option></select></div>
       </div>
       <div class="fg"><label class="fl">Description</label><input class="fi" id="journal-desc" placeholder="Entry description"></div>
       <div style="display:grid;grid-template-columns:3fr 1fr 1fr 28px;gap:8px;margin-bottom:8px">
@@ -1913,7 +1904,7 @@
         <div class="inv-item journal-line"><select class="fi journal-account" onchange="recalcJournal()"><option>Select Account...</option><option>Cash & Cash Equivalents (1000)</option><option>Sales Revenue (3000)</option><option>Accounts Receivable (1100)</option></select><input class="fi mono journal-debit" placeholder="0.00" oninput="recalcJournal()"><input class="fi mono journal-credit" placeholder="0.00" oninput="recalcJournal()"><button class="btn btn-g" style="padding:4px 8px" onclick="remJournalLine(this)">✕</button></div>
         <div class="inv-item journal-line"><select class="fi journal-account" onchange="recalcJournal()"><option>Select Account...</option><option>Cash & Cash Equivalents (1000)</option><option>Sales Revenue (3000)</option><option>Accounts Receivable (1100)</option></select><input class="fi mono journal-debit" placeholder="0.00" oninput="recalcJournal()"><input class="fi mono journal-credit" placeholder="0.00" oninput="recalcJournal()"><button class="btn btn-g" style="padding:4px 8px" onclick="remJournalLine(this)">✕</button></div>
       </div>
-      <button class="btn btn-g btn-sm" style="margin-top:8px" onclick="addJournalLine()">+ Add Line</button>
+      <div class="flx" style="margin-top:8px"><button class="btn btn-g btn-sm" onclick="addJournalLine()">+ Add Line</button><button class="btn btn-g btn-sm" onclick="prepareJournalForm(true)">Clear</button></div>
       <div class="inv-total-row">
         <div class="inv-total-box">
           <div class="tot-row"><span style="color:var(--text3)">Total Debit</span><span class="mono" id="j-dr">AED 0.00</span></div>
@@ -1924,7 +1915,7 @@
     </div>
     <div class="flx-b">
       <button class="btn btn-g" onclick="saveJournalDraft()">💾 Save Draft</button>
-      <div class="flx"><button class="btn btn-warn" onclick="toast('Journal submitted for approval','info')">Submit</button><button class="btn btn-success" onclick="toast('Journal approved','ok')">Approve</button><button class="btn btn-p" onclick="postJournalEntry()">📤 Post Entry</button></div>
+      <div class="flx"><button class="btn btn-g" onclick="saveJournalDraft()">Save Draft</button><button class="btn btn-p" onclick="postJournalEntry()">Post Entry</button></div>
     </div>
   </div>
 
@@ -2071,39 +2062,11 @@
     </div>
   </div>
 
-  <div class="tab-body" id="acc-corp-tax">
-    <div class="g4 mb16">
-      <div class="stat"><div class="stat-lbl">Accounting Profit</div><div class="stat-val" style="color:var(--accent)">AED 1.24M</div><div class="stat-delta">before CT adjustments</div></div>
-      <div class="stat"><div class="stat-lbl">Adjustments</div><div class="stat-val" style="color:var(--amber)">AED 82K</div><div class="stat-delta">add backs / deductions</div></div>
-      <div class="stat"><div class="stat-lbl">Taxable Income</div><div class="stat-val" style="color:var(--purple)">AED 1.32M</div><div class="stat-delta">after losses</div></div>
-      <div class="stat"><div class="stat-lbl">Corporate Tax</div><div class="stat-val" style="color:var(--green)">AED 84.6K</div><div class="stat-delta">draft return</div></div>
-    </div>
-    <div class="g2">
-      <div class="card">
-        <div class="card-hd"><div><div class="card-title">Corporate Tax Calculation</div><div class="card-sub">Accounting profit to taxable income</div></div><button class="btn btn-g btn-sm" onclick="toast('Corporate tax report exported','ok')">Export</button></div>
-        <table class="tbl"><thead><tr><th>Step</th><th>Amount</th><th>Status</th></tr></thead><tbody>
-          <tr><td>Accounting Profit</td><td class="mono">1,240,000</td><td><span class="b b-g">Ready</span></td></tr>
-          <tr><td>Add: Non-deductible Expenses</td><td class="mono">96,000</td><td><span class="b b-a">Review</span></td></tr>
-          <tr><td>Less: Tax Loss Carry Forward</td><td class="mono">(14,000)</td><td><span class="b b-g">Applied</span></td></tr>
-          <tr><td>Taxable Income</td><td class="mono">1,322,000</td><td><span class="b b-b">Calculated</span></td></tr>
-          <tr><td>Corporate Tax Due</td><td class="mono">84,645</td><td><span class="b b-a">Draft</span></td></tr>
-        </tbody></table>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div><div class="card-title">Related Party Transactions</div><div class="card-sub">Transfer pricing notes and review markers</div></div></div>
-        <table class="tbl"><thead><tr><th>Party</th><th>Type</th><th>Amount</th><th>Review</th></tr></thead><tbody>
-          <tr><td>Group Logistics LLC</td><td>Recharge</td><td class="mono">145,000</td><td><span class="b b-a">TP note</span></td></tr>
-          <tr><td>Director Loan</td><td>Loan</td><td class="mono">80,000</td><td><span class="b b-g">Documented</span></td></tr>
-        </tbody></table>
-      </div>
-    </div>
-  </div>
-
   <div class="tab-body" id="acc-assets">
     <div class="g2 mb16">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">Fixed Asset Register</div><div class="card-sub">Purchase, location, custodian, depreciation, disposal</div></div><button class="btn btn-p btn-sm" onclick="toast('Asset form opened','info')">+ Asset</button></div>
-        <table class="tbl"><thead><tr><th>Asset</th><th>Category</th><th>Cost</th><th>Accum. Dep.</th><th>Book Value</th><th>Custodian</th></tr></thead><tbody>
+        <div class="card-hd"><div><div class="card-title">Fixed Asset Register</div><div class="card-sub">Purchase, location, custodian, depreciation, disposal</div></div><button class="btn btn-p btn-sm" onclick="addCorporateAsset()">+ Asset</button></div>
+        <table class="tbl"><thead><tr><th>Asset</th><th>Category</th><th>Cost</th><th>Accum. Dep.</th><th>Book Value</th><th>Custodian</th></tr></thead><tbody id="corp-assets-tbody">
           <tr><td>Delivery Van</td><td>Vehicle</td><td class="mono">95,000</td><td class="mono">18,000</td><td class="mono">77,000</td><td>Operations</td></tr>
           <tr><td>Warehouse Racking</td><td>Equipment</td><td class="mono">42,000</td><td class="mono">6,500</td><td class="mono">35,500</td><td>Warehouse</td></tr>
         </tbody></table>
@@ -2119,8 +2082,8 @@
   <div class="tab-body" id="acc-accruals">
     <div class="g2">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">Accruals & Prepayments</div><div class="card-sub">Accrued expenses, income, prepaid expenses, deferred income</div></div><button class="btn btn-p btn-sm" onclick="toast('Accrual form opened','info')">+ Schedule</button></div>
-        <table class="tbl"><thead><tr><th>Type</th><th>Reference</th><th>Total</th><th>Monthly</th><th>Auto Reverse</th></tr></thead><tbody>
+        <div class="card-hd"><div><div class="card-title">Accruals & Prepayments</div><div class="card-sub">Accrued expenses, income, prepaid expenses, deferred income</div></div><button class="btn btn-p btn-sm" onclick="addCorporateAccrual()">+ Schedule</button></div>
+        <table class="tbl"><thead><tr><th>Type</th><th>Reference</th><th>Total</th><th>Monthly</th><th>Auto Reverse</th></tr></thead><tbody id="corp-accruals-tbody">
           <tr><td>Prepaid Expense</td><td>Annual Rent</td><td class="mono">240,000</td><td class="mono">20,000</td><td><span class="b b-g">Yes</span></td></tr>
           <tr><td>Accrued Expense</td><td>Utilities</td><td class="mono">8,400</td><td class="mono">8,400</td><td><span class="b b-a">Next month</span></td></tr>
         </tbody></table>
@@ -2135,8 +2098,8 @@
 
   <div class="tab-body" id="acc-cost-centers">
     <div class="card">
-      <div class="card-hd"><div><div class="card-title">Cost Centers / Departments</div><div class="card-sub">Journal lines carry Account + Cost Center + Branch + Project</div></div><button class="btn btn-p btn-sm" onclick="toast('Cost center form opened','info')">+ Cost Center</button></div>
-      <table class="tbl"><thead><tr><th>Code</th><th>Name</th><th>Department</th><th>Branch</th><th>Project</th><th>Status</th></tr></thead><tbody>
+      <div class="card-hd"><div><div class="card-title">Cost Centers / Departments</div><div class="card-sub">Journal lines carry Account + Cost Center + Branch + Project</div></div><button class="btn btn-p btn-sm" onclick="addCorporateCostCenter()">+ Cost Center</button></div>
+      <table class="tbl"><thead><tr><th>Code</th><th>Name</th><th>Department</th><th>Branch</th><th>Project</th><th>Status</th></tr></thead><tbody id="corp-cost-centers-tbody">
         <tr><td class="mono">CC-OPS</td><td>Operations</td><td>Operations</td><td>Dubai HQ</td><td>Warehouse Expansion</td><td><span class="b b-g">Active</span></td></tr>
         <tr><td class="mono">CC-SALES</td><td>Sales Team</td><td>Sales</td><td>Abu Dhabi</td><td>Corporate Accounts</td><td><span class="b b-g">Active</span></td></tr>
       </tbody></table>
@@ -2146,8 +2109,8 @@
   <div class="tab-body" id="acc-budget">
     <div class="g2">
       <div class="card">
-        <div class="card-hd"><div><div class="card-title">Budget vs Actual</div><div class="card-sub">Annual, monthly, department budget, variance</div></div><button class="btn btn-g btn-sm" onclick="toast('Budget report exported','ok')">Export</button></div>
-        <table class="tbl"><thead><tr><th>Department</th><th>Budget</th><th>Actual</th><th>Variance</th><th>Approval</th></tr></thead><tbody>
+        <div class="card-hd"><div><div class="card-title">Budget vs Actual</div><div class="card-sub">Annual, monthly, department budget, variance</div></div><button class="btn btn-p btn-sm" onclick="addCorporateBudget()">+ Budget</button></div>
+        <table class="tbl"><thead><tr><th>Department</th><th>Budget</th><th>Actual</th><th>Variance</th><th>Approval</th></tr></thead><tbody id="corp-budget-tbody">
           <tr><td>Operations</td><td class="mono">600,000</td><td class="mono">548,000</td><td><span class="b b-g">52,000 under</span></td><td><span class="b b-g">Approved</span></td></tr>
           <tr><td>Sales</td><td class="mono">420,000</td><td class="mono">456,000</td><td><span class="b b-a">36,000 over</span></td><td><span class="b b-a">Review</span></td></tr>
         </tbody></table>
@@ -2165,32 +2128,34 @@
       <div class="stat"><div class="stat-lbl">Expected Payments</div><div class="stat-val" style="color:var(--red)">AED 246K</div></div>
       <div class="stat"><div class="stat-lbl">Net Cash Flow</div><div class="stat-val" style="color:var(--accent)">AED 64K</div></div>
     </div>
-    <div class="card"><div class="card-hd"><div><div class="card-title">Cash Flow Management</div><div class="card-sub">Direct, indirect, forecast, receipts, payments</div></div></div><table class="tbl"><thead><tr><th>Date</th><th>Receipts</th><th>Payments</th><th>Net</th><th>Method</th></tr></thead><tbody><tr><td>Week 1</td><td class="mono">92,000</td><td class="mono">64,000</td><td class="mono">28,000</td><td>Direct</td></tr><tr><td>Week 2</td><td class="mono">118,000</td><td class="mono">96,000</td><td class="mono">22,000</td><td>Direct</td></tr></tbody></table></div>
+    <div class="card"><div class="card-hd"><div><div class="card-title">Cash Flow Management</div><div class="card-sub">Direct, indirect, forecast, receipts, payments</div></div><button class="btn btn-p btn-sm" onclick="addCorporateCashFlow()">+ Forecast</button></div><table class="tbl"><thead><tr><th>Date</th><th>Receipts</th><th>Payments</th><th>Net</th><th>Method</th></tr></thead><tbody id="corp-cashflow-tbody"><tr><td>Week 1</td><td class="mono">92,000</td><td class="mono">64,000</td><td class="mono">28,000</td><td>Direct</td></tr><tr><td>Week 2</td><td class="mono">118,000</td><td class="mono">96,000</td><td class="mono">22,000</td><td>Direct</td></tr></tbody></table></div>
   </div>
 
   <div class="tab-body" id="acc-credit">
     <div class="card">
       <div class="card-hd"><div><div class="card-title">Credit Control</div><div class="card-sub">Credit limit, hold, aging alerts, collections, bad debt</div></div></div>
-      <table class="tbl"><thead><tr><th>Customer</th><th>Limit</th><th>Outstanding</th><th>Status</th><th>Promise</th><th>Provision</th></tr></thead><tbody>
+      <table class="tbl"><thead><tr><th>Customer</th><th>Limit</th><th>Outstanding</th><th>Status</th><th>Promise</th><th>Provision</th></tr></thead><tbody id="corp-credit-tbody">
         <tr><td>Dubai Steel Co.</td><td class="mono">100,000</td><td class="mono">84,000</td><td><span class="b b-a">Watch</span></td><td>15 Jul</td><td class="mono">0</td></tr>
         <tr><td>Emirates Supplies</td><td class="mono">50,000</td><td class="mono">62,000</td><td><span class="b b-r">Credit Hold</span></td><td>Missing</td><td class="mono">6,200</td></tr>
       </tbody></table>
       <div class="divider"></div>
-      <div class="card-sub">Bad debt posting: Dr Bad Debt Expense, Cr Accounts Receivable. Write-off requires approval.</div>
+      <div class="divider"></div>
+      <button class="btn btn-p btn-sm" onclick="addCorporateCreditControl()">+ Credit Review</button>
+      <div class="card-sub mt12">Bad debt posting: Dr Bad Debt Expense, Cr Accounts Receivable. Write-off requires approval.</div>
     </div>
   </div>
 
   <div class="tab-body" id="acc-consolidation">
     <div class="g2">
-      <div class="card"><div class="card-hd"><div><div class="card-title">Intercompany / Related Party</div><div class="card-sub">Receivables, payables, loans, recharges, transfer pricing notes</div></div></div><table class="tbl"><thead><tr><th>Company</th><th>Type</th><th>Amount</th><th>Elimination</th></tr></thead><tbody><tr><td>TaxFlow Trading LLC</td><td>Receivable</td><td class="mono">120,000</td><td><span class="b b-a">Pending</span></td></tr><tr><td>TaxFlow Services LLC</td><td>Recharge</td><td class="mono">48,000</td><td><span class="b b-g">Matched</span></td></tr></tbody></table></div>
-      <div class="card"><div class="card-hd"><div><div class="card-title">Group Consolidation</div><div class="card-sub">Currency translation, intercompany elimination, group P&L and balance sheet</div></div></div><table class="tbl"><thead><tr><th>Subsidiary</th><th>Currency</th><th>Translated</th><th>Status</th></tr></thead><tbody><tr><td>Dubai Branch</td><td>AED</td><td class="mono">1,420,000</td><td><span class="b b-g">Ready</span></td></tr><tr><td>Oman Branch</td><td>OMR</td><td class="mono">384,000</td><td><span class="b b-a">FX Review</span></td></tr></tbody></table></div>
+      <div class="card"><div class="card-hd"><div><div class="card-title">Intercompany / Related Party</div><div class="card-sub">Receivables, payables, loans, recharges, transfer pricing notes</div></div><button class="btn btn-p btn-sm" onclick="addCorporateRelatedParty()">+ Party</button></div><table class="tbl"><thead><tr><th>Company</th><th>Type</th><th>Amount</th><th>Elimination</th></tr></thead><tbody id="corp-related-party-tbody"><tr><td>TaxFlow Trading LLC</td><td>Receivable</td><td class="mono">120,000</td><td><span class="b b-a">Pending</span></td></tr><tr><td>TaxFlow Services LLC</td><td>Recharge</td><td class="mono">48,000</td><td><span class="b b-g">Matched</span></td></tr></tbody></table></div>
+      <div class="card"><div class="card-hd"><div><div class="card-title">Group Consolidation</div><div class="card-sub">Currency translation, intercompany elimination, group P&L and balance sheet</div></div><button class="btn btn-p btn-sm" onclick="addCorporateConsolidation()">+ Entity</button></div><table class="tbl"><thead><tr><th>Subsidiary</th><th>Currency</th><th>Translated</th><th>Status</th></tr></thead><tbody id="corp-consolidation-tbody"><tr><td>Dubai Branch</td><td>AED</td><td class="mono">1,420,000</td><td><span class="b b-g">Ready</span></td></tr><tr><td>Oman Branch</td><td>OMR</td><td class="mono">384,000</td><td><span class="b b-a">FX Review</span></td></tr></tbody></table></div>
     </div>
   </div>
 
   <div class="tab-body" id="acc-approval">
     <div class="card">
-      <div class="card-hd"><div><div class="card-title">Approval Matrix by Amount</div><div class="card-sub">Journal, payment, purchase, expense approvals by amount and department</div></div><button class="btn btn-p btn-sm" onclick="toast('Approval rule form opened','info')">+ Rule</button></div>
-      <table class="tbl"><thead><tr><th>Module</th><th>Amount Range</th><th>Department</th><th>Approver</th><th>Status</th></tr></thead><tbody>
+      <div class="card-hd"><div><div class="card-title">Approval Matrix by Amount</div><div class="card-sub">Journal, payment, purchase, expense approvals by amount and department</div></div><button class="btn btn-p btn-sm" onclick="addCorporateApprovalRule()">+ Rule</button></div>
+      <table class="tbl"><thead><tr><th>Module</th><th>Amount Range</th><th>Department</th><th>Approver</th><th>Status</th></tr></thead><tbody id="corp-approval-tbody">
         <tr><td>Expense</td><td class="mono">&lt; 1,000</td><td>All</td><td>Supervisor</td><td><span class="b b-g">Active</span></td></tr>
         <tr><td>Expense</td><td class="mono">1,000 - 10,000</td><td>All</td><td>Manager</td><td><span class="b b-g">Active</span></td></tr>
         <tr><td>Expense</td><td class="mono">10,000+</td><td>All</td><td>Director</td><td><span class="b b-g">Active</span></td></tr>
@@ -2206,27 +2171,41 @@
     <div class="tab on" onclick="stab(this,'corp-tax')">Corporate Tax</div>
     <div class="tab" onclick="stab(this,'corp-assets')">Fixed Assets</div>
     <div class="tab" onclick="stab(this,'corp-accruals')">Accruals</div>
-    <div class="tab" onclick="stab(this,'corp-cost')">Cost Centers</div>
+    <div class="tab" onclick="stab(this,'corp-cost-centers')">Cost Centers</div>
     <div class="tab" onclick="stab(this,'corp-budget')">Budgets</div>
+    <div class="tab" onclick="stab(this,'corp-cashflow')">Cash Flow</div>
+    <div class="tab" onclick="stab(this,'corp-credit')">Credit Control</div>
+    <div class="tab" onclick="stab(this,'corp-consolidation')">Consolidation</div>
+    <div class="tab" onclick="stab(this,'corp-approval')">Approvals</div>
   </div>
   <div class="tab-body on" id="corp-tax">
-    <div class="card">
-      <div class="card-hd"><div><div class="card-title">Corporate Tax Summary</div><div class="card-sub">Accounting profit, tax adjustments, taxable income, and filing status</div></div></div>
-      <table class="tbl"><thead><tr><th>Area</th><th>Current Value</th><th>Status</th></tr></thead><tbody><tr><td>Taxable Profit Calculation</td><td class="mono">AED 412,500</td><td><span class="b b-a">Review</span></td></tr><tr><td>Non-deductible Expenses</td><td class="mono">AED 18,200</td><td><span class="b b-g">Mapped</span></td></tr><tr><td>Tax Loss Carry Forward</td><td class="mono">AED 0</td><td><span class="b b-g">Clear</span></td></tr></tbody></table>
+    <div class="g4 mb16">
+      <div class="stat"><div class="stat-lbl">Accounting Profit</div><div class="stat-val" style="color:var(--accent)">AED 1.24M</div><div class="stat-delta">before CT adjustments</div></div>
+      <div class="stat"><div class="stat-lbl">Adjustments</div><div class="stat-val" style="color:var(--amber)">AED 82K</div><div class="stat-delta">add backs / deductions</div></div>
+      <div class="stat"><div class="stat-lbl">Taxable Income</div><div class="stat-val" style="color:var(--purple)">AED 1.32M</div><div class="stat-delta">after losses</div></div>
+      <div class="stat"><div class="stat-lbl">Corporate Tax</div><div class="stat-val" style="color:var(--green)">AED 84.6K</div><div class="stat-delta">draft return</div></div>
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Corporate Tax Calculation</div><div class="card-sub">Accounting profit to taxable income</div></div><button class="btn btn-g btn-sm" onclick="toast('Corporate tax report exported','ok')">Export</button></div>
+        <table class="tbl"><thead><tr><th>Step</th><th>Amount</th><th>Status</th></tr></thead><tbody id="corp-tax-tbody">
+          <tr><td>Accounting Profit</td><td class="mono">1,240,000</td><td><span class="b b-g">Ready</span></td></tr>
+          <tr><td>Add: Non-deductible Expenses</td><td class="mono">96,000</td><td><span class="b b-a">Review</span></td></tr>
+          <tr><td>Less: Tax Loss Carry Forward</td><td class="mono">(14,000)</td><td><span class="b b-g">Applied</span></td></tr>
+          <tr><td>Taxable Income</td><td class="mono">1,322,000</td><td><span class="b b-b">Calculated</span></td></tr>
+          <tr><td>Corporate Tax Due</td><td class="mono">84,645</td><td><span class="b b-a">Draft</span></td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div><div class="card-title">Related Party Transactions</div><div class="card-sub">Transfer pricing notes and review markers</div></div></div>
+        <table class="tbl"><thead><tr><th>Party</th><th>Type</th><th>Amount</th><th>Review</th></tr></thead><tbody id="corp-tax-related-tbody">
+          <tr><td>Group Logistics LLC</td><td>Recharge</td><td class="mono">145,000</td><td><span class="b b-a">TP note</span></td></tr>
+          <tr><td>Director Loan</td><td>Loan</td><td class="mono">80,000</td><td><span class="b b-g">Documented</span></td></tr>
+        </tbody></table>
+      </div>
     </div>
   </div>
-  <div class="tab-body" id="corp-assets">
-    <div class="card"><div class="card-hd"><div class="card-title">Fixed Asset Register</div></div><table class="tbl"><thead><tr><th>Asset</th><th>Category</th><th>Cost</th><th>Depreciation</th><th>Book Value</th></tr></thead><tbody><tr><td>Delivery Van</td><td>Vehicle</td><td class="mono">AED 95,000</td><td class="mono">AED 18,000</td><td class="mono">AED 77,000</td></tr></tbody></table></div>
-  </div>
-  <div class="tab-body" id="corp-accruals">
-    <div class="card"><div class="card-hd"><div class="card-title">Accruals & Prepayments</div></div><table class="tbl"><thead><tr><th>Type</th><th>Description</th><th>Monthly Amount</th><th>Auto Reversal</th></tr></thead><tbody><tr><td>Prepaid Expense</td><td>Annual rent</td><td class="mono">AED 8,000</td><td><span class="b b-g">Enabled</span></td></tr></tbody></table></div>
-  </div>
-  <div class="tab-body" id="corp-cost">
-    <div class="card"><div class="card-hd"><div class="card-title">Cost Centers</div></div><table class="tbl"><thead><tr><th>Cost Center</th><th>Branch</th><th>Project</th><th>Status</th></tr></thead><tbody><tr><td>Operations</td><td>Dubai HQ</td><td>Warehouse</td><td><span class="b b-g">Active</span></td></tr></tbody></table></div>
-  </div>
-  <div class="tab-body" id="corp-budget">
-    <div class="card"><div class="card-hd"><div class="card-title">Budget vs Actual</div></div><table class="tbl"><thead><tr><th>Department</th><th>Budget</th><th>Actual</th><th>Variance</th></tr></thead><tbody><tr><td>Sales</td><td class="mono">AED 250,000</td><td class="mono">AED 236,000</td><td><span class="b b-g">5.6% under</span></td></tr></tbody></table></div>
-  </div>
+  <div id="corporate-accounting-bodies"></div>
 </div>
 
 <!-- ═══════════════════ BILLS & VENDORS MODULE ═══════════════════ -->

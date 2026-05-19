@@ -38,7 +38,15 @@ router = APIRouter(prefix="/app-data", tags=["app data"])
 
 def decimal_value(value: Any) -> Decimal:
     try:
-        cleaned = str(value or "0").replace(",", "").replace("AED", "").strip()
+        cleaned = re.sub(r"(?i)\b(AED|Dhs\.?|د\.إ)\b", "", str(value or "0")).strip()
+        cleaned = cleaned.replace(" ", "")
+        if "," in cleaned and "." not in cleaned:
+            if re.search(r",[0-9]{1,2}$", cleaned):
+                cleaned = cleaned.replace(",", ".")
+            else:
+                cleaned = cleaned.replace(",", "")
+        elif "," in cleaned and "." in cleaned:
+            cleaned = cleaned.replace(",", "")
         return Decimal(cleaned or "0")
     except (InvalidOperation, ValueError):
         return Decimal("0")
@@ -63,6 +71,17 @@ def record_key(collection: str, record: dict[str, Any]) -> str | None:
         "salesUnits": "code",
         "purchaseRecords": "ref",
         "purchaseDocuments": "id",
+        "journalDrafts": "ref",
+        "corporateTax": "period",
+        "relatedPartyTransactions": "party",
+        "fixedAssets": "asset_code",
+        "accrualsPrepayments": "reference",
+        "costCenters": "code",
+        "budgets": "cost_center",
+        "cashFlowForecasts": "forecast_date",
+        "creditControl": "customer_name",
+        "consolidation": "subsidiary_name",
+        "approvalMatrix": "module",
         "app_actions": "id",
     }
     field = keys.get(collection)
@@ -570,7 +589,7 @@ def ingest_purchase_document(db: Session, current_user: User, file: dict[str, An
     except Exception as exc:
         return [purchase_extraction_error(name, f"Could not parse file: {exc}")]
 
-    invoices = build_purchase_invoices_from_rows(db, current_user, rows, name)
+    invoices = merge_purchase_invoices(build_purchase_invoices_from_rows(db, current_user, rows, name), name)
     if not invoices:
         hints = purchase_excel_debug_hint(content, ext)
         return [purchase_extraction_error(name, "No purchase invoice rows were found in the uploaded file" + hints)]
@@ -736,6 +755,8 @@ def parse_excel_html_rows(content: bytes) -> list[dict[str, Any]]:
 def parse_pdf_purchase_rows(content: bytes) -> list[dict[str, Any]]:
     text = extract_pdf_text(content)
     if not text:
+        text = extract_pdf_text_with_ocr(content)
+    if not text:
         return []
     return purchase_rows_from_document_text(text)
 
@@ -757,14 +778,22 @@ def extract_image_text_with_tesseract(content: bytes, ext: str) -> str:
         output_base = Path(tmp) / "ocr"
         image_path.write_bytes(content)
         result = subprocess.run(
-            [tesseract, str(image_path), str(output_base)],
+            [tesseract, str(image_path), str(output_base), "--psm", "6", "-c", "preserve_interword_spaces=1"],
             capture_output=True,
             text=True,
             timeout=45,
             check=False,
         )
         if result.returncode != 0:
-            return ""
+            result = subprocess.run(
+                [tesseract, str(image_path), str(output_base), "--psm", "4", "-c", "preserve_interword_spaces=1"],
+                capture_output=True,
+                text=True,
+                timeout=45,
+                check=False,
+            )
+            if result.returncode != 0:
+                return ""
         try:
             return (output_base.with_suffix(".txt")).read_text(encoding="utf-8", errors="ignore")
         except OSError:
@@ -783,6 +812,56 @@ def find_tesseract_executable() -> str | None:
         if Path(candidate).exists():
             return candidate
     return None
+
+
+def find_pdftoppm_executable() -> str | None:
+    found = shutil.which("pdftoppm")
+    if found:
+        return found
+    candidates = [
+        r"C:\Program Files\poppler\Library\bin\pdftoppm.exe",
+        r"C:\Program Files\poppler\bin\pdftoppm.exe",
+    ]
+    for candidate in candidates:
+        if Path(candidate).exists():
+            return candidate
+    return None
+
+
+def extract_pdf_text_with_ocr(content: bytes) -> str:
+    pdftoppm = find_pdftoppm_executable()
+    tesseract = find_tesseract_executable()
+    if not pdftoppm or not tesseract:
+        return ""
+    with tempfile.TemporaryDirectory() as tmp:
+        pdf_path = Path(tmp) / "upload.pdf"
+        output_prefix = Path(tmp) / "page"
+        pdf_path.write_bytes(content)
+        result = subprocess.run(
+            [pdftoppm, "-png", "-r", "200", "-f", "1", "-l", "3", str(pdf_path), str(output_prefix)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        if result.returncode != 0:
+            return ""
+        chunks: list[str] = []
+        for image_path in sorted(Path(tmp).glob("page-*.png")):
+            ocr_base = image_path.with_suffix("")
+            result = subprocess.run(
+                [tesseract, str(image_path), str(ocr_base), "--psm", "6", "-c", "preserve_interword_spaces=1"],
+                capture_output=True,
+                text=True,
+                timeout=45,
+                check=False,
+            )
+            if result.returncode == 0:
+                try:
+                    chunks.append(ocr_base.with_suffix(".txt").read_text(encoding="utf-8", errors="ignore"))
+                except OSError:
+                    pass
+        return "\n".join(chunks).strip()
 
 
 def extract_pdf_text(content: bytes) -> str:
@@ -853,14 +932,26 @@ def purchase_rows_from_document_text(text: str) -> list[dict[str, Any]]:
     lines = [line for line in lines if line]
     if not lines:
         lines = [re.sub(r"\s+", " ", text).strip()]
-    invoice_no = find_document_value(lines, (r"invoice\s*(?:no|number|#)?[:\s-]*([A-Z0-9][A-Z0-9\-\/]{2,})", r"bill\s*(?:no|number|#)?[:\s-]*([A-Z0-9][A-Z0-9\-\/]{2,})"))
-    date = find_document_value(lines, (r"(?:invoice\s*)?date[:\s-]*([0-9]{1,2}[\/\-.][0-9]{1,2}[\/\-.][0-9]{2,4})", r"date[:\s-]*([0-9]{4}[\/\-.][0-9]{1,2}[\/\-.][0-9]{1,2})"))
+    invoice_no = find_document_value(lines, (
+        r"\b(INV\/[0-9]{4}\/[0-9]{2,})\b",
+        r"invoice\s*(?:no|number|#|num)[:\s-]*([A-Z0-9][A-Z0-9\-\/]{2,})",
+        r"inv\s*(?:no|#)[:\s-]*([A-Z0-9][A-Z0-9\-\/]{2,})",
+        r"bill\s*(?:no|number|#)?[:\s-]*([A-Z0-9][A-Z0-9\-\/]{2,})",
+        r"(?:tax\s*)?invoice[:\s-]+([A-Z0-9][A-Z0-9\-\/]{2,})",
+    ))
+    date = find_document_value(lines, (
+        r"(?:invoice|document)?\s*date[:\s-]*([0-9]{1,2}[\/\-.][0-9]{1,2}[\/\-.][0-9]{2,4})",
+        r"date[:\s-]*([0-9]{4}[\/\-.][0-9]{1,2}[\/\-.][0-9]{1,2})",
+    ))
+    if not date:
+        date = find_invoice_date_near_number(lines, invoice_no)
     supplier = find_supplier_name(lines)
     trn = find_document_value(lines, (r"\bTRN[:\s-]*([0-9]{10,20})", r"tax\s+registration\s+(?:number|no)[:\s-]*([0-9]{10,20})"))
-    total = find_money_after_label(lines, ("grand total", "invoice total", "total amount", "net payable", "amount due", "total"))
-    vat = find_money_after_label(lines, ("vat", "tax amount", "tax"))
-    subtotal = find_money_after_label(lines, ("subtotal", "sub total", "taxable amount", "taxable value", "net amount"))
-    item_rows = purchase_item_rows_from_lines(lines, invoice_no, date, supplier, trn)
+    total = find_money_after_label(lines, ("sub total inclusive", "grand total", "invoice total", "total amount", "net payable", "amount due", "total"))
+    vat = find_money_after_label(lines, ("total 5% vat amount", "vat amount", "tax amount", "vat", "tax"))
+    subtotal = find_money_after_label(lines, ("invoice subtotal", "total before discount", "subtotal", "sub total", "taxable amount", "taxable value", "net amount"))
+    pay_term = find_document_value(lines, (r"payment\s*terms?[:\s-]*([0-9]+\s*days?)", r"\b([0-9]+\s*days?)\b"))
+    item_rows = purchase_item_rows_from_lines(lines, invoice_no, date, supplier, trn, pay_term)
     if item_rows:
         return item_rows
     if not invoice_no and not supplier and not total:
@@ -870,6 +961,7 @@ def purchase_rows_from_document_text(text: str) -> list[dict[str, Any]]:
         "date": date,
         "supplier": supplier or "Supplier",
         "supplier_trn": trn,
+        "pay_term": pay_term,
         "product": "Extracted purchase invoice",
         "quantity": 1,
         "unit": "PCS",
@@ -881,6 +973,8 @@ def purchase_rows_from_document_text(text: str) -> list[dict[str, Any]]:
 
 
 def normalize_document_lines(text: str) -> list[str]:
+    text = re.sub(r"(?<=[a-z])(?=[A-Z][a-z])", " ", text or "")
+    text = re.sub(r"(?i)(invoice\s*(?:no|number|#)|bill\s*(?:no|number|#)|date|supplier|vendor|seller|trn|subtotal|sub\s+total|vat|tax\s+amount|grand\s+total|amount\s+due|description|product|item|qty|quantity|unit\s+price|rate|amount)", r"\n\1", text)
     lines = [re.sub(r"\s+", " ", line).strip() for line in text.splitlines()]
     lines = [line for line in lines if line]
     if len(lines) > 1:
@@ -912,11 +1006,27 @@ def normalize_document_lines(text: str) -> list[str]:
 
 
 def find_document_value(lines: list[str], patterns: tuple[str, ...]) -> str:
-    for line in lines[:80]:
-        for pattern in patterns:
+    for pattern in patterns:
+        for line in lines[:80]:
             match = re.search(pattern, line, flags=re.IGNORECASE)
             if match:
                 return match.group(1).strip()
+    return ""
+
+
+def find_invoice_date_near_number(lines: list[str], invoice_no: str) -> str:
+    date_pattern = r"[0-9]{1,2}[\/\-.][0-9]{1,2}[\/\-.][0-9]{2,4}"
+    if invoice_no:
+        for index, line in enumerate(lines[:80]):
+            if invoice_no in line:
+                dates = re.findall(date_pattern, " ".join(lines[index:index + 3]))
+                if dates:
+                    return dates[0]
+    for index, line in enumerate(lines[:80]):
+        if re.search(r"\b(document|invoice)\s+date\b", line, flags=re.IGNORECASE):
+            dates = re.findall(date_pattern, " ".join(lines[index:index + 3]))
+            if dates:
+                return dates[0]
     return ""
 
 
@@ -925,6 +1035,9 @@ def find_supplier_name(lines: list[str]) -> str:
         match = re.search(r"^(?:supplier|vendor|seller)(?:\s+name)?[:\s-]+(.+)", line, flags=re.IGNORECASE)
         if match:
             return clean_document_label_value(match.group(1))
+    for line in lines[:15]:
+        if re.search(r"\b(L\.?L\.?C\.?|LLC|LTD|LIMITED|FZE|FZC)\b", line, flags=re.IGNORECASE):
+            return clean_document_label_value(line)[:120]
     for line in lines[:8]:
         tax_invoice = re.search(r"\btax\s+invoice\b", line, flags=re.IGNORECASE)
         if tax_invoice:
@@ -933,6 +1046,7 @@ def find_supplier_name(lines: list[str]) -> str:
                 return prefix[:120]
         if (
             not re.search(r"\b(invoice|tax|vat|trn|date|total|bill|description|qty|quantity|amount|rate|price)\b", line, flags=re.IGNORECASE)
+            and not re.search(r"\bINV\/[0-9]{4}\/[0-9]{2,}\b", line, flags=re.IGNORECASE)
             and not re.search(r"[0-9][0-9,]*\.[0-9]{2}", line)
             and any(ch.isalpha() for ch in line)
         ):
@@ -952,16 +1066,114 @@ def clean_document_label_value(value: str) -> str:
 
 def find_money_after_label(lines: list[str], labels: tuple[str, ...]) -> Decimal:
     for label in labels:
-        pattern = re.compile(rf"{re.escape(label)}[^\d\-]*([0-9][0-9,]*\.?[0-9]*)", flags=re.IGNORECASE)
         for line in reversed(lines):
-            match = pattern.search(line)
-            if match:
-                return decimal_value(match.group(1))
+            if re.search(rf"\b{re.escape(label)}\b", line, flags=re.IGNORECASE):
+                money = money_values_in_line(line)
+                if money:
+                    return decimal_value(money[-1])
     return Decimal("0")
 
 
-def purchase_item_rows_from_lines(lines: list[str], invoice_no: str, date: str, supplier: str, trn: str) -> list[dict[str, Any]]:
+def purchase_columnar_item_rows_from_lines(
+    lines: list[str],
+    invoice_no: str,
+    date: str,
+    supplier: str,
+    trn: str,
+    pay_term: str = "",
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    current: list[str] = []
+    for line in lines:
+        if is_document_summary_line(line):
+            if current:
+                row = parse_columnar_purchase_item(current, invoice_no, date, supplier, trn, pay_term)
+                if row:
+                    rows.append(row)
+                current = []
+            continue
+        if re.search(r"(?:^|\s)\d{1,3}\s+\[[A-Z0-9\-]{3,}\]", line) or re.search(r"\[[A-Z0-9\-]{3,}\]", line):
+            if current:
+                row = parse_columnar_purchase_item(current, invoice_no, date, supplier, trn, pay_term)
+                if row:
+                    rows.append(row)
+            current = [line]
+            continue
+        if current:
+            current.append(line)
+            if len(money_values_in_line(" ".join(current))) >= 5:
+                row = parse_columnar_purchase_item(current, invoice_no, date, supplier, trn, pay_term)
+                if row:
+                    rows.append(row)
+                    current = []
+    if current:
+        row = parse_columnar_purchase_item(current, invoice_no, date, supplier, trn, pay_term)
+        if row:
+            rows.append(row)
+    return rows[:200]
+
+
+def parse_columnar_purchase_item(
+    parts: list[str],
+    invoice_no: str,
+    date: str,
+    supplier: str,
+    trn: str,
+    pay_term: str = "",
+) -> dict[str, Any] | None:
+    text = " ".join(parts)
+    money = money_values_in_line(text)
+    if len(money) < 3:
+        return None
+    item_match = re.search(r"(?:^|\s)(?:\d{1,3}\s+)?\[([A-Z0-9\-]{3,})\]\s*(.+)", text)
+    if not item_match:
+        return None
+    sku = item_match.group(1)
+    description_area = item_match.group(2)
+    description_area = re.split(r"\b\d{2}\s*-\s*\d{4,6}\s*-\s*\d{2}\b", description_area, maxsplit=1)[0]
+    description_area = re.split(r"\b(?:lot|exp\.?\s*date|price|discount|excl\.?\s*vat|incl\.?\s*vat)\b", description_area, maxsplit=1, flags=re.IGNORECASE)[0]
+    product = re.sub(r"\s+", " ", description_area).strip(" :-")
+    if not product or re.search(r"\b(description|invoice|total|subtotal|vat)\b", product, flags=re.IGNORECASE):
+        return None
+    qty = Decimal("1")
+    qty_match = re.search(r"\b\d{2}\s*-\s*\d{4,6}\s*-\s*\d{2}\s+([0-9]+(?:[.,][0-9]+)?)\b", text)
+    if qty_match:
+        qty = decimal_value(qty_match.group(1)) or Decimal("1")
+    else:
+        item_number = re.match(r"\s*\d{1,3}\s+\[", text)
+        qty_candidates = re.findall(r"(?<![A-Z0-9])([1-9][0-9]{0,2})(?![A-Z0-9])", text[item_number.end() if item_number else 0:])
+        if qty_candidates:
+            qty = decimal_value(qty_candidates[0]) or Decimal("1")
+    price_before_tax = decimal_value(money[0])
+    price_after_discount = decimal_value(money[-4]) if len(money) >= 6 else price_before_tax
+    line_total = decimal_value(money[-3])
+    vat_amount = decimal_value(money[-2])
+    if line_total <= 0:
+        return None
+    return normalize_purchase_row({
+        "invoice_no": invoice_no or "PDF-INVOICE",
+        "date": date,
+        "supplier": supplier or "Supplier",
+        "supplier_trn": trn,
+        "pay_term": pay_term,
+        "sku": sku,
+        "product": product[:180],
+        "quantity": qty,
+        "unit": "PCS",
+        "unit_cost": price_before_tax,
+        "discount": Decimal("0"),
+        "unit_cost_before_tax": price_after_discount,
+        "vat_amount": vat_amount,
+        "line_total": line_total,
+        "tax_type": "VAT 5%" if vat_amount else "None",
+    })
+
+
+def purchase_item_rows_from_lines(lines: list[str], invoice_no: str, date: str, supplier: str, trn: str, pay_term: str = "") -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    rows.extend(purchase_columnar_item_rows_from_lines(lines, invoice_no, date, supplier, trn, pay_term))
+    if rows:
+        return rows
     pending_description = ""
     item_section_started = False
     for line in lines:
@@ -974,13 +1186,13 @@ def purchase_item_rows_from_lines(lines: list[str], invoice_no: str, date: str, 
             line = re.sub(r"\b(description|item|product|particulars|qty|quantity|rate|price|amount|total|unit)\b", " ", line, flags=re.IGNORECASE)
         if is_document_summary_line(line):
             continue
-        money = re.findall(r"(?<![A-Z0-9])([0-9][0-9,]*\.[0-9]{2})(?![A-Z0-9])", line)
+        money = money_values_in_line(line)
         if not money:
             if item_section_started and looks_like_item_description(line):
                 pending_description = line
             continue
         qty_match = re.search(r"(?:^|\s)([0-9]+(?:\.[0-9]+)?)\s*(?:pcs|nos|qty|each|ea|unit|units|kg|ltr|mtr)?\b", line, flags=re.IGNORECASE)
-        description = re.sub(r"\b[0-9][0-9,]*\.[0-9]{2}\b", " ", line)
+        description = re.sub(r"\b[0-9][0-9,]*(?:\.[0-9]{1,2})?\b", " ", line)
         description = re.sub(r"\b(?:AED|VAT|TOTAL|SUBTOTAL|TAX|QTY|PCS|NOS)\b", " ", description, flags=re.IGNORECASE)
         description = re.sub(r"\s+", " ", description).strip(" :-")
         if pending_description and (not description or len(description) < 4 or description.replace(".", "").isdigit()):
@@ -1008,6 +1220,21 @@ def purchase_item_rows_from_lines(lines: list[str], invoice_no: str, date: str, 
         if len(rows) >= 200:
             break
     return rows
+
+
+def money_values_in_line(line: str) -> list[str]:
+    values = re.findall(
+        r"(?<![A-Z0-9])(?:AED|Dhs\.?|د\.إ|Ø¯\.Ø¥)\s*([0-9][0-9,]*(?:[.,][0-9]{1,2})?)|(?<![A-Z0-9])([0-9][0-9,]*(?:[.,][0-9]{1,2}))(?![A-Z0-9])",
+        line,
+        flags=re.IGNORECASE,
+    )
+    cleaned: list[str] = []
+    for prefixed, decimal_text in values:
+        value = prefixed or decimal_text
+        number = decimal_value(value)
+        if number > 0:
+            cleaned.append(str(number))
+    return cleaned
 
 
 def is_document_summary_line(line: str) -> bool:
@@ -1249,6 +1476,74 @@ def build_purchase_invoices_from_rows(
         invoice["due"] = max(Decimal("0"), invoice["total"] - decimal_value(invoice.get("paid")))
         invoices.append(json.loads(json.dumps(invoice, default=float)))
     return invoices
+
+
+def merge_purchase_invoices(invoices: list[dict[str, Any]], filename: str = "") -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    for index, invoice in enumerate(invoices or [], start=1):
+        invoice_no = str(invoice.get("invoice_no") or invoice.get("ref") or f"{clean_base(filename)}-{index}").strip()
+        key = invoice_no.lower()
+        target = grouped.setdefault(
+            key,
+            {
+                **invoice,
+                "invoice_no": invoice_no,
+                "subtotal": Decimal("0"),
+                "vat_amount": Decimal("0"),
+                "total": Decimal("0"),
+                "paid": Decimal("0"),
+                "shipping": Decimal("0"),
+                "confidence": 0,
+                "lines": [],
+            },
+        )
+        for field in (
+            "date",
+            "supplier",
+            "supplier_trn",
+            "address",
+            "pay_term",
+            "discount_type",
+            "tax_type",
+            "payment_method",
+            "payment_account",
+            "payment_note",
+            "paid_on",
+            "shipping_details",
+            "notes",
+            "status",
+            "issues",
+        ):
+            if not target.get(field) and invoice.get(field):
+                target[field] = invoice.get(field)
+        target["subtotal"] = max(decimal_value(target.get("subtotal")), decimal_value(invoice.get("subtotal") or invoice.get("net_amount")))
+        target["vat_amount"] = max(decimal_value(target.get("vat_amount")), decimal_value(invoice.get("vat_amount") or invoice.get("tax_amount")))
+        target["total"] = max(decimal_value(target.get("total")), decimal_value(invoice.get("total")))
+        target["paid"] = max(decimal_value(target.get("paid")), decimal_value(invoice.get("paid")))
+        target["shipping"] = max(decimal_value(target.get("shipping")), decimal_value(invoice.get("shipping")))
+        target["confidence"] = max(int(decimal_value(target.get("confidence"))), int(decimal_value(invoice.get("confidence"))))
+        for line in invoice.get("lines") or []:
+            product = str(line.get("product") or line.get("description") or line.get("sku") or "").strip().lower()
+            amount = decimal_value(line.get("line_total") or line.get("amount"))
+            qty = decimal_value(line.get("quantity") or line.get("qty"))
+            if not any(
+                str(existing.get("product") or existing.get("description") or existing.get("sku") or "").strip().lower() == product
+                and decimal_value(existing.get("line_total") or existing.get("amount")) == amount
+                and decimal_value(existing.get("quantity") or existing.get("qty")) == qty
+                for existing in target["lines"]
+            ):
+                target["lines"].append(line)
+    merged = []
+    for invoice in grouped.values():
+        line_total = sum((decimal_value(line.get("line_total") or line.get("amount")) for line in invoice.get("lines") or []), Decimal("0"))
+        if line_total and (not decimal_value(invoice.get("subtotal")) or len(invoice.get("lines") or []) > 1):
+            invoice["subtotal"] = max(decimal_value(invoice.get("subtotal")), line_total)
+        if not decimal_value(invoice.get("total")):
+            invoice["total"] = decimal_value(invoice.get("subtotal")) + decimal_value(invoice.get("vat_amount")) + decimal_value(invoice.get("shipping"))
+        invoice["due"] = max(Decimal("0"), decimal_value(invoice.get("total")) - decimal_value(invoice.get("paid")))
+        invoice["items"] = len(invoice.get("lines") or [])
+        merged.append(json.loads(json.dumps(invoice, default=float)))
+    return merged
 
 
 def excel_date_value(value: Any) -> str:

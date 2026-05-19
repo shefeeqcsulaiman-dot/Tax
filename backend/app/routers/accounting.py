@@ -61,12 +61,17 @@ def create_journal(
     if len(found) != len(account_ids):
         raise HTTPException(status_code=422, detail="One or more accounts do not belong to this company")
 
+    journal_data = {
+        "company_id": current_user.company_id,
+        "entry_number": payload.entry_number,
+        "source_module": payload.source_module,
+        "source_id": payload.source_id,
+        "description": payload.description,
+    }
+    if payload.entry_date is not None:
+        journal_data["entry_date"] = payload.entry_date
     journal = JournalEntry(
-        company_id=current_user.company_id,
-        entry_number=payload.entry_number,
-        source_module=payload.source_module,
-        source_id=payload.source_id,
-        description=payload.description,
+        **journal_data,
     )
     journal.lines = [JournalLine(**line.model_dump()) for line in payload.lines]
     db.add(journal)
