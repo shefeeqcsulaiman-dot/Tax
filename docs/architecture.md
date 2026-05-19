@@ -7,21 +7,25 @@ The current repository is a React + Vite frontend that mounts the TaxFlow UI she
 ## 1. Current Prototype Structure
 
 ```text
-frontend/                 React + Vite shell
-frontend/src/main.jsx     Login shell, legacy UI mount, backend bridge
-frontend/public/taxflow/  Main TaxFlow UI markup, styles, and browser logic
-backend/                  FastAPI API, SQLAlchemy models, routers, storage
-backend/app/main.py       API app, router registration, startup seed data
-backend/app/routers/      Auth, invoices, documents, reports, app data, modules, events, exceptions
-backend/scripts/          Local data reset and 50-record seed scripts
-backend/*.db              Local SQLite databases for lightweight development
-docs/                     Architecture and roadmap
+frontend/                    React + Vite shell
+frontend/index.html          Vite entry document only
+frontend/src/main.jsx        Login shell, legacy UI mount, backend bridge
+frontend/src/api.js          Authenticated API client
+frontend/.env.local          Local API base override when backend is not on port 8000
+frontend/public/taxflow/     Main TaxFlow UI markup, styles, and browser logic
+backend/                     FastAPI API, SQLAlchemy models, routers, storage
+backend/app/main.py          API app, router registration, startup seed data
+backend/app/routers/         Auth, invoices, documents, reports, app data, modules, events, exceptions
+backend/scripts/             Local data reset and 50-record seed scripts
+backend/*.db                 Local SQLite databases for lightweight development
+docs/                        Architecture and roadmap
 ```
 
 Local development note:
 
 ```text
 backend/.env currently points local SQLite to taxflow-seed50-v2.db.
+frontend/.env.local can point Vite to a local API port, for example http://127.0.0.1:8010/api/v1.
 backend/scripts/add_seed_50_all.py seeds at least 50 records across all SQLAlchemy tables and key UI collections.
 SQLite journaling is disabled in local dev because this Windows workspace denies rollback-journal deletion.
 Production must use PostgreSQL with normal transactional durability.
@@ -60,6 +64,68 @@ Backend
 |-- Reporting snapshot tables
 |-- Module record APIs for purchases, items, units, settings
 `-- Prototype app-data API retained as compatibility bridge
+```
+
+## 1.2 Current Local Runtime Architecture
+
+The local development runtime is intentionally lightweight and does not require Docker.
+
+```text
+Browser
+  |
+  v
+React + Vite dev server
+http://127.0.0.1:5173
+  |
+  | loads Vite shell:
+  |   frontend/index.html
+  |   frontend/src/main.jsx
+  |   frontend/src/api.js
+  |
+  | mounts legacy TaxFlow UI from:
+  |   frontend/public/taxflow/index.html
+  |   frontend/public/taxflow/src/styles.css
+  |   frontend/public/taxflow/src/app.js
+  |
+  v
+FastAPI backend
+http://127.0.0.1:8010/api/v1 in the current Windows local run
+http://127.0.0.1:8000/api/v1 by default when port 8000 is available
+  |
+  v
+SQLite seed database
+backend/taxflow-seed50-v2.db
+```
+
+Runtime responsibilities:
+
+```text
+React + Vite shell
+|-- owns login and token storage
+|-- verifies /auth/me before mounting the workspace
+|-- sets window.TAXFLOW_API_BASE_URL from VITE_API_BASE_URL
+|-- injects the legacy TaxFlow document into the page body
+`-- exposes a small window.TaxFlowAPI bridge for backend-backed actions
+
+Legacy TaxFlow UI
+|-- owns most current screens, navigation, tables, forms, and demo workflows
+|-- reads window.TAXFLOW_API_BASE_URL before falling back to port 8000
+|-- uses local browser state for some prototype UI collections
+`-- calls proper module APIs where backend endpoints already exist
+
+FastAPI backend
+|-- owns authentication, tenant/company context, and durable API records
+|-- serves module APIs under /api/v1
+|-- uses SQLite for local development
+`-- targets PostgreSQL, Redis/Celery, and S3-compatible storage in production
+```
+
+Important local rule:
+
+```text
+Do not replace frontend/index.html with the legacy TaxFlow HTML.
+The root index.html must remain the Vite shell.
+The legacy UI belongs under frontend/public/taxflow/.
 ```
 
 Seeded local data:
@@ -1885,7 +1951,120 @@ Required controls:
 - Queue worker tenant validation
 - Period reopen approvals
 
-## 25. Implementation Priorities
+## 25. Testing Architecture
+
+TaxFlow testing must prove business correctness across UI, API, accounting, VAT, inventory, security, audit, tenant isolation, posting, exception handling, and database integrity.
+
+The repository testing guidance lives under:
+
+```text
+testing/TESTING_RULES.md
+testing/TEST_MATRIX.md
+testing/sales/TESTING_GUIDE.md
+testing/purchases/TESTING_GUIDE.md
+testing/inventory/TESTING_GUIDE.md
+testing/accounting/TESTING_GUIDE.md
+testing/tax/TESTING_GUIDE.md
+testing/security/TESTING_GUIDE.md
+testing/exceptions/TESTING_GUIDE.md
+testing/performance/TESTING_GUIDE.md
+testing/ai-ocr/TESTING_GUIDE.md
+testing/payroll/TESTING_GUIDE.md
+```
+
+Testing layers:
+
+```text
+1. Unit Testing
+2. API Testing
+3. Integration Testing
+4. Workflow Testing
+5. End-to-End Testing
+```
+
+Every module must validate:
+
+```text
+Tenant isolation
+Audit logging
+Permission checks
+Duplicate prevention
+Accounting balance
+VAT calculation
+Source transaction creation
+Approval state transitions
+Exception handling
+Database integrity
+```
+
+Never allow:
+
+```text
+Direct UI to ledger posting
+Negative inventory unless enabled
+Unbalanced journals
+Missing tax evidence
+Posting without approval
+Cross-tenant reads or writes
+```
+
+Recommended tools:
+
+| Area | Tool |
+| --- | --- |
+| Frontend and E2E | Playwright |
+| API and backend logic | Pytest + FastAPI TestClient |
+| Load testing | k6 or Locust |
+| Security | OWASP ZAP plus focused authorization tests |
+| Queue | Celery integration tests |
+| Database | PostgreSQL transaction and constraint tests |
+
+Highest-priority test areas:
+
+```text
+1. Accounting posting
+2. VAT engine
+3. Inventory valuation
+4. Tenant isolation
+5. Source transactions
+6. Approval workflow
+7. Audit logging
+8. Exception handling
+9. Queue retry
+10. Period locking
+```
+
+Production-level tests must validate the full chain:
+
+```text
+UI Action
+    |
+    v
+API Validation
+    |
+    v
+Source Transaction
+    |
+    v
+Approval
+    |
+    v
+Posting Queue
+    |
+    v
+Journal Entry
+    |
+    v
+Tax Lines
+    |
+    v
+Audit Log
+    |
+    v
+Reports
+```
+
+## 26. Implementation Priorities
 
 | Priority | Improvement |
 | --- | --- |
@@ -1902,7 +2081,7 @@ Required controls:
 | 11 | Audit logging and event outbox |
 | 12 | Payroll, Rota, WPS, and eInvoicing after accounting/VAT/inventory are stable |
 
-## 26. Implementation Phases
+## 27. Implementation Phases
 
 ### Phase 1: Stabilize Prototype
 
@@ -1960,7 +2139,7 @@ Start this only after accounting, VAT, documents, and inventory are stable.
 - Add auto reconciliation.
 - Add alerting and exception dashboards.
 
-## 27. Final Architecture Recommendation
+## 28. Final Architecture Recommendation
 
 Use this production pattern:
 

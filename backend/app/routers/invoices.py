@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
@@ -44,6 +44,14 @@ def create_invoice(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Invoice:
+    existing = (
+        db.query(Invoice.id)
+        .filter(Invoice.company_id == current_user.company_id, Invoice.invoice_number == payload.invoice_number)
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="Invoice number already exists for this company")
+
     invoice = Invoice(
         company_id=current_user.company_id,
         customer_name=payload.customer_name,

@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import QRCode from "qrcode";
 import { api, clearToken, getToken, setToken } from "./api";
 import "./styles.css";
 
-const TAXFLOW_LEGACY_VERSION = "20260517-invoice-edit";
+const TAXFLOW_LEGACY_VERSION = "20260519-uae-invoice-layout";
 
 function App() {
   const [tokenReady, setTokenReady] = useState(Boolean(getToken()));
@@ -72,6 +73,7 @@ function TaxFlowLegacyApp({ onLogout }) {
       window.__taxflowLogout = onLogout;
       const localApiHost = ["localhost", "::1", ""].includes(window.location.hostname) ? "127.0.0.1" : window.location.hostname;
       window.TAXFLOW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || `http://${localApiHost}:8000/api/v1`;
+      window.TaxFlowQRCode = QRCode;
       setLoadMessage("Starting app...");
       await loadScriptOnce("taxflow-original-js", versionedTaxFlowUrl("/taxflow/src/app.js"));
       patchLegacyLogout(onLogout);

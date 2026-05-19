@@ -83,6 +83,12 @@ def ensure_schema_updates() -> None:
             for column_name, column_type in required_columns.items():
                 if column_name not in existing_columns:
                     connection.execute(text(f"ALTER TABLE item_units ADD COLUMN {column_name} {column_type}"))
+        if "invoices" in table_names:
+            index_names = {index["name"] for index in inspector.get_indexes("invoices")}
+            if "uq_invoice_company_number" not in index_names:
+                connection.execute(
+                    text("CREATE UNIQUE INDEX IF NOT EXISTS uq_invoice_company_number ON invoices (company_id, invoice_number)")
+                )
 
 
 def seed_initial_data() -> None:

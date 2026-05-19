@@ -55,6 +55,8 @@ def record_key(collection: str, record: dict[str, Any]) -> str | None:
         "bills": "bill_no",
         "vendors": "name",
         "payments": "ref",
+        "bankAccounts": "iban",
+        "expenses": "ref",
         "audit": "time",
         "invoiceLayout": "company",
         "salesCategories": "name",

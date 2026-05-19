@@ -258,7 +258,7 @@
       </div>
       <div class="card">
         <div class="card-hd"><div class="card-title">Key Contacts</div><button class="btn btn-g btn-sm" onclick="toast('Contact added','ok')">+ Add</button></div>
-        <div class="fg"><label class="fl">Authorized Signatory</label><input class="fi" value="Sara Al Mansouri"></div>
+        <div class="fg"><label class="fl">Authorized Signatory</label><input class="fi"></div>
         <div class="fr2">
           <div class="fg"><label class="fl">Emirates ID</label><input class="fi mono" value="784-1990-1234567-1"></div>
           <div class="fg"><label class="fl">Designation</label><input class="fi" value="General Manager"></div>
@@ -365,10 +365,7 @@
       <table class="tbl">
         <thead><tr><th>Invoice No.</th><th>Customer</th><th>Date</th><th>Due Date</th><th>Amount</th><th>VAT</th><th>Total</th><th>Source</th><th>Status</th><th></th></tr></thead>
         <tbody id="sales-invoice-tbody">
-          <tr><td class="mono">INV-2024-0848</td><td>Dubai Steel Co.</td><td>20 Jun 2024</td><td>20 Jul 2024</td><td class="mono">42,000</td><td class="mono">2,100</td><td class="mono">44,100</td><td><span class="b b-gray">Manual</span></td><td><span class="b b-a">Pending</span></td><td data-action-col="1"><div class="row-actions sales-actions"><button class="icon-btn view" type="button" title="View" aria-label="View invoice" onclick="openSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.8 8s2.2-4 6.2-4 6.2 4 6.2 4-2.2 4-6.2 4-6.2-4-6.2-4z"/><circle cx="8" cy="8" r="1.8"/></svg></button><button class="icon-btn share" type="button" title="Share" aria-label="Share invoice" onclick="shareSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 8.5l3-1.8"/><path d="M6.5 7.5l3 1.8"/><circle cx="4.5" cy="8" r="2"/><circle cx="11.5" cy="5.8" r="2"/><circle cx="11.5" cy="10.2" r="2"/></svg></button></div></td></tr>
-          <tr><td class="mono">INV-2024-0847</td><td>Gulf Logistics Ltd</td><td>18 Jun 2024</td><td>18 Jul 2024</td><td class="mono">18,500</td><td class="mono">925</td><td class="mono">19,425</td><td><span class="b b-gray">Manual</span></td><td><span class="b b-g">Paid</span></td><td data-action-col="1"><div class="row-actions sales-actions"><button class="icon-btn view" type="button" title="View" aria-label="View invoice" onclick="openSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.8 8s2.2-4 6.2-4 6.2 4 6.2 4-2.2 4-6.2 4-6.2-4-6.2-4z"/><circle cx="8" cy="8" r="1.8"/></svg></button><button class="icon-btn share" type="button" title="Share" aria-label="Share invoice" onclick="shareSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 8.5l3-1.8"/><path d="M6.5 7.5l3 1.8"/><circle cx="4.5" cy="8" r="2"/><circle cx="11.5" cy="5.8" r="2"/><circle cx="11.5" cy="10.2" r="2"/></svg></button></div></td></tr>
-          <tr><td class="mono">INV-2024-0846</td><td>Emirates Supplies</td><td>15 Jun 2024</td><td>15 Jul 2024</td><td class="mono">31,000</td><td class="mono">1,550</td><td class="mono">32,550</td><td><span class="b b-gray">Manual</span></td><td><span class="b b-r">Overdue</span></td><td data-action-col="1"><div class="row-actions sales-actions"><button class="icon-btn view" type="button" title="View" aria-label="View invoice" onclick="openSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.8 8s2.2-4 6.2-4 6.2 4 6.2 4-2.2 4-6.2 4-6.2-4-6.2-4z"/><circle cx="8" cy="8" r="1.8"/></svg></button><button class="icon-btn share" type="button" title="Share" aria-label="Share invoice" onclick="shareSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 8.5l3-1.8"/><path d="M6.5 7.5l3 1.8"/><circle cx="4.5" cy="8" r="2"/><circle cx="11.5" cy="5.8" r="2"/><circle cx="11.5" cy="10.2" r="2"/></svg></button></div></td></tr>
-          <tr><td class="mono">INV-2024-0845</td><td>Al Baraka Trading</td><td>10 Jun 2024</td><td>10 Jul 2024</td><td class="mono">7,200</td><td class="mono">360</td><td class="mono">7,560</td><td><span class="b b-gray">Manual</span></td><td><span class="b b-g">Paid</span></td><td data-action-col="1"><div class="row-actions sales-actions"><button class="icon-btn view" type="button" title="View" aria-label="View invoice" onclick="openSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.8 8s2.2-4 6.2-4 6.2 4 6.2 4-2.2 4-6.2 4-6.2-4-6.2-4z"/><circle cx="8" cy="8" r="1.8"/></svg></button><button class="icon-btn share" type="button" title="Share" aria-label="Share invoice" onclick="shareSalesInvoiceRow(this)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 8.5l3-1.8"/><path d="M6.5 7.5l3 1.8"/><circle cx="4.5" cy="8" r="2"/><circle cx="11.5" cy="5.8" r="2"/><circle cx="11.5" cy="10.2" r="2"/></svg></button></div></td></tr>
+          <tr data-empty-state="1"><td colspan="10" style="color:var(--text3);text-align:center">No sales invoices in database yet.</td></tr>
         </tbody>
       </table>
     </div>
@@ -380,15 +377,20 @@
       <div class="card">
         <div class="card-hd"><div class="card-title">Invoice Details</div></div>
         <div class="fr3 mb12">
-          <div class="fg" style="margin:0"><label class="fl">Invoice No.</label><input class="fi mono" value="INV-2024-0849" id="inv-no"></div>
+          <div class="fg" style="margin:0"><label class="fl">Invoice No.</label><input class="fi mono" id="inv-no" dir="auto"></div>
           <div class="fg" style="margin:0"><label class="fl">Invoice Date</label><input class="fi" type="date" id="inv-date"></div>
           <div class="fg" style="margin:0"><label class="fl">Due Date</label><input class="fi" type="date" id="inv-due"></div>
         </div>
+        <div class="fr3">
+          <div class="fg"><label class="fl">Purchase Order No.</label><input class="fi mono" id="inv-po" placeholder="PO-0001"></div>
+          <div class="fg"><label class="fl">Delivery Note No.</label><input class="fi mono" id="inv-delivery" placeholder="DN-0001"></div>
+          <div class="fg"><label class="fl">Reference No.</label><input class="fi mono" id="inv-ref" placeholder="REF-0001"></div>
+        </div>
         <div class="fr2">
-          <div class="fg"><label class="fl">Customer Name</label><div class="field-action-row"><input class="fi" id="inv-cust" placeholder="Select or type customer"><button class="btn btn-g btn-sm" type="button" onclick="openAddCustomerFromInvoice()">+ Add</button></div></div>
+            <div class="fg"><label class="fl">Customer Name</label><div class="field-action-row"><input class="fi" id="inv-cust" list="invoice-customer-options" placeholder="Select or type customer" dir="auto" onfocus="refreshInvoiceCustomerOptions()" onchange="applyInvoiceCustomerSelection()"><button class="btn btn-g btn-sm" type="button" onclick="openAddCustomerFromInvoice()">+ Add</button></div><datalist id="invoice-customer-options"></datalist></div>
           <div class="fg"><label class="fl">Customer TRN</label><input class="fi mono" id="inv-ctrn" placeholder="15-digit TRN"></div>
         </div>
-        <div class="fg"><label class="fl">Customer Address</label><input class="fi" placeholder="Billing address"></div>
+        <div class="fg"><label class="fl">Customer Address</label><input class="fi" id="inv-caddr" placeholder="Billing address" dir="auto"></div>
       </div>
       <div class="card">
         <div class="card-hd"><div class="card-title">Payment & Notes</div></div>
@@ -409,22 +411,22 @@
         <div></div>
       </div>
       <div id="inv-lines">
-        <div class="inv-item sales-inv-line"><input class="fi inv-product" list="invoice-product-options" placeholder="Description or product" style="font-size:12.5px" onfocus="refreshInvoiceProductSuggestions()" onchange="applyInvoiceProductSuggestion(this)"><input class="fi inv-unit" value="PCS" readonly style="font-size:12.5px;background:var(--bg)"><input class="fi inv-qty" value="10" style="font-size:12.5px" oninput="calcLine(this)"><input class="fi inv-price" value="4200.00" style="font-size:12.5px" oninput="calcLine(this)"><input class="fi mono inv-amount" value="42,000.00" readonly style="background:var(--bg)"><button class="btn btn-g" style="padding:4px 8px" onclick="remLine(this)">✕</button></div>
+        <div class="inv-item sales-inv-line"><input class="fi inv-product" list="invoice-product-options" placeholder="Description or product" dir="auto" style="font-size:12.5px" onfocus="refreshInvoiceProductSuggestions()" onchange="applyInvoiceProductSuggestion(this)"><input class="fi inv-unit" value="PCS" dir="auto" readonly style="font-size:12.5px;background:var(--bg)"><input class="fi inv-qty" value="1" style="font-size:12.5px" oninput="calcLine(this)"><input class="fi inv-price" value="0.00" style="font-size:12.5px" oninput="calcLine(this)"><input class="fi mono inv-amount" value="0.00" readonly style="background:var(--bg)"><button class="btn btn-g" style="padding:4px 8px" onclick="remLine(this)">✕</button></div>
       </div>
       <div class="inv-total-row">
         <div class="inv-total-box">
-          <div class="tot-row"><span style="color:var(--text3)">Subtotal</span><span id="subtotal" class="mono">AED 42,000.00</span></div>
-          <div class="tot-row"><span style="color:var(--text3)">VAT (5%)</span><span id="vat-amt" class="mono" style="color:var(--accent)">AED 2,100.00</span></div>
-          <div class="tot-final"><span>Total</span><span id="inv-total" class="mono" style="color:var(--accent)">AED 44,100.00</span></div>
+          <div class="tot-row"><span style="color:var(--text3)">Subtotal</span><span id="subtotal" class="mono">AED 0.00</span></div>
+          <div class="tot-row"><span style="color:var(--text3)">VAT (5%)</span><span id="vat-amt" class="mono" style="color:var(--accent)">AED 0.00</span></div>
+          <div class="tot-final"><span>Total</span><span id="inv-total" class="mono" style="color:var(--accent)">AED 0.00</span></div>
         </div>
       </div>
     </div>
     <div class="flx-b">
-      <button class="btn btn-g" onclick="toast('Draft saved','ok')">💾 Save Draft</button>
+      <button class="btn btn-g" onclick="saveDraftInvoice()">💾 Save Draft</button>
       <div class="flx">
         <button class="btn btn-g" onclick="openDraftInvoicePreview()">👁 Preview PDF</button>
         <button class="btn btn-g" onclick="openDraftInvoiceShare()">Share</button>
-        <button class="btn btn-p" onclick="openDraftInvoiceShare()">📤 Send Invoice</button>
+        <button class="btn btn-p" onclick="saveAndSendDraftInvoice()">📤 Save and Send</button>
       </div>
     </div>
   </div>
@@ -436,9 +438,7 @@
       <table class="tbl">
         <thead><tr><th>Name</th><th>TRN</th><th>Emirate</th><th>Contact</th><th>Total Business</th><th></th></tr></thead>
         <tbody id="customer-tbody">
-          <tr><td>Dubai Steel Co.</td><td class="mono">100348712600001</td><td>Dubai</td><td>accounts@dubsteel.ae</td><td class="mono" style="color:var(--accent)">AED 142,000</td><td><button class="btn btn-g btn-sm">View</button></td></tr>
-          <tr><td>Gulf Logistics Ltd</td><td class="mono">100874321500002</td><td>Sharjah</td><td>finance@gulflog.ae</td><td class="mono" style="color:var(--accent)">AED 98,500</td><td><button class="btn btn-g btn-sm">View</button></td></tr>
-          <tr><td>Emirates Supplies</td><td class="mono">100512378900003</td><td>Abu Dhabi</td><td>ap@emiratessup.ae</td><td class="mono" style="color:var(--accent)">AED 76,200</td><td><button class="btn btn-g btn-sm">View</button></td></tr>
+          <tr data-empty-state="1"><td colspan="6" style="color:var(--text3);text-align:center">No customers in database yet.</td></tr>
         </tbody>
       </table>
     </div>
@@ -469,7 +469,7 @@
       <div class="card">
         <div class="card-hd"><div class="card-title">Quotation Details</div></div>
         <div class="fr2">
-          <div class="fg"><label class="fl">Quotation No.</label><input class="fi mono" id="quote-no" value="QTN-2024-0063"></div>
+          <div class="fg"><label class="fl">Quotation No.</label><input class="fi mono" id="quote-no"></div>
           <div class="fg"><label class="fl">Customer</label><input class="fi" id="quote-customer" placeholder="Customer name"></div>
           <div class="fg"><label class="fl">Date</label><input class="fi" id="quote-date" type="date"></div>
           <div class="fg"><label class="fl">Valid Until</label><input class="fi" id="quote-valid" type="date"></div>
@@ -486,10 +486,10 @@
     <div class="card mb16">
       <div class="card-hd"><div class="card-title">Line Items</div><button class="btn btn-g btn-sm" onclick="addQuotationLine()">+ Add Line</button></div>
       <div style="display:grid;grid-template-columns:3fr 1fr 1fr 1fr 28px;gap:8px;margin-bottom:8px">
-        <div class="card-sub">Description</div><div class="card-sub">Qty</div><div class="card-sub">Unit Price</div><div class="card-sub">Amount</div><div></div>
+        <div class="card-sub">Item</div><div class="card-sub">Qty</div><div class="card-sub">Unit Price</div><div class="card-sub">Amount</div><div></div>
       </div>
       <div id="quote-lines">
-        <div class="inv-item quote-line"><input class="fi" placeholder="Description"><input class="fi quote-qty" value="1" oninput="calcQuotationLine(this)"><input class="fi quote-price" value="0.00" oninput="calcQuotationLine(this)"><input class="fi mono quote-amount" value="0.00" readonly style="background:var(--bg)"><button class="btn btn-g" style="padding:4px 8px" onclick="removeQuotationLine(this)">x</button></div>
+        <div class="inv-item quote-line"><select class="fi quote-item" onchange="selectQuotationItem(this)" onfocus="refreshQuotationProductOptions()"><option value="">Select item...</option></select><input class="fi quote-qty" value="1" oninput="calcQuotationLine(this)"><input class="fi quote-price" value="0.00" oninput="calcQuotationLine(this)"><input class="fi mono quote-amount" value="0.00" readonly style="background:var(--bg)"><button class="btn btn-g" style="padding:4px 8px" onclick="removeQuotationLine(this)">x</button></div>
       </div>
     </div>
     <div class="flx-b">
@@ -533,23 +533,9 @@
         </div>
       </div>
       <div class="card">
-        <div class="card-hd"><div class="card-title">Uploaded Files</div><span class="b b-b" id="file-count-badge">3 files</span></div>
+        <div class="card-hd"><div class="card-title">Uploaded Files</div><span class="b b-b" id="file-count-badge">0 files</span></div>
         <div id="pur-file-list">
-          <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
-            <span style="font-size:20px">📄</span>
-            <div style="flex:1"><div style="font-size:13px;font-weight:500">Purchases_June_Batch.zip</div><div class="mono" style="color:var(--text3);font-size:11px">47 files · 28.4 MB · Jun 2024</div></div>
-            <span class="b b-g">Extracted</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
-            <span style="font-size:20px">📊</span>
-            <div style="flex:1"><div style="font-size:13px;font-weight:500">Bank_Emirates_June.xlsx</div><div class="mono" style="color:var(--text3);font-size:11px">1 file · 340 KB · Jun 2024</div></div>
-            <span class="b b-a">Processing</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
-            <span style="font-size:20px">📋</span>
-            <div style="flex:1"><div style="font-size:13px;font-weight:500">Supplier_ADPaints_Invoice.pdf</div><div class="mono" style="color:var(--text3);font-size:11px">1 file · 180 KB · Jun 2024</div></div>
-            <span class="b b-r">Error</span>
-          </div>
+          <div style="font-size:12px;color:var(--text3);padding:10px 0">No uploaded files in database yet.</div>
         </div>
         <div id="pur-prog" style="display:none;margin-top:12px">
           <div class="flx-b" style="margin-bottom:4px"><span style="font-size:12px;color:var(--text2)" id="pur-fname">Uploading...</span><span id="pur-pct" style="font-size:11px;color:var(--text3)">0%</span></div>
@@ -617,7 +603,7 @@
         <div class="flx"><button class="btn btn-g btn-sm" onclick="importManualPurchaseProducts()">Import Products</button><button class="btn btn-p btn-sm" onclick="addManualPurchaseLine()">+ Add Product</button></div>
       </div>
       <table class="tbl" data-delete-actions-bound="skip" data-no-table-tools="1">
-        <thead><tr><th class="line-no-head">#</th><th>Product Name</th><th>Purchase Quantity</th><th>Unit of Measure</th><th>Unit Cost Before Discount</th><th>Discount %</th><th>Unit Cost Before Tax</th><th>Line Total</th><th>Profit Margin %</th><th>Unit Selling Price Inc. Tax</th><th></th></tr></thead>
+        <thead><tr><th>Product Name</th><th>Purchase Quantity</th><th>Unit of Measure</th><th>Unit Cost Before Discount</th><th>Discount %</th><th>Unit Cost Before Tax</th><th>Line Total</th><th>Profit Margin %</th><th>Unit Selling Price Inc. Tax</th><th></th></tr></thead>
         <tbody id="mp-lines"></tbody>
       </table>
       <datalist id="purchase-product-options"></datalist>
@@ -678,16 +664,13 @@
         <div class="flx">
           <button class="btn btn-g btn-sm" id="purchase-show-recent-btn" type="button" onclick="showRecentPurchaseRecords()">Show Recent</button>
           <button class="btn btn-g btn-sm" id="purchase-load-more-btn" type="button" onclick="loadMorePurchaseRecords()">Load More</button>
-          <button class="btn btn-g btn-sm" type="button" onclick="addFourPurchaseRecords()">Add 4 Data</button>
           <button class="btn btn-p btn-sm" type="button" onclick="stab(document.querySelector('#page-purchase .tab:nth-child(4)'),'p-manual')">+ Manual Entry</button>
         </div>
       </div>
       <table class="tbl">
         <thead><tr><th>Ref No.</th><th>Supplier</th><th>Date</th><th>Location</th><th>Items</th><th>Net Amount</th><th>Tax</th><th>Shipping</th><th>Total</th><th>Paid</th><th>Due</th><th>Source</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="purchase-record-tbody">
-          <tr><td class="mono">PUR-2024-0221</td><td>Al Hamad Steel</td><td>15 Jun 2024</td><td>Dubai HQ</td><td class="mono">1</td><td class="mono">28,000</td><td class="mono">1,400</td><td class="mono">0</td><td class="mono">29,400</td><td class="mono">0</td><td class="mono">29,400</td><td><span class="b b-p">AI Upload</span></td><td><span class="b b-g">Valid</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td></tr>
-          <tr><td class="mono">PUR-2024-0219</td><td>Gulf Freight</td><td>10 Jun 2024</td><td>Main Warehouse</td><td class="mono">1</td><td class="mono">12,000</td><td class="mono">600</td><td class="mono">0</td><td class="mono">12,600</td><td class="mono">0</td><td class="mono">12,600</td><td><span class="b b-p">AI Upload</span></td><td><span class="b b-g">Valid</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td></tr>
-          <tr><td class="mono">PUR-2024-0215</td><td>Office Depot UAE</td><td>03 Jun 2024</td><td>Nuevo (BL0001)</td><td class="mono">1</td><td class="mono">2,400</td><td class="mono">120</td><td class="mono">0</td><td class="mono">2,520</td><td class="mono">2,520</td><td class="mono">0</td><td><span class="b b-gray">Manual</span></td><td><span class="b b-g">Paid</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td></tr>
+          <tr data-empty-state="1"><td colspan="14" style="color:var(--text3);text-align:center">No purchase records in database yet.</td></tr>
         </tbody>
       </table>
     </div>
@@ -699,9 +682,7 @@
       <table class="tbl">
         <thead><tr><th>Vendor</th><th>TRN</th><th>Category</th><th>Email</th><th>Address</th><th>Open Balance</th><th>Status</th></tr></thead>
         <tbody id="vendor-tbody">
-          <tr><td>Al Hamad Steel</td><td class="mono">100224455600003</td><td>Materials</td><td>accounts@alhamadsteel.ae</td><td class="mono">AED 29,400</td><td><span class="b b-g">Active</span></td></tr>
-          <tr><td>Gulf Freight</td><td class="mono">100445566700004</td><td>Logistics</td><td>ap@gulffreight.ae</td><td class="mono">AED 12,600</td><td><span class="b b-g">Active</span></td></tr>
-          <tr><td>Office Depot UAE</td><td class="mono">100998877600002</td><td>Office Supplies</td><td>billing@officedepot.ae</td><td class="mono">AED 0</td><td><span class="b b-g">Active</span></td></tr>
+          <tr data-empty-state="1"><td colspan="7" style="color:var(--text3);text-align:center">No vendors in database yet.</td></tr>
         </tbody>
       </table>
     </div>
@@ -768,17 +749,8 @@
       <div class="card-hd"><div class="card-title">Registered Bank Accounts</div><button class="btn btn-p" onclick="showM('m-bank')">+ Add Account</button></div>
       <table class="tbl">
         <thead><tr><th>Bank</th><th>Account Name</th><th>IBAN</th><th>Currency</th><th>Type</th><th>Balance</th><th>Status</th><th></th></tr></thead>
-        <tbody>
-          <tr>
-            <td><div class="flx"><span style="font-size:18px">🏦</span><span>Emirates NBD</span></div></td>
-            <td>Acme Trading LLC</td><td class="mono">AE070331234567890123456</td><td>AED</td><td><span class="b b-b">Current</span></td><td class="mono" style="color:var(--green)">AED 1,240,000</td><td><span class="b b-g">Active</span></td>
-            <td><button class="btn btn-g btn-sm" onclick="toast('Syncing with bank...','info')">Sync</button></td>
-          </tr>
-          <tr>
-            <td><div class="flx"><span style="font-size:18px">🏦</span><span>FAB</span></div></td>
-            <td>Acme Trading LLC</td><td class="mono">AE180200000001234567890</td><td>USD</td><td><span class="b b-t">Savings</span></td><td class="mono" style="color:var(--green)">USD 164,000</td><td><span class="b b-g">Active</span></td>
-            <td><button class="btn btn-g btn-sm" onclick="toast('Syncing with bank...','info')">Sync</button></td>
-          </tr>
+        <tbody id="bank-account-tbody">
+          <tr data-empty-state="1"><td colspan="8" style="color:var(--text3);text-align:center">No bank accounts in database yet.</td></tr>
         </tbody>
       </table>
     </div>
@@ -1827,11 +1799,8 @@
       <div class="card-hd"><div class="card-title">All Expenses</div><button class="btn btn-p" onclick="go('expense');setTimeout(()=>stab(document.querySelectorAll('#page-expense .tab')[1],'exp-create'),50)">+ New Expense</button></div>
       <table class="tbl">
         <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>VAT</th><th>Total</th><th>Status</th><th></th></tr></thead>
-        <tbody>
-          <tr><td>28 Jun</td><td>Office Supplies — Carrefour</td><td><span class="b b-gray">Supplies</span></td><td class="mono">1,200</td><td class="mono">60</td><td class="mono">1,260</td><td><span class="b b-g">Approved</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
-          <tr><td>27 Jun</td><td>Fuel — Shell Station</td><td><span class="b b-gray">Transport</span></td><td class="mono">850</td><td class="mono">42.50</td><td class="mono">892.50</td><td><span class="b b-a">Pending</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
-          <tr><td>25 Jun</td><td>Internet — Etisalat</td><td><span class="b b-gray">Utilities</span></td><td class="mono">2,400</td><td class="mono">120</td><td class="mono">2,520</td><td><span class="b b-g">Approved</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
-          <tr><td>22 Jun</td><td>Hotel — Business Trip</td><td><span class="b b-gray">Travel</span></td><td class="mono">3,500</td><td class="mono">175</td><td class="mono">3,675</td><td><span class="b b-r">Rejected</span></td><td><button class="btn btn-g btn-sm">View</button></td></tr>
+        <tbody id="expense-tbody">
+          <tr data-empty-state="1"><td colspan="8" style="color:var(--text3);text-align:center">No expenses in database yet.</td></tr>
         </tbody>
       </table>
     </div>
@@ -1842,12 +1811,12 @@
       <div class="card">
         <div class="card-hd"><div class="card-title">Expense Details</div></div>
         <div class="fr2">
-          <div class="fg"><label class="fl">Date</label><input class="fi" type="date"></div>
+          <div class="fg"><label class="fl">Date</label><input class="fi" id="expense-date" type="date"></div>
           <div class="fg"><label class="fl">Category</label>
-            <select class="fi"><option>Supplies</option><option>Transport</option><option>Utilities</option><option>Travel</option><option>Entertainment</option><option>Communication</option><option>Maintenance</option></select>
+            <select class="fi" id="expense-category"><option>Supplies</option><option>Transport</option><option>Utilities</option><option>Travel</option><option>Entertainment</option><option>Communication</option><option>Maintenance</option></select>
           </div>
         </div>
-        <div class="fg"><label class="fl">Description</label><input class="fi" placeholder="What was this expense for?"></div>
+        <div class="fg"><label class="fl">Description</label><input class="fi" id="expense-description" placeholder="What was this expense for?"></div>
         <div class="fg"><label class="fl">AI Suggestion</label><div class="chip on" style="width:100%;justify-content:center">Utilities</div></div>
       </div>
       <div class="card">
@@ -1861,14 +1830,14 @@
     </div>
     <div class="card mb16">
       <div class="fr3">
-        <div class="fg"><label class="fl">Amount (AED)</label><input class="fi mono" placeholder="0.00"></div>
-        <div class="fg"><label class="fl">VAT Amount (AED)</label><input class="fi mono" placeholder="0.00"></div>
-        <div class="fg"><label class="fl">Total (AED)</label><input class="fi mono" placeholder="0.00" readonly style="background:var(--bg)"></div>
+        <div class="fg"><label class="fl">Amount (AED)</label><input class="fi mono" id="expense-amount" placeholder="0.00" oninput="calcExpenseTotal()"></div>
+        <div class="fg"><label class="fl">VAT Amount (AED)</label><input class="fi mono" id="expense-vat" placeholder="0.00" oninput="calcExpenseTotal()"></div>
+        <div class="fg"><label class="fl">Total Amount (AED)</label><input class="fi mono" id="expense-total" placeholder="0.00" readonly style="background:var(--bg)"></div>
       </div>
     </div>
     <div class="flx-b">
-      <button class="btn btn-g" onclick="toast('Draft saved','ok')">💾 Save Draft</button>
-      <button class="btn btn-p" onclick="toast('Expense submitted for approval ✓','ok')">✅ Submit for Approval</button>
+      <button class="btn btn-g" onclick="saveExpense('Draft')">💾 Save Draft</button>
+      <button class="btn btn-p" onclick="saveExpense('Pending')">✅ Submit for Approval</button>
     </div>
   </div>
 
@@ -1877,11 +1846,8 @@
       <div class="card-hd"><div class="card-title">Pending Approvals</div></div>
       <table class="tbl">
         <thead><tr><th>Employee</th><th>Description</th><th>Amount</th><th>Date</th><th>Status</th><th></th></tr></thead>
-        <tbody>
-          <tr><td>Ahmed Rashid</td><td>Fuel — Shell Station</td><td class="mono">AED 892.50</td><td>27 Jun</td><td><span class="b b-a">Pending</span></td>
-            <td><div class="flx"><button class="btn btn-success btn-sm" onclick="toast('Expense approved ✓','ok')">✓</button><button class="btn btn-danger btn-sm" onclick="toast('Expense rejected','err')">✕</button></div></td></tr>
-          <tr><td>Mohamed Jaber</td><td>Client Lunch</td><td class="mono">AED 1,450</td><td>26 Jun</td><td><span class="b b-a">Pending</span></td>
-            <td><div class="flx"><button class="btn btn-success btn-sm" onclick="toast('Expense approved ✓','ok')">✓</button><button class="btn btn-danger btn-sm" onclick="toast('Expense rejected','err')">✕</button></div></td></tr>
+        <tbody id="expense-approval-tbody">
+          <tr data-empty-state="1"><td colspan="6" style="color:var(--text3);text-align:center">No pending expenses for approval.</td></tr>
         </tbody>
       </table>
     </div>
@@ -3077,7 +3043,7 @@
         </div>
         <div class="card">
           <div class="card-hd"><div class="card-title">Key Contacts</div><button class="btn btn-g btn-sm" onclick="toast('Contact added','ok')">+ Add</button></div>
-          <div class="fg"><label class="fl">Authorized Signatory</label><input class="fi" value="Sara Al Mansouri"></div>
+        <div class="fg"><label class="fl">Authorized Signatory</label><input class="fi"></div>
           <div class="fr2">
             <div class="fg"><label class="fl">Emirates ID</label><input class="fi mono" value="784-1990-1234567-1"></div>
             <div class="fg"><label class="fl">Designation</label><input class="fi" value="General Manager"></div>
@@ -3278,7 +3244,7 @@
 
   <div class="tab-body" id="set-docs">
     <div class="card mb16">
-      <div class="card-hd"><div><div class="card-title">Invoice Design Layout</div><div class="card-sub">Branding, tax details, numbering, payment terms, QR, signature, and live invoice preview</div></div><button class="btn btn-p btn-sm" onclick="saveInvoiceLayout()">Save Layout</button></div>
+      <div class="card-hd"><div><div class="card-title">Invoice Design Layout</div><div class="card-sub">Branding, tax details, numbering, payment terms, QR, signature, and live invoice preview</div></div><div class="flx"><button class="btn btn-g btn-sm" onclick="previewLayoutSampleInvoice()">Preview Invoice</button><button class="btn btn-p btn-sm" onclick="saveInvoiceLayout()">Save Layout</button></div></div>
       <div class="g2">
         <div>
           <div class="section-hd">Template & Brand</div>
@@ -3288,65 +3254,98 @@
             <div class="fg"><label class="fl">Header Alignment</label><select class="fi" id="inv-layout-align" onchange="updateInvoiceLayoutPreview()"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></div>
           </div>
           <div class="fr3">
-            <div class="fg"><label class="fl">Accent Color</label><input class="fi mono" id="inv-layout-color" value="#4f8ef0" oninput="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">Accent Color</label><input class="fi mono" id="inv-layout-color" type="color" value="#2563eb" oninput="updateInvoiceLayoutPreview()"></div>
             <div class="fg"><label class="fl">Logo Text</label><input class="fi" id="inv-layout-logo" value="TaxFlow" oninput="updateInvoiceLayoutPreview()"></div>
             <div class="fg"><label class="fl">Brand Font</label><select class="fi" id="inv-layout-font" onchange="updateInvoiceLayoutPreview()"><option>Modern Sans</option><option>Classic Serif</option><option>Compact Mono</option></select></div>
           </div>
           <div class="section-hd">Company & Tax</div>
           <div class="fr3">
-            <div class="fg"><label class="fl">Company Display Name</label><input class="fi" id="inv-layout-company" value="Acme Trading LLC" oninput="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">Company Display Name</label><input class="fi" id="inv-layout-company" value="Acme Trading LLC" dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
             <div class="fg"><label class="fl">TRN Display</label><select class="fi" id="inv-layout-trn-mode" onchange="updateInvoiceLayoutPreview()"><option value="show">Show company TRN</option><option value="hide">Hide company TRN</option></select></div>
             <div class="fg"><label class="fl">Tax Label</label><select class="fi" id="inv-layout-tax-label" onchange="updateInvoiceLayoutPreview()"><option>Tax Invoice</option><option>Simplified Tax Invoice</option><option>Proforma Invoice</option></select></div>
           </div>
-          <div class="fg"><label class="fl">Header Address</label><input class="fi" id="inv-layout-address" value="Dubai, United Arab Emirates" oninput="updateInvoiceLayoutPreview()"></div>
+          <div class="fr3">
+            <div class="fg"><label class="fl">Business TRN Label</label><input class="fi" id="inv-layout-trn-label" value="TRN" dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">Customer TRN Label</label><input class="fi" id="inv-layout-customer-trn-label" value="Customer TRN" dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">VAT Mode</label><select class="fi" id="inv-layout-vat-mode" onchange="updateInvoiceLayoutPreview()"><option value="exclusive">Exclusive</option><option value="inclusive">Inclusive</option></select></div>
+          </div>
+          <div class="fr3">
+            <div class="toggle-row"><div><div>Show Business TRN</div><div class="toggle-copy">Display seller TRN on UAE tax invoices.</div></div><input type="checkbox" id="inv-layout-show-trn" checked onchange="updateInvoiceLayoutPreview()"></div>
+            <div class="toggle-row"><div><div>Show Customer TRN</div><div class="toggle-copy">Display customer TRN when available.</div></div><input type="checkbox" id="inv-layout-show-customer-trn" checked onchange="updateInvoiceLayoutPreview()"></div>
+            <div class="toggle-row"><div><div>Show Business Name</div><div class="toggle-copy">Business name remains visible in invoice header.</div></div><input type="checkbox" checked disabled></div>
+          </div>
+          <div class="fg"><label class="fl">Header Address</label><input class="fi" id="inv-layout-address" value="Dubai, United Arab Emirates" dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
+          <div class="section-hd">Invoice Information</div>
+          <div class="fr3">
+            <div class="toggle-row"><div><div>Show PO Number</div><div class="toggle-copy">Display customer purchase order number.</div></div><input type="checkbox" id="inv-layout-show-po" checked onchange="updateInvoiceLayoutPreview()"></div>
+            <div class="toggle-row"><div><div>Show Delivery Note No.</div><div class="toggle-copy">Display linked delivery note number.</div></div><input type="checkbox" id="inv-layout-show-delivery" onchange="updateInvoiceLayoutPreview()"></div>
+            <div class="toggle-row"><div><div>Show Reference No.</div><div class="toggle-copy">Display internal or customer reference number.</div></div><input type="checkbox" id="inv-layout-show-reference" checked onchange="updateInvoiceLayoutPreview()"></div>
+          </div>
+          <div class="fr3">
+            <div class="fg"><label class="fl">PO Number Label</label><input class="fi" id="inv-layout-po-label" value="Purchase Order No." dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">Delivery Note Label</label><input class="fi" id="inv-layout-delivery-label" value="Delivery Note No." dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">Reference Label</label><input class="fi" id="inv-layout-reference-label" value="Reference No." dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
+          </div>
           <div class="section-hd">Payment & Footer</div>
           <div class="fr3">
             <div class="fg"><label class="fl">Payment Terms</label><select class="fi" id="inv-layout-terms" onchange="updateInvoiceLayoutPreview()"><option>Net 30</option><option>Due on receipt</option><option>Net 15</option><option>Net 45</option></select></div>
             <div class="fg"><label class="fl">Due Days</label><input class="fi mono" id="inv-layout-due-days" value="30" oninput="updateInvoiceLayoutPreview()"></div>
             <div class="fg"><label class="fl">Currency Format</label><select class="fi" id="inv-layout-currency" onchange="updateInvoiceLayoutPreview()"><option>AED 1,234.00</option><option>د.إ 1,234.00</option><option>1,234.00 AED</option></select></div>
           </div>
-          <div class="fg"><label class="fl">Bank / Payment Note</label><input class="fi" id="inv-layout-bank" value="Bank transfer to Emirates NBD · IBAN AE070331234567890123456" oninput="updateInvoiceLayoutPreview()"></div>
           <div class="fr3">
-            <div class="fg"><label class="fl">Footer Message</label><input class="fi" id="inv-layout-footer" value="Thank you for your business" oninput="updateInvoiceLayoutPreview()"></div>
+            <div class="toggle-row"><div><div>Show Payment Terms</div><div class="toggle-copy">Display payment terms in invoice information.</div></div><input type="checkbox" id="inv-layout-show-payment-terms" checked onchange="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">Payment Terms Label</label><input class="fi" id="inv-layout-payment-terms-label" value="Payment Terms" dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
+            <div class="toggle-row"><div><div>Show Bank Details</div><div class="toggle-copy">Display bank account fields on the invoice.</div></div><input type="checkbox" id="inv-layout-show-bank" checked onchange="updateInvoiceLayoutPreview()"></div>
+          </div>
+          <div class="fr3">
+            <div class="fg"><label class="fl">Bank Name</label><input class="fi" id="inv-layout-bank-name" placeholder="Emirates NBD" dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">Account Name</label><input class="fi" id="inv-layout-account-name" placeholder="TaxFlow UAE LLC" dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">Account Number</label><input class="fi mono" id="inv-layout-account-number" placeholder="0000000000" oninput="updateInvoiceLayoutPreview()"></div>
+          </div>
+          <div class="fr3">
+            <div class="fg"><label class="fl">IBAN</label><input class="fi mono" id="inv-layout-iban" placeholder="AE070331234567890123456" oninput="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">SWIFT Code</label><input class="fi mono" id="inv-layout-swift" placeholder="EBILAEAD" oninput="updateInvoiceLayoutPreview()"></div>
+          </div>
+          <div class="fr3">
+            <div class="fg"><label class="fl">Footer Message</label><input class="fi" id="inv-layout-footer" value="Thank you for your business" dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
             <div class="fg"><label class="fl">Language</label><select class="fi" id="inv-layout-language" onchange="updateInvoiceLayoutPreview()"><option>English</option><option>English + Arabic</option><option>Arabic</option></select></div>
             <div class="fg"><label class="fl">Decimal Places</label><select class="fi" id="inv-layout-decimals" onchange="updateInvoiceLayoutPreview()"><option>2 decimals</option><option>3 decimals</option><option>No decimals</option></select></div>
           </div>
+          <div class="section-hd">Arabic / Bilingual Labels</div>
+          <div class="fr3">
+            <div class="toggle-row"><div><div>Enable Arabic Labels</div><div class="toggle-copy">Show bilingual labels on invoice.</div></div><input type="checkbox" id="inv-layout-enable-arabic" checked onchange="updateInvoiceLayoutPreview()"></div>
+            <div class="toggle-row"><div><div>Enable RTL Support</div><div class="toggle-copy">Apply right-to-left direction to invoice content.</div></div><input type="checkbox" id="inv-layout-enable-rtl" onchange="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">Invoice Heading</label><input class="fi arabic-capable" id="inv-layout-heading-label" value="Tax Invoice | فاتورة ضريبية" dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
+          </div>
+          <div class="fr3">
+            <div class="fg"><label class="fl">Product Label</label><input class="fi arabic-capable" id="inv-layout-product-label" value="Product | المنتج" dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">Quantity Label</label><input class="fi arabic-capable" id="inv-layout-quantity-label" value="Qty | الكمية" dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">VAT Label</label><input class="fi arabic-capable" id="inv-layout-vat-label" value="VAT | ضريبة القيمة المضافة" dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
+          </div>
+          <div class="fg"><label class="fl">Total Label</label><input class="fi arabic-capable" id="inv-layout-total-label" value="Total | الإجمالي" dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
           <div class="section-hd">Print Options</div>
           <div class="fr3">
-            <div class="toggle-row"><div><div>Show QR Code</div><div class="toggle-copy">Display a VAT QR placeholder in invoice preview and exports.</div></div><input type="checkbox" id="inv-layout-qr" checked onchange="updateInvoiceLayoutPreview()"></div>
+            <div class="toggle-row"><div><div>Show VAT Rate Per Item</div><div class="toggle-copy">Display VAT percentage on each line.</div></div><input type="checkbox" id="inv-layout-show-vat-rate" checked onchange="updateInvoiceLayoutPreview()"></div>
+            <div class="toggle-row"><div><div>Show VAT Amount Per Item</div><div class="toggle-copy">Display calculated VAT amount on each line.</div></div><input type="checkbox" id="inv-layout-show-vat-amount" checked onchange="updateInvoiceLayoutPreview()"></div>
+            <div class="toggle-row"><div><div>Show Taxable Amount</div><div class="toggle-copy">Display taxable line amount before VAT.</div></div><input type="checkbox" id="inv-layout-show-taxable" checked onchange="updateInvoiceLayoutPreview()"></div>
+          </div>
+          <div class="fr3">
+            <div class="toggle-row"><div><div>Show QR Code</div><div class="toggle-copy">Display a scannable digital invoice QR in invoice preview and exports.</div></div><input type="checkbox" id="inv-layout-qr" checked onchange="updateInvoiceLayoutPreview()"></div>
             <div class="toggle-row"><div><div>Show Tax Summary</div><div class="toggle-copy">Include subtotal, VAT, and total summary block.</div></div><input type="checkbox" id="inv-layout-tax-summary" checked onchange="updateInvoiceLayoutPreview()"></div>
             <div class="toggle-row"><div><div>Signature & Stamp</div><div class="toggle-copy">Reserve space for authorized signature and company stamp.</div></div><input type="checkbox" id="inv-layout-signature" checked onchange="updateInvoiceLayoutPreview()"></div>
           </div>
+          <div class="fr3">
+            <div class="toggle-row"><div><div>Show Prepared By</div><div class="toggle-copy">Display prepared-by signoff.</div></div><input type="checkbox" id="inv-layout-show-prepared" onchange="updateInvoiceLayoutPreview()"></div>
+            <div class="toggle-row"><div><div>Show Approved By</div><div class="toggle-copy">Display approved-by signoff.</div></div><input type="checkbox" id="inv-layout-show-approved" onchange="updateInvoiceLayoutPreview()"></div>
+            <div class="toggle-row"><div><div>Show Company Stamp</div><div class="toggle-copy">Reserve company stamp space.</div></div><input type="checkbox" id="inv-layout-show-stamp" onchange="updateInvoiceLayoutPreview()"></div>
+          </div>
+          <div class="fr3">
+            <div class="toggle-row"><div><div>Show Authorized Signature</div><div class="toggle-copy">Display authorized signature block.</div></div><input type="checkbox" id="inv-layout-show-authorized" checked onchange="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">Signature Label</label><input class="fi" id="inv-layout-signature-label" value="Authorized Signature" dir="auto" oninput="updateInvoiceLayoutPreview()"></div>
+            <div class="fg"><label class="fl">QR Code Type</label><select class="fi" id="inv-layout-qr-type" onchange="updateInvoiceLayoutPreview()"><option value="invoice_url">Invoice URL</option><option value="uae_vat_qr">UAE VAT QR</option><option value="zatca_qr" disabled>ZATCA QR (Saudi only)</option></select></div>
+          </div>
         </div>
         <div class="chart-panel" id="invoice-layout-preview"></div>
-      </div>
-    </div>
-    <div class="g2 mb16">
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Document Numbering</div></div>
-        <table class="tbl">
-          <thead><tr><th>Document</th><th>Prefix</th><th>Next No.</th><th>Reset</th></tr></thead>
-          <tbody>
-            <tr><td>Sales Invoice</td><td><input class="fi mono" value="INV-"></td><td><input class="fi mono" value="0849"></td><td>Yearly</td></tr>
-            <tr><td>Purchase</td><td><input class="fi mono" value="PUR-"></td><td><input class="fi mono" value="0222"></td><td>Yearly</td></tr>
-            <tr><td>Journal</td><td><input class="fi mono" value="JE-"></td><td><input class="fi mono" value="0018"></td><td>Monthly</td></tr>
-            <tr><td>Payslip</td><td><input class="fi mono" value="PAY-"></td><td><input class="fi mono" value="0105"></td><td>Monthly</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="card">
-        <div class="card-hd"><div class="card-title">Templates</div><button class="btn btn-p btn-sm" onclick="toast('Template editor opened','info')">Edit Template</button></div>
-        <div class="toggle-row"><div><div>Invoice PDF</div><div class="toggle-copy">Logo, bank details, QR placeholder, tax wording.</div></div><span class="b b-g">Active</span></div>
-        <div class="toggle-row"><div><div>Receipt Voucher</div><div class="toggle-copy">Payment confirmation and allocation details.</div></div><span class="b b-g">Active</span></div>
-        <div class="toggle-row"><div><div>Payslip</div><div class="toggle-copy">Salary, allowances, deductions, leave balance.</div></div><span class="b b-g">Active</span></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-hd"><div class="card-title">Branding</div></div>
-      <div class="fr3">
-        <div class="fg"><label class="fl">Primary Color</label><input class="fi mono" value="#4f8ef0"></div>
-        <div class="fg"><label class="fl">Invoice Footer</label><input class="fi" value="Thank you for your business"></div>
-        <div class="fg"><label class="fl">Default Terms</label><select class="fi"><option>Net 30</option><option>Due on receipt</option><option>Net 15</option></select></div>
       </div>
     </div>
   </div>
@@ -4223,37 +4222,37 @@ Reports + Audit Trail + Document Evidence
       <div class="card">
         <div class="card-hd"><div class="card-title">📈 Entity Relationship Summary</div></div>
         <div class="mono" style="font-size:11px;line-height:1.8">
-users ─────< funds_accounts<br>
-users ─────< fund_transactions<br>
-customers ─< sales_invoices<br>
-  │        └─< invoice_items<br>
-suppliers ─< purchase_invoices<br>
-  │        └─< invoice_items<br>
-items ─────< inventory_movements<br>
-source_transactions ─< posting_jobs<br>
-posting_jobs ─< posting_errors<br>
-source_transactions ─< journal_entries<br>
-source_transactions ─< tax_lines<br>
-tax_codes ─< tax_lines<br>
-tax_lines ─< vat_returns<br>
-sales_invoices ─< einvoice_payloads<br>
-einvoice_payloads ─< einvoice_transmissions<br>
-accounts ──< journal_entries<br>
-  │        └─< journal_lines<br>
-employees ─< attendance<br>
-employees ─< attendance_corrections<br>
-employees ─< overtime_requests<br>
-employees ─< leave_requests<br>
-employees ─< payroll_items<br>
-payroll_items ─< wps_batches<br>
-wps_batches ─< wps_sif_files<br>
-rota_templates ─< rota_assignments<br>
-employees ─< rota_assignments<br>
-shifts ─────< rota_assignments<br>
-attendance ─< attendance_breaks<br>
-attendance ─< overtime_requests<br>
-documents ─< document_links<br>
-period_locks ─< audit_logs
+users ─────&lt; funds_accounts<br>
+users ─────&lt; fund_transactions<br>
+customers ─&lt; sales_invoices<br>
+  │        └─&lt; invoice_items<br>
+suppliers ─&lt; purchase_invoices<br>
+  │        └─&lt; invoice_items<br>
+items ─────&lt; inventory_movements<br>
+source_transactions ─&lt; posting_jobs<br>
+posting_jobs ─&lt; posting_errors<br>
+source_transactions ─&lt; journal_entries<br>
+source_transactions ─&lt; tax_lines<br>
+tax_codes ─&lt; tax_lines<br>
+tax_lines ─&lt; vat_returns<br>
+sales_invoices ─&lt; einvoice_payloads<br>
+einvoice_payloads ─&lt; einvoice_transmissions<br>
+accounts ──&lt; journal_entries<br>
+  │        └─&lt; journal_lines<br>
+employees ─&lt; attendance<br>
+employees ─&lt; attendance_corrections<br>
+employees ─&lt; overtime_requests<br>
+employees ─&lt; leave_requests<br>
+employees ─&lt; payroll_items<br>
+payroll_items ─&lt; wps_batches<br>
+wps_batches ─&lt; wps_sif_files<br>
+rota_templates ─&lt; rota_assignments<br>
+employees ─&lt; rota_assignments<br>
+shifts ─────&lt; rota_assignments<br>
+attendance ─&lt; attendance_breaks<br>
+attendance ─&lt; overtime_requests<br>
+documents ─&lt; document_links<br>
+period_locks ─&lt; audit_logs
         </div>
       </div>
     </div>
@@ -4383,10 +4382,16 @@ period_locks ─< audit_logs
 
 <!-- ═══ MODALS ═══ -->
 <div class="overlay" id="m-product" onclick="closeOvBg(event,'m-product')">
-  <div class="modal"><div class="modal-title">Add Product / Service</div><div class="modal-sub">Add to your product catalogue for invoicing</div>
-    <div class="fr2"><div class="fg"><label class="fl">Product Code</label><input class="fi" id="prod-code" placeholder="PRD-005"></div><div class="fg"><label class="fl">Category</label><select class="fi" id="prod-category"><option>Materials</option><option>Services</option><option>Supplies</option></select></div></div>
-    <div class="fg"><label class="fl">Product / Service Name</label><input class="fi" id="prod-name" placeholder="Full name as on invoice"></div>
-    <div class="fr3"><div class="fg"><label class="fl">Unit of Measure</label><select class="fi" id="prod-unit"><option>Each</option><option>Ton</option><option>Box</option><option>Hour</option><option>Trip</option><option>Sqm</option></select></div><div class="fg"><label class="fl">Unit Price (AED)</label><input class="fi mono" id="prod-price" placeholder="0.00"></div><div class="fg"><label class="fl">VAT Treatment</label><select class="fi" id="prod-vat"><option>Standard 5%</option><option>Zero-rated 0%</option><option>Exempt</option></select></div></div>
+  <div class="modal modal-lg"><div class="modal-title">Add Product / Service</div><div class="modal-sub">Add item, stock settings, supplier, and invoice pricing</div>
+    <div class="fr2"><div class="fg"><label class="fl">Item Code</label><input class="fi mono" id="prod-code" placeholder="ITM-005"></div><div class="fg"><label class="fl">Category</label><select class="fi" id="prod-category"><option>Materials</option><option>Services</option><option>Supplies</option></select></div></div>
+    <div class="fg"><label class="fl">Item Name</label><input class="fi" id="prod-name" placeholder="Full item name"></div>
+    <div class="fr2"><div class="fg"><label class="fl">Unit of Measure</label><select class="fi" id="prod-unit"><option>Each</option><option>Ton</option><option>Box</option><option>Hour</option><option>Trip</option><option>Sqm</option></select></div><div class="fg"><label class="fl">Cost Price</label><input class="fi mono" id="prod-cost" placeholder="0.00"></div></div>
+    <div class="section-hd">Stock Settings</div>
+    <div class="fr2"><div class="fg"><label class="fl">Stock Tracking</label><select class="fi" id="prod-tracking"><option>Yes</option><option>No</option><option>Optional</option></select></div><div class="fg"><label class="fl">Opening Date</label><input class="fi" id="prod-opening-date" type="date"></div></div>
+    <div class="fr3"><div class="fg"><label class="fl">Reorder Level</label><input class="fi mono" id="prod-reorder" placeholder="50"></div><div class="fg"><label class="fl">Minimum Stock</label><input class="fi mono" id="prod-min" placeholder="25"></div><div class="fg"><label class="fl">Maximum Stock</label><input class="fi mono" id="prod-max" placeholder="500"></div></div>
+    <div class="fg"><label class="fl">Preferred Supplier</label><select class="fi" id="prod-supplier"><option value="">Select Supplier</option></select></div>
+    <div class="section-hd">Invoice Pricing</div>
+    <div class="fr3"><div class="fg"><label class="fl">Unit Selling Price (AED)</label><input class="fi mono" id="prod-price" placeholder="0.00"></div><div class="fg"><label class="fl">VAT Treatment</label><select class="fi" id="prod-vat"><option>Standard 5%</option><option>Zero-rated 0%</option><option>Exempt</option></select></div><div class="fg"><label class="fl">Status</label><select class="fi" id="prod-status"><option>Active</option><option>Inactive</option><option>Draft</option></select></div></div>
     <div class="fg"><label class="fl">Description</label><textarea class="fi" id="prod-desc" rows="2" placeholder="Optional description for invoice..."></textarea></div>
     <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-product')">Cancel</button><button class="btn btn-p" onclick="saveProd()">Add Product</button></div>
   </div>
@@ -4431,12 +4436,13 @@ period_locks ─< audit_logs
 </div>
 
 <div class="overlay" id="m-sales-view" onclick="closeOvBg(event,'m-sales-view')">
-  <div class="modal modal-lg">
+  <div class="modal modal-xl">
     <div class="modal-title" id="sales-view-title">Invoice Preview</div>
     <div class="modal-sub" id="sales-view-sub">Sales invoice</div>
     <div id="sales-view-body"></div>
     <div class="modal-foot">
-      <button class="btn btn-g" onclick="toast('Preparing invoice PDF...','info')">Export PDF</button>
+      <button class="btn btn-g" onclick="downloadCurrentInvoicePdf()">Download PDF</button>
+      <button class="btn btn-g" onclick="openCurrentPublicInvoice()">Digital Invoice</button>
       <button class="btn btn-g" onclick="shareCurrentInvoice('email')">Email</button>
       <button class="btn btn-success" onclick="shareCurrentInvoice('whatsapp')">WhatsApp</button>
       <button class="btn btn-p" onclick="openInvoiceShareModal()">Share Options</button>
@@ -4448,15 +4454,18 @@ period_locks ─< audit_logs
 <div class="overlay" id="m-invoice-share" onclick="closeOvBg(event,'m-invoice-share')">
   <div class="modal">
     <div class="modal-title">Share Invoice</div>
-    <div class="modal-sub" id="invoice-share-sub">Send invoice by email or WhatsApp</div>
+    <div class="modal-sub" id="invoice-share-sub">Share the PDF invoice and online view link</div>
     <div class="fr2">
       <div class="fg"><label class="fl">Customer Email</label><input class="fi" id="share-email" type="email" placeholder="customer@example.com"></div>
       <div class="fg"><label class="fl">WhatsApp Number</label><input class="fi mono" id="share-phone" placeholder="+971 50 000 0000"></div>
     </div>
     <div class="fg"><label class="fl">Message</label><textarea class="fi" id="share-message" rows="4"></textarea></div>
+    <div class="fg"><label class="fl">Online View Link</label><div class="field-action-row"><input class="fi mono" id="share-link" readonly><button class="btn btn-g btn-sm" type="button" onclick="copyCurrentInvoiceLink()">Copy Link</button></div></div>
     <div class="g2 mb16">
-      <div class="setting-tile"><strong>Email</strong><p>Send invoice PDF link with invoice number, due date, and total.</p><button class="btn btn-p btn-sm" onclick="shareCurrentInvoice('email')">Send Email</button></div>
-      <div class="setting-tile"><strong>WhatsApp</strong><p>Open WhatsApp share with invoice summary and payment note.</p><button class="btn btn-success btn-sm" onclick="shareCurrentInvoice('whatsapp')">Send WhatsApp</button></div>
+      <div class="setting-tile"><strong>PDF Invoice</strong><p>Download the invoice PDF file.</p><button class="btn btn-g btn-sm" onclick="downloadCurrentInvoicePdf()">Download PDF</button></div>
+      <div class="setting-tile"><strong>Online View</strong><p>Open the customer-facing digital invoice link.</p><button class="btn btn-g btn-sm" onclick="openCurrentPublicInvoice()">Open Online View</button></div>
+      <div class="setting-tile"><strong>Email PDF + Link</strong><p>Open the PDF view and prepare an email containing the online view link.</p><button class="btn btn-p btn-sm" onclick="shareInvoicePdfAndLink('email')">Email PDF + Link</button></div>
+      <div class="setting-tile"><strong>WhatsApp Link</strong><p>Open the PDF view and prepare a WhatsApp message with the online view link.</p><button class="btn btn-success btn-sm" onclick="shareInvoicePdfAndLink('whatsapp')">WhatsApp Link</button></div>
     </div>
     <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-invoice-share')">Close</button></div>
   </div>
@@ -4464,12 +4473,12 @@ period_locks ─< audit_logs
 
 <div class="overlay" id="m-bank" onclick="closeOvBg(event,'m-bank')">
   <div class="modal"><div class="modal-title">Add Bank Account</div><div class="modal-sub">Register a new bank account for reconciliation</div>
-    <div class="fg"><label class="fl">Bank Name</label><select class="fi"><option>Emirates NBD</option><option>ADCB</option><option>FAB</option><option>Mashreq</option><option>ADIB</option><option>DIB</option><option>RAK Bank</option><option>HSBC UAE</option></select></div>
-    <div class="fg"><label class="fl">Account Holder Name</label><input class="fi" value="Acme Trading LLC"></div>
-    <div class="fg"><label class="fl">IBAN</label><input class="fi mono" placeholder="AE..."></div>
-    <div class="fr2"><div class="fg"><label class="fl">Account Type</label><select class="fi"><option>Current</option><option>Savings</option></select></div><div class="fg"><label class="fl">Currency</label><select class="fi"><option>AED</option><option>USD</option><option>EUR</option><option>GBP</option></select></div></div>
-    <div class="fr2"><div class="fg"><label class="fl">Swift Code</label><input class="fi mono" placeholder="ENBD AEADxxx"></div><div class="fg"><label class="fl">Branch</label><input class="fi" placeholder="Branch name"></div></div>
-    <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-bank')">Cancel</button><button class="btn btn-p" onclick="saveM('m-bank','Bank account added ✓')">Save Account</button></div>
+    <div class="fg"><label class="fl">Bank Name</label><select class="fi" id="bank-name"><option>Emirates NBD</option><option>ADCB</option><option>FAB</option><option>Mashreq</option><option>ADIB</option><option>DIB</option><option>RAK Bank</option><option>HSBC UAE</option></select></div>
+    <div class="fg"><label class="fl">Account Holder Name</label><input class="fi" id="bank-holder"></div>
+    <div class="fg"><label class="fl">IBAN</label><input class="fi mono" id="bank-iban" placeholder="AE..."></div>
+    <div class="fr2"><div class="fg"><label class="fl">Account Type</label><select class="fi" id="bank-type"><option>Current</option><option>Savings</option></select></div><div class="fg"><label class="fl">Currency</label><select class="fi" id="bank-currency"><option>AED</option><option>USD</option><option>EUR</option><option>GBP</option></select></div></div>
+    <div class="fr2"><div class="fg"><label class="fl">Swift Code</label><input class="fi mono" id="bank-swift" placeholder="ENBD AEADxxx"></div><div class="fg"><label class="fl">Branch</label><input class="fi" id="bank-branch" placeholder="Branch name"></div></div>
+    <div class="modal-foot"><button class="btn btn-g" onclick="closeM('m-bank')">Cancel</button><button class="btn btn-p" onclick="saveBankAccount()">Save Account</button></div>
   </div>
 </div>
 

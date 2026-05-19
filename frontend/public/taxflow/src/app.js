@@ -18,6 +18,7 @@ META.exception={t:'Exception Center',s:'Failed postings - duplicates - VAT/OCR -
 let isHydratingFromServer=false;
 const tableRefreshTimers=new WeakMap();
 const purchaseRecordCache=new Map();
+let currentPurchaseViewRef='';
 const PURCHASE_PAGE_SIZE=100;
 let purchaseRecordsTotal=0;
 let purchaseRecordsOffset=0;
@@ -133,6 +134,7 @@ function go(page){
   closeSidebar();
   if(page==='reports')syncReportsFromDatabase();
   if(page==='exception')loadExceptionCenter();
+  if(page==='inventory')ensurePurchaseRecordsLoadedForStock();
   runPageWarmup(page);
   updateBackButton();
 }
@@ -149,6 +151,7 @@ function stab(el,target){
   const t=document.getElementById(target);
   if(t)t.classList.add('on');
   if(target==='inv-mapping')loadStockMappingsFromServer();
+  if(target==='inv-stock')ensurePurchaseRecordsLoadedForStock();
   if(target==='p-records')ensurePurchaseRecordsLoaded();
   if(target==='p-manual'){
     bindManualPurchaseCalculator();
@@ -183,9 +186,27 @@ function closeSidebar(){toggleSidebar(false);}
 function showM(id){
   const modal=document.getElementById(id);
   if(!modal)return;
+  ensureModalCloseButton(modal,id);
   modal.classList.add('on');
-  setTimeout(()=>modal.querySelector('input,select,textarea,button')?.focus(),30);
+  setTimeout(()=>modal.querySelector('input,select,textarea,button:not(.modal-x)')?.focus(),30);
 }
+
+function ensureModalCloseButton(overlay,id){
+  const panel=overlay.querySelector('.modal');
+  if(!panel||panel.querySelector('.modal-x'))return;
+  const close=document.createElement('button');
+  close.type='button';
+  close.className='modal-x';
+  close.setAttribute('aria-label','Close popup');
+  close.title='Close';
+  close.textContent='×';
+  close.onclick=event=>{
+    event.stopPropagation();
+    closeM(id);
+  };
+  panel.prepend(close);
+}
+
 function closeM(id){
   document.getElementById(id)?.classList.remove('on');
   if(id==='m-customer')customerReturnToInvoice=false;
@@ -1277,13 +1298,21 @@ function renderDatabaseDashboardSummary(data){
     {label:'Documents',count:counts.document_count,page:'documents',icon:'DOC',tone:'green',copy:'Uploaded files and attachments'},
     {label:'Audit Logs',count:counts.audit_count,page:'settings',tab:'set-backup',icon:'LOG',tone:'red',copy:'Backup and audit trail'}
   ];
+  const totalRecords=rows.reduce((sum,item)=>sum+Number(item.count||0),0);
   card.innerHTML=`
-    <div class="card-hd">
-      <span class="b b-g">${escapeHtml(meta.status||'Database synced')}</span>
+    <div class="card-hd app-function-hd">
+      <div>
+        <div class="card-title">App Functions</div>
+        <div class="card-sub">Live database count by functional area. Open a tile to jump to its module.</div>
+      </div>
+      <div class="app-function-meta">
+        <span class="b b-g">${escapeHtml(meta.status||'Database synced')}</span>
+        <span class="mono">${rows.length.toLocaleString('en-AE')} areas · ${totalRecords.toLocaleString('en-AE')} records</span>
+      </div>
     </div>
-    <div class="db-shortcuts">
+    <div class="db-shortcuts app-function-grid">
       ${rows.map(item=>`
-        <button class="db-shortcut ${escapeHtml(item.tone)}" type="button" onclick="openDashboardRecord('${escapeHtml(item.page)}','${escapeHtml(item.tab||'')}')">
+        <button class="db-shortcut app-function-tile ${escapeHtml(item.tone)}" type="button" onclick="openDashboardRecord('${escapeHtml(item.page)}','${escapeHtml(item.tab||'')}')" aria-label="Open ${escapeHtml(item.label)}">
           <span class="db-shortcut-icon">${escapeHtml(item.icon)}</span>
           <span class="db-shortcut-body">
             <span class="db-shortcut-top">
@@ -1431,11 +1460,11 @@ function loadExceptionCenter(){
 }
 
 function saveInvoiceLayoutServer(layout){
-  apiRequest('invoice-layout',layout).catch(err=>console.warn('Database layout save failed:',err));
+  return apiRequest('invoice-layout',layout);
 }
 
 function audit(action,record='System',result='Logged'){
-  const entry={time:new Date().toLocaleString('en-AE',{dateStyle:'short',timeStyle:'short'}),user:'Sara',action,record,result};
+  const entry={time:new Date().toLocaleString('en-AE',{dateStyle:'short',timeStyle:'short'}),user:'System User',action,record,result};
   saveServer('audit',entry);
   renderAuditLog([entry]);
 }
@@ -1478,6 +1507,9 @@ function clearStaticDemoData(){
     'vendor-tbody':'No vendors in database yet.',
     'payment-in-tbody':'No receipts in database yet.',
     'payment-out-tbody':'No payments in database yet.',
+    'bank-account-tbody':'No bank accounts in database yet.',
+    'expense-tbody':'No expenses in database yet.',
+    'expense-approval-tbody':'No pending expenses for approval.',
     'prod-tbody':'No products in database yet.',
     'account-tbody':'No accounts in database yet.',
     'ledger-tbody':'No ledger entries in database yet.',
@@ -1491,20 +1523,73 @@ function clearStaticDemoData(){
   });
   document.querySelectorAll('[data-demo-static="1"]').forEach(node=>node.remove());
   clearDemoFormDefaults();
+  clearDemoCardsAndCounters();
+  resetDraftEntryDefaults();
 }
 
 function clearDemoFormDefaults(){
-  const demoOptionText=/^(Al Hamad Steel|Gulf Freight|Office Depot UAE|UAE Paints Co\.|Dubai Steel Co\.|Gulf Logistics Ltd|Emirates Supplies|Al Baraka Trading|Steel Rods 12mm|Packaging Box A|Industrial Oil 5L|Safety Gloves|Sara Al Mansouri|Ahmed Rashid|Rania Abboud|Mohamed Jaber)$/i;
+  const demoOptionText=/^(Al Hamad Steel|Gulf Freight|Office Depot UAE|UAE Paints Co\.|Dubai Steel Co\.|Gulf Logistics Ltd|Emirates Supplies|Al Baraka Trading|Steel Rods 12mm|Packaging Box A|Industrial Oil 5L|Safety Gloves|Sara Al Mansouri|Ahmed Rashid|Rania Abboud|Mohamed Jaber|Dubai HQ|Abu Dhabi Warehouse|Sharjah Sales Office|Tue Evening|Sat Morning|Wed Morning)$/i;
   document.querySelectorAll('select').forEach(select=>{
     [...select.options].forEach(option=>{
       if(demoOptionText.test(option.textContent.trim()))option.remove();
     });
     if(select.options.length&&select.selectedIndex<0)select.selectedIndex=0;
   });
-  const demoInputValue=/^(Sara Al Mansouri|INV-2024-\d+|PUR-2024-\d+|Steel Rods 12mm|Packaging Box A|Industrial Oil 5L|Safety Gloves)$/i;
+  const demoInputValue=/^(Sara Al Mansouri|INV-2024-\d+|PUR-2024-\d+|QTN-2024-\d+|Steel Rods 12mm|Packaging Box A|Industrial Oil 5L|Safety Gloves)$/i;
   document.querySelectorAll('input').forEach(input=>{
     if(demoInputValue.test(String(input.value||'').trim()))input.value='';
   });
+}
+
+function clearDemoCardsAndCounters(){
+  const fileList=document.getElementById('pur-file-list');
+  if(fileList)fileList.innerHTML='<div style="font-size:12px;color:var(--text3);padding:10px 0">No uploaded files in database yet.</div>';
+  setText('file-count-badge','0 files');
+  document.querySelectorAll('.page:not(#page-dashboard) .stat-val').forEach(node=>{
+    const current=node.textContent.trim();
+    node.textContent=/^AED/i.test(current)?'AED 0.00':'0';
+  });
+  document.querySelectorAll('.page:not(#page-dashboard) .stat-delta').forEach(node=>{node.textContent='';});
+  document.querySelectorAll('button').forEach(button=>{
+    const label=button.textContent.trim().toLowerCase();
+    const action=button.getAttribute('onclick')||'';
+    if(label==='add 4 data'||action.includes('addFourPurchaseRecords')){
+      button.remove();
+    }
+  });
+}
+
+function resetDraftEntryDefaults(){
+  setFieldValue(document.getElementById('inv-no'),'');
+  setFieldValue(document.getElementById('quote-no'),'');
+  document.querySelectorAll('#inv-lines .sales-inv-line').forEach((row,index)=>{
+    if(index>0){
+      row.remove();
+      return;
+    }
+    setFieldValue(row.querySelector('.inv-product'),'');
+    setFieldValue(row.querySelector('.inv-unit'),'PCS');
+    setFieldValue(row.querySelector('.inv-qty'),'1');
+    setFieldValue(row.querySelector('.inv-price'),'0.00');
+    setFieldValue(row.querySelector('.inv-amount'),'0.00');
+  });
+  document.querySelectorAll('#quote-lines .quote-line').forEach((row,index)=>{
+    if(index>0){
+      row.remove();
+      return;
+    }
+    const item=row.querySelector('.quote-item');
+    if(item)item.value='';
+    setFieldValue(row.querySelector('.quote-qty'),'1');
+    setFieldValue(row.querySelector('.quote-price'),'0.00');
+    setFieldValue(row.querySelector('.quote-amount'),'0.00');
+  });
+  setText('subtotal','AED 0.00');
+  setText('vat-amt','AED 0.00');
+  setText('inv-total','AED 0.00');
+  setText('quote-subtotal','AED 0.00');
+  setText('quote-vat','AED 0.00');
+  setText('quote-total','AED 0.00');
 }
 
 function quotationActionsHtml(){
@@ -1551,7 +1636,9 @@ function renderQuotationRecord(quote){
     vat_amount:quote.vat_amount||quote.vat||0,
     total:quote.total||0,
     status:quote.status||'Draft',
-    owner:quote.owner||'Sales Team'
+    owner:quote.owner||'Sales Team',
+    subject:quote.subject||'',
+    lines:Array.isArray(quote.lines)?quote.lines:[]
   };
   row.dataset.serverRecord='quotations';
   row.dataset.quotation=JSON.stringify(record);
@@ -1573,6 +1660,34 @@ function renderCustomerRecord(customer){
   row.innerHTML=`<td>${escapeHtml(customer.name)}</td><td class="mono">${escapeHtml(customer.trn||'Not registered')}</td><td>${escapeHtml(customer.emirate||'Dubai')}</td><td>${escapeHtml(customer.email||customer.phone||'-')}</td><td class="mono" style="color:var(--accent)">AED 0</td><td><button class="btn btn-g btn-sm">View</button></td>`;
   removeEmptyState(tbody);
   tbody.prepend(row);
+  refreshInvoiceCustomerOptions();
+}
+
+function invoiceCustomerRecords(){
+  return [...document.querySelectorAll('#customer-tbody tr:not([data-empty-state])')].map(row=>({
+    name:row.children[0]?.textContent.trim()||'',
+    trn:(row.children[1]?.textContent.trim()||'').replace(/^Not registered$/i,''),
+    emirate:row.children[2]?.textContent.trim()||'',
+    contact:row.children[3]?.textContent.trim()||''
+  })).filter(customer=>customer.name);
+}
+
+function refreshInvoiceCustomerOptions(){
+  const list=document.getElementById('invoice-customer-options');
+  if(!list)return;
+  list.innerHTML=invoiceCustomerRecords()
+    .map(customer=>`<option value="${escapeHtml(customer.name)}" label="${escapeHtml([customer.trn,customer.emirate,customer.contact].filter(Boolean).join(' - '))}"></option>`)
+    .join('');
+}
+
+function applyInvoiceCustomerSelection(){
+  const input=document.getElementById('inv-cust');
+  const value=(input?.value||'').trim().toLowerCase();
+  if(!value)return;
+  const match=invoiceCustomerRecords().find(customer=>customer.name.toLowerCase()===value);
+  if(!match)return;
+  const trn=document.getElementById('inv-ctrn');
+  if(trn)trn.value=match.trn||'';
 }
 
 function renderProductRecord(product,options={}){
@@ -1582,7 +1697,9 @@ function renderProductRecord(product,options={}){
   const vatClass=vatText==='5%'?'b-b':'b-t';
   const row=document.createElement('tr');
   row.dataset.serverRecord='products';
-  row.dataset.cost=product.cost??0;
+  row.dataset.cost=product.cost??product.unit_cost??0;
+  row.dataset.price=product.price??product.sales_price??product.selling_price??product.unit_price??product.cost??0;
+  row.dataset.unit=product.unit||'Each';
   row.dataset.supplier=product.supplier_name||product.supplier||'';
   row.dataset.reorderLevel=product.reorder_level??product.reorderLevel??0;
   row.dataset.available=product.available??product.quantity??product.stock_on_hand??product.opening_stock??0;
@@ -1596,6 +1713,7 @@ function renderProductRecord(product,options={}){
   if(!options.deferSuggestions&&!isHydratingFromServer){
     refreshInvoiceProductSuggestions();
     refreshPurchaseProductSuggestions();
+    refreshQuotationProductOptions();
   }
 }
 
@@ -1651,6 +1769,21 @@ function purchaseStockItems(){
     : [...document.querySelectorAll('#purchase-record-tbody tr:not([data-empty-state])')].map(purchaseRecordFromRow);
   sourceRecords.forEach(record=>{
     const lines=Array.isArray(record?.lines)?record.lines:[];
+    if(!lines.length&&Number(record?.items||0)>0){
+      const name=record.supplier?`${record.supplier} purchase items`:'Unmapped purchase items';
+      const code=record.ref||record.invoice_no||record.reference||name;
+      const key=stockItemKey(code,name);
+      const existing=items.get(key)||{
+        code,
+        name,
+        category:'Purchases',
+        available:0,
+        unit:'ITEM',
+        reorderLevel:0
+      };
+      existing.available+=Number(record.items||0);
+      items.set(key,existing);
+    }
     lines.forEach(line=>{
       const name=purchaseAiProductName(line)||line.name||line.description||'Purchase item';
       const code=String(line.sku||line.code||name).trim();
@@ -1708,6 +1841,7 @@ function updateStockLevelStats(products){
 function syncProductMasterOptions(){
   const categorySelect=document.getElementById('prod-category');
   const unitSelect=document.getElementById('prod-unit');
+  const supplierSelect=document.getElementById('prod-supplier');
   if(categorySelect){
     const current=categorySelect.value;
     const categories=[...document.querySelectorAll('#sales-category-tbody tr td:first-child')]
@@ -1723,6 +1857,15 @@ function syncProductMasterOptions(){
       .filter(Boolean);
     unitSelect.innerHTML=[...new Set(units)].map(name=>`<option>${escapeHtml(name)}</option>`).join('');
     if(current&&units.includes(current))unitSelect.value=current;
+  }
+  if(supplierSelect){
+    const current=supplierSelect.value;
+    const suppliers=[...document.querySelectorAll('#vendor-tbody tr:not([data-empty-state]) td:first-child')]
+      .map(td=>td.textContent.trim())
+      .filter(Boolean);
+    const unique=[...new Set(suppliers)];
+    supplierSelect.innerHTML='<option value="">Select Supplier</option>'+unique.map(name=>`<option>${escapeHtml(name)}</option>`).join('');
+    if(current&&unique.includes(current))supplierSelect.value=current;
   }
 }
 
@@ -1805,7 +1948,8 @@ function applySupplierAddress(){
   const supplier=document.getElementById('mp-supplier')?.value||'';
   const address=vendorAddressByName(supplier);
   const field=document.getElementById('mp-address');
-  if(field&&address&&!field.value)field.value=address;
+  if(!field)return;
+  field.value=address||'';
 }
 
 function syncSupplierOptions(selected=''){
@@ -1838,6 +1982,187 @@ function renderPaymentRecord(payment){
   tbody.prepend(row);
 }
 
+function bankAccountKey(account){
+  return String(account?.iban||account?.account_number||account?.name||account?.bank||'').trim().toLowerCase();
+}
+
+function renderBankAccountRecord(account){
+  const tbody=document.getElementById('bank-account-tbody');
+  const key=bankAccountKey(account);
+  if(!tbody||!key)return;
+  const exists=[...tbody.querySelectorAll('tr:not([data-empty-state])')]
+    .some(row=>bankAccountKey({iban:row.dataset.iban,bank:row.dataset.bank})===key);
+  if(exists)return;
+  const currency=account.currency||'AED';
+  const balance=Number(account.balance||0);
+  const type=account.type||account.account_type||'Current';
+  const typeClass=String(type).toLowerCase().includes('saving')?'b-t':'b-b';
+  const row=document.createElement('tr');
+  row.dataset.serverRecord='bankAccounts';
+  row.dataset.iban=account.iban||'';
+  row.dataset.bank=account.bank||account.bank_name||'';
+  row.innerHTML=`<td><div class="flx"><span style="font-size:18px">🏦</span><span>${escapeHtml(account.bank||account.bank_name||'Bank')}</span></div></td><td>${escapeHtml(account.holder||account.account_holder||account.name||'-')}</td><td class="mono">${escapeHtml(account.iban||'-')}</td><td>${escapeHtml(currency)}</td><td><span class="b ${typeClass}">${escapeHtml(type)}</span></td><td class="mono" style="color:var(--green)">${escapeHtml(currency)} ${balance.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td><span class="b b-g">${escapeHtml(account.status||'Active')}</span></td><td><button class="btn btn-g btn-sm" onclick="toast('Syncing with bank...','info')">Sync</button></td>`;
+  removeEmptyState(tbody);
+  tbody.prepend(row);
+  updateBankAccountSummary();
+}
+
+function updateBankAccountSummary(){
+  const rows=[...document.querySelectorAll('#bank-account-tbody tr:not([data-empty-state])')];
+  const total=rows.reduce((sum,row)=>sum+parseAmount(row.children[5]?.textContent),0);
+  const stats=[...document.querySelectorAll('#bk-accounts .stat-val')];
+  if(stats[0])stats[0].textContent=formatAed(total);
+  if(stats[1])stats[1].textContent=formatAed(0);
+  if(stats[2])stats[2].textContent=formatAed(0);
+}
+
+function buildBankAccountFromForm(){
+  return {
+    id:(document.getElementById('bank-iban')?.value||`BANK-${Date.now()}`).trim(),
+    bank:document.getElementById('bank-name')?.value||'Bank',
+    holder:document.getElementById('bank-holder')?.value?.trim()||currentCompany?.name||'',
+    iban:document.getElementById('bank-iban')?.value?.trim()||'',
+    type:document.getElementById('bank-type')?.value||'Current',
+    currency:document.getElementById('bank-currency')?.value||'AED',
+    swift:document.getElementById('bank-swift')?.value?.trim()||'',
+    branch:document.getElementById('bank-branch')?.value?.trim()||'',
+    balance:0,
+    status:'Active'
+  };
+}
+
+function saveBankAccount(){
+  const record=buildBankAccountFromForm();
+  if(!record.bank||!record.holder){
+    toast('Enter bank and account holder','warn');
+    return;
+  }
+  renderBankAccountRecord(record);
+  saveServer('bankAccounts',record);
+  closeM('m-bank');
+  ['bank-holder','bank-iban','bank-swift','bank-branch'].forEach(id=>setFieldValue(document.getElementById(id),''));
+  toast('Bank account added','ok');
+  audit('Added bank account',record.bank,'Saved');
+}
+
+function calcExpenseTotal(){
+  const amount=parseAmount(document.getElementById('expense-amount')?.value);
+  const vat=parseAmount(document.getElementById('expense-vat')?.value);
+  const total=document.getElementById('expense-total');
+  if(total)total.value=(amount+vat).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function renderExpenseRecord(expense){
+  const tbody=document.getElementById('expense-tbody');
+  const ref=expense?.ref||expense?.id;
+  if(!tbody||!ref||hasFirstCellValue(tbody,ref))return;
+  const amount=Number(expense.amount||0);
+  const vat=Number(expense.vat_amount||expense.vat||0);
+  const total=Number(expense.total||amount+vat);
+  const status=expense.status||'Pending';
+  const statusClass=status==='Approved'?'b-g':status==='Rejected'?'b-r':status==='Draft'?'b-gray':'b-a';
+  const row=document.createElement('tr');
+  row.dataset.serverRecord='expenses';
+  row.dataset.expense=JSON.stringify(expense);
+  row.dataset.expenseRef=ref;
+  row.innerHTML=`<td>${escapeHtml(expense.date||'-')}</td><td>${escapeHtml(expense.description||ref)}</td><td><span class="b b-gray">${escapeHtml(expense.category||'Expense')}</span></td><td class="mono">${amount.toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${vat.toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${total.toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td><button class="btn btn-g btn-sm" onclick="openRowDetail(this,'Expense Detail','Expense')">View</button></td>`;
+  removeEmptyState(tbody);
+  tbody.prepend(row);
+  renderExpenseApprovalRecord(expense);
+  updateExpenseStats();
+}
+
+function renderExpenseApprovalRecord(expense){
+  const tbody=document.getElementById('expense-approval-tbody');
+  const ref=expense?.ref||expense?.id;
+  if(!tbody||!ref)return;
+  tbody.querySelector(`tr[data-expense-ref="${CSS.escape(ref)}"]`)?.remove();
+  if(String(expense.status||'').toLowerCase()!=='pending'){
+    if(!tbody.querySelector('tr:not([data-empty-state])'))emptyTableMessage(tbody,'No pending expenses for approval.');
+    return;
+  }
+  const row=document.createElement('tr');
+  row.dataset.expenseRef=ref;
+  row.innerHTML=`<td>${escapeHtml(expense.employee||'Current User')}</td><td>${escapeHtml(expense.description||ref)}</td><td class="mono">${formatAed(expense.total||0)}</td><td>${escapeHtml(expense.date||'-')}</td><td><span class="b b-a">Pending</span></td><td><div class="flx"><button class="btn btn-success btn-sm" onclick="setExpenseApprovalStatus('${escapeHtml(ref)}','Approved')">Approve</button><button class="btn btn-danger btn-sm" onclick="setExpenseApprovalStatus('${escapeHtml(ref)}','Rejected')">Reject</button></div></td>`;
+  removeEmptyState(tbody);
+  tbody.prepend(row);
+}
+
+function expenseRecordFromListRow(row){
+  if(row?.dataset.expense){
+    try{return JSON.parse(row.dataset.expense);}catch{}
+  }
+  return null;
+}
+
+function setExpenseApprovalStatus(ref,status){
+  const listRow=[...document.querySelectorAll('#expense-tbody tr:not([data-empty-state])')]
+    .find(row=>row.dataset.expenseRef===ref);
+  const record={...(expenseRecordFromListRow(listRow)||{}),ref,status};
+  if(listRow){
+    const badge=listRow.children[6]?.querySelector('.b');
+    if(badge){
+      badge.className=`b ${status==='Approved'?'b-g':'b-r'}`;
+      badge.textContent=status;
+    }
+    listRow.dataset.expense=JSON.stringify(record);
+  }
+  document.querySelector(`#expense-approval-tbody tr[data-expense-ref="${CSS.escape(ref)}"]`)?.remove();
+  const approvalBody=document.getElementById('expense-approval-tbody');
+  if(approvalBody&&!approvalBody.querySelector('tr:not([data-empty-state])'))emptyTableMessage(approvalBody,'No pending expenses for approval.');
+  updateExpenseStats();
+  saveServer('expenses',record);
+  toast(status==='Approved'?'Expense approved':'Expense rejected',status==='Approved'?'ok':'warn');
+  audit(`${status} expense`,ref,status);
+}
+
+function updateExpenseStats(){
+  const rows=[...document.querySelectorAll('#expense-tbody tr:not([data-empty-state])')];
+  const total=rows.reduce((sum,row)=>sum+parseAmount(row.children[5]?.textContent),0);
+  const pending=rows.filter(row=>/pending/i.test(row.children[6]?.textContent||'')).reduce((sum,row)=>sum+parseAmount(row.children[5]?.textContent),0);
+  const approved=rows.filter(row=>/approved/i.test(row.children[6]?.textContent||'')).reduce((sum,row)=>sum+parseAmount(row.children[5]?.textContent),0);
+  const rejected=rows.filter(row=>/rejected/i.test(row.children[6]?.textContent||'')).reduce((sum,row)=>sum+parseAmount(row.children[5]?.textContent),0);
+  const stats=[...document.querySelectorAll('#exp-list .stat-val')];
+  if(stats[0])stats[0].textContent=formatAed(total);
+  if(stats[1])stats[1].textContent=formatAed(pending);
+  if(stats[2])stats[2].textContent=formatAed(approved);
+  if(stats[3])stats[3].textContent=formatAed(rejected);
+}
+
+function buildExpenseRecord(status='Pending'){
+  calcExpenseTotal();
+  const amount=parseAmount(document.getElementById('expense-amount')?.value);
+  const vat=parseAmount(document.getElementById('expense-vat')?.value);
+  return {
+    ref:`EXP-${Date.now()}`,
+    date:document.getElementById('expense-date')?.value||new Date().toISOString().split('T')[0],
+    category:document.getElementById('expense-category')?.value||'Expense',
+    description:document.getElementById('expense-description')?.value?.trim()||'Expense',
+    amount,
+    vat_amount:vat,
+    total:amount+vat,
+    status
+  };
+}
+
+function clearExpenseForm(){
+  ['expense-description','expense-amount','expense-vat','expense-total'].forEach(id=>setFieldValue(document.getElementById(id),''));
+}
+
+function saveExpense(status='Pending'){
+  const record=buildExpenseRecord(status);
+  if(!record.description||record.amount<=0){
+    toast('Enter expense description and amount','warn');
+    return;
+  }
+  renderExpenseRecord(record);
+  saveServer('expenses',record);
+  clearExpenseForm();
+  stab(document.querySelector('#page-expense .tab:nth-child(1)'),'exp-list');
+  toast(status==='Draft'?'Expense draft saved':'Expense submitted for approval','ok');
+  audit(status==='Draft'?'Saved expense draft':'Submitted expense',record.ref,'Saved');
+}
+
 function buildPurchaseRecordRow(purchase){
   const ref=purchase?.ref||purchase?.invoice_no||purchase?.reference;
   if(!ref)return null;
@@ -1845,11 +2170,12 @@ function buildPurchaseRecordRow(purchase){
   const row=document.createElement('tr');
   row.dataset.serverRecord='purchaseRecords';
   row.dataset.purchaseRef=String(ref);
+  row.dataset.purchaseRecord=JSON.stringify({...purchase,ref});
   const status=purchase.status||'Draft';
   const statusClass=status==='Paid'?'b-g':status==='Received'?'b-b':status.includes('Payment')?'b-a':'b-gray';
   const source=String(purchase.source||'Manual');
   const sourceClass=source.toLowerCase().includes('ai')?'b-p':'b-gray';
-  row.innerHTML=`<td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(purchase.supplier||'-')}</td><td>${escapeHtml(purchase.date||'-')}</td><td>${escapeHtml(purchase.location||'-')}</td><td class="mono">${Number(purchase.items||0)}</td><td class="mono">${Number(purchase.net_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.tax_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.shipping||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.total||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.paid||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.due||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openRowDetail(this,'Purchase Detail','Purchase Records')">View</button></div></td>`;
+  row.innerHTML=`<td class="mono">${escapeHtml(ref)}</td><td>${escapeHtml(purchase.supplier||'-')}</td><td>${escapeHtml(purchase.date||'-')}</td><td>${escapeHtml(purchase.location||'-')}</td><td class="mono">${Number(purchase.items||0)}</td><td class="mono">${Number(purchase.net_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.tax_amount||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.shipping||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.total||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.paid||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td class="mono">${Number(purchase.due||0).toLocaleString('en-AE',{maximumFractionDigits:2})}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td><div class="flx"><button class="btn btn-g btn-sm" type="button" onclick="editPurchaseRecord(this)">Edit</button><button class="btn btn-g btn-sm" type="button" onclick="openPurchaseRecordPreview(this)">View</button></div></td>`;
   return row;
 }
 
@@ -1943,6 +2269,7 @@ async function fetchPurchaseRecordsPage({reset=false}={}){
     purchaseRecordsOffset+=records.length;
     purchaseRecordsLoaded=true;
     renderPurchaseRecordWindow();
+    syncStockLevelsFromProducts();
     return data;
   }catch(err){
     console.warn('Purchase records page load failed:',err);
@@ -1960,6 +2287,14 @@ function ensurePurchaseRecordsLoaded(){
     return;
   }
   fetchPurchaseRecordsPage();
+}
+
+function ensurePurchaseRecordsLoadedForStock(){
+  if(purchaseRecordsLoaded||purchaseRecordsLoading){
+    syncStockLevelsFromProducts();
+    return;
+  }
+  fetchPurchaseRecordsPage().then(()=>syncStockLevelsFromProducts());
 }
 
 function loadMorePurchaseRecords(){
@@ -2105,6 +2440,8 @@ function hydrateFromServer(){
       renderStats.bills=renderRecordList(data.bills,renderBillRecord,'bill');
       renderStats.vendors=renderRecordList(data.vendors,renderVendorRecord,'vendor');
       renderStats.payments=renderRecordList(data.payments,renderPaymentRecord,'payment');
+      renderStats.bankAccounts=renderRecordList(data.bankAccounts,renderBankAccountRecord,'bank account');
+      renderStats.expenses=renderRecordList(data.expenses,renderExpenseRecord,'expense');
       renderStats.purchaseRecords={rendered:0,failed:0,total:0,lazy:true};
       loadPurchaseDocumentsFromServer(data.purchaseDocuments||[],[]);
     }finally{
@@ -2131,6 +2468,7 @@ function hydrateFromServer(){
       renderAuditLog(data.audit);
     }
     updateAccountSelectors();
+    refreshInvoiceCustomerOptions();
     syncProductMasterOptions();
     syncSupplierOptions();
     syncInventoryItemOptions();
@@ -2140,6 +2478,7 @@ function hydrateFromServer(){
     syncStockMappingFromItems();
     refreshInvoiceProductSuggestions();
     refreshPurchaseProductSuggestions();
+    refreshQuotationProductOptions();
     loadStockMappingsFromServer();
     filterLedger();
     refreshActivePageTables();
@@ -2542,9 +2881,14 @@ function shareIconSvg(){
   return `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 8.5l3-1.8"/><path d="M6.5 7.5l3 1.8"/><circle cx="4.5" cy="8" r="2"/><circle cx="11.5" cy="5.8" r="2"/><circle cx="11.5" cy="10.2" r="2"/></svg>`;
 }
 
+function downloadIconSvg(){
+  return `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v7"/><path d="M5 6l3 3 3-3"/><path d="M3 13h10"/></svg>`;
+}
+
 function salesInvoiceActionsHtml(){
   return `<div class="row-actions sales-actions">
     <button class="icon-btn view" type="button" title="View" aria-label="View invoice" onclick="openSalesInvoiceRow(this)">${viewIconSvg()}</button>
+    <button class="icon-btn share" type="button" title="Download PDF" aria-label="Download invoice PDF" onclick="downloadSalesInvoiceRowPdf(this)">${downloadIconSvg()}</button>
     <button class="icon-btn share" type="button" title="Share" aria-label="Share invoice" onclick="shareSalesInvoiceRow(this)">${shareIconSvg()}</button>
     <button class="icon-btn edit" type="button" title="Edit" aria-label="Edit invoice" onclick="openGenericEditRow(this,'Edit Sales Invoice','Update selected invoice')">${editIconSvg()}</button>
     <button class="icon-btn danger row-delete-btn" type="button" title="Delete" aria-label="Delete invoice" onclick="deleteTableRow(this)">${deleteIconSvg()}</button>
@@ -2559,14 +2903,16 @@ function addSalesInvoiceRow(inv,options={persist:true}){
   const fmt=n=>Number(n||0).toLocaleString('en-AE',{maximumFractionDigits:2});
   const source=inv.source||((inv.sourceFile||inv.confidence)?'AI Upload':'Manual');
   const sourceClass=String(source).toLowerCase().includes('ai')?'b-p':'b-gray';
+  const status=inv.status||'Draft';
+  const statusClass=String(status).toLowerCase().includes('draft')?'b-gray':'b-a';
   const row=document.createElement('tr');
-  row.dataset.salesInvoice=JSON.stringify({...inv,source});
+  row.dataset.salesInvoice=JSON.stringify({...inv,source,status});
   row.dataset.rowActionsAdded='1';
-  row.innerHTML=`<td class="mono">${escapeHtml(inv.invoice_no)}</td><td>${escapeHtml(inv.customer)}</td><td>${escapeHtml(inv.date)}</td><td>${escapeHtml(inv.due_date||'30 days')}</td><td class="mono">${fmt(inv.subtotal)}</td><td class="mono">${fmt(inv.vat_amount)}</td><td class="mono">${fmt(inv.total)}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b b-a">Pending</span></td><td data-action-col="1">${salesInvoiceActionsHtml()}</td>`;
+  row.innerHTML=`<td class="mono">${escapeHtml(inv.invoice_no)}</td><td>${escapeHtml(inv.customer)}</td><td>${escapeHtml(inv.date)}</td><td>${escapeHtml(inv.due_date||'30 days')}</td><td class="mono">${fmt(inv.subtotal)}</td><td class="mono">${fmt(inv.vat_amount)}</td><td class="mono">${fmt(inv.total)}</td><td><span class="b ${sourceClass}">${escapeHtml(source)}</span></td><td><span class="b ${statusClass}">${escapeHtml(status)}</span></td><td data-action-col="1">${salesInvoiceActionsHtml()}</td>`;
   removeEmptyState(tbody);
   tbody.prepend(row);
   registerSalesInvoiceKey(inv.invoice_no);
-  if(options.persist)persistSalesInvoice({...inv,source});
+  if(options.persist)persistSalesInvoice({...inv,source,status});
   return true;
 }
 
@@ -2593,32 +2939,194 @@ function invoiceFromSalesRow(row){
   };
 }
 
-function getInvoiceLayout(){
+function defaultInvoiceLayout(){
   return {
-    template:document.getElementById('inv-layout-template')?.value||'Modern Tax Invoice',
-    paper:document.getElementById('inv-layout-paper')?.value||'A4 Portrait',
-    align:document.getElementById('inv-layout-align')?.value||'left',
-    color:document.getElementById('inv-layout-color')?.value||'#4f8ef0',
-    logo:document.getElementById('inv-layout-logo')?.value||'TaxFlow',
-    font:document.getElementById('inv-layout-font')?.value||'Modern Sans',
-    company:document.getElementById('inv-layout-company')?.value||currentCompany?.name||'TaxFlow UAE LLC',
-    trnMode:document.getElementById('inv-layout-trn-mode')?.value||'show',
-    taxLabel:document.getElementById('inv-layout-tax-label')?.value||'Tax Invoice',
-    address:document.getElementById('inv-layout-address')?.value||'Dubai, United Arab Emirates',
-    terms:document.getElementById('inv-layout-terms')?.value||'Net 30',
-    dueDays:document.getElementById('inv-layout-due-days')?.value||'30',
-    currency:document.getElementById('inv-layout-currency')?.value||'AED 1,234.00',
-    bank:document.getElementById('inv-layout-bank')?.value||'Bank transfer to Emirates NBD - IBAN AE070331234567890123456',
-    footer:document.getElementById('inv-layout-footer')?.value||'Thank you for your business',
-    language:document.getElementById('inv-layout-language')?.value||'English',
-    decimals:document.getElementById('inv-layout-decimals')?.value||'2 decimals',
-    qr:document.getElementById('inv-layout-qr')?.checked!==false,
-    taxSummary:document.getElementById('inv-layout-tax-summary')?.checked!==false,
-    signature:document.getElementById('inv-layout-signature')?.checked!==false
+    template:'Modern Tax Invoice',
+    paper:'A4 Portrait',
+    align:'left',
+    color:'#2563eb',
+    logo:'TaxFlow',
+    font:'Modern Sans',
+    company:currentCompany?.name||'TaxFlow UAE LLC',
+    trnMode:'show',
+    taxLabel:'Tax Invoice',
+    address:'Dubai, United Arab Emirates',
+    terms:'Net 30',
+    dueDays:'30',
+    currency:'AED 1,234.00',
+    bank:'Bank transfer to Emirates NBD - IBAN AE070331234567890123456',
+    footer:'Thank you for your business',
+    language:'English',
+    decimals:'2 decimals',
+    qr:true,
+    taxSummary:true,
+    signature:true,
+    showTrn:true,
+    showCustomerTrn:true,
+    trnLabel:'TRN',
+    customerTrnLabel:'Customer TRN',
+    showVatRate:true,
+    showVatAmount:true,
+    showTaxableAmount:true,
+    vatMode:'exclusive',
+    showPoNumber:true,
+    poLabel:'Purchase Order No.',
+    showDeliveryNote:false,
+    deliveryLabel:'Delivery Note No.',
+    showReferenceNo:true,
+    referenceLabel:'Reference No.',
+    showPaymentTerms:true,
+    paymentTermsLabel:'Payment Terms',
+    showBankDetails:true,
+    bankName:'',
+    accountName:'',
+    accountNumber:'',
+    iban:'',
+    swiftCode:'',
+    paymentLink:'',
+    enableArabic:true,
+    enableRtl:false,
+    headingLabel:'Tax Invoice | فاتورة ضريبية',
+    productLabel:'Product | المنتج',
+    quantityLabel:'Qty | الكمية',
+    vatLabel:'VAT | ضريبة القيمة المضافة',
+    totalLabel:'Total | الإجمالي',
+    showPreparedBy:false,
+    showApprovedBy:false,
+    showCompanyStamp:false,
+    showAuthorizedSignature:true,
+    signatureLabel:'Authorized Signature',
+    qrCodeType:'invoice_url'
+  };
+}
+
+function repairInvoiceArabicDefaults(layout){
+  const defaults=defaultInvoiceLayout();
+  const brokenArabic=value=>/[�]{1,}|[ØÙ][\s\S]*[ØÙ]|\?{3,}/.test(String(value||''));
+  ['headingLabel','productLabel','quantityLabel','vatLabel','totalLabel'].forEach(key=>{
+    if(brokenArabic(layout[key]))layout[key]=defaults[key];
+  });
+  return layout;
+}
+
+function normalizeInvoiceLayout(layout={}){
+  return repairInvoiceArabicDefaults({...defaultInvoiceLayout(),...(layout||{})});
+}
+
+function invoiceUsesArabic(layout){
+  return Boolean(layout?.enableArabic)||String(layout?.language||'').toLowerCase().includes('arabic');
+}
+
+function invoiceArabicMode(layout){
+  return String(layout?.language||'').toLowerCase()==='arabic';
+}
+
+function invoiceBilingualLabel(layout,english,arabic){
+  if(!invoiceUsesArabic(layout))return english;
+  if(invoiceArabicMode(layout))return arabic;
+  return `${english} | ${arabic}`;
+}
+
+function invoiceLabels(layout){
+  const bilingual=(english,arabic)=>invoiceBilingualLabel(layout,english,arabic);
+  return {
+    heading:invoiceUsesArabic(layout)?layout.headingLabel:(layout.taxLabel||'Tax Invoice'),
+    billTo:bilingual('Bill To','الفاتورة إلى'),
+    issueDate:bilingual('Issue Date','تاريخ الإصدار'),
+    dueDate:bilingual('Due Date','تاريخ الاستحقاق'),
+    paymentTerms:layout.paymentTermsLabel||bilingual('Payment Terms','شروط الدفع'),
+    currency:bilingual('Currency','العملة'),
+    product:invoiceUsesArabic(layout)?layout.productLabel:'Product',
+    unit:bilingual('Unit','الوحدة'),
+    quantity:invoiceUsesArabic(layout)?layout.quantityLabel:'Qty',
+    unitPrice:bilingual('Unit Price','سعر الوحدة'),
+    taxable:bilingual('Taxable','الخاضع للضريبة'),
+    vat:invoiceUsesArabic(layout)?layout.vatLabel:'VAT',
+    vatAmount:bilingual('VAT Amount','مبلغ الضريبة'),
+    amount:bilingual('Amount','المبلغ'),
+    subtotal:bilingual('Subtotal','المجموع الفرعي'),
+    total:invoiceUsesArabic(layout)?layout.totalLabel:'Total',
+    balanceDue:bilingual('Balance Due','الرصيد المستحق'),
+    purchaseOrder:layout.poLabel||bilingual('Purchase Order No.','رقم أمر الشراء'),
+    deliveryNote:layout.deliveryLabel||bilingual('Delivery Note No.','رقم إشعار التسليم'),
+    reference:layout.referenceLabel||bilingual('Reference No.','الرقم المرجعي'),
+    paymentDetails:bilingual('Payment Details','تفاصيل الدفع'),
+    scanQr:bilingual('Scan QR','امسح رمز QR'),
+    openDigitalInvoice:bilingual('Open digital invoice','فتح الفاتورة الرقمية'),
+    preparedBy:bilingual('Prepared By','أعدها'),
+    approvedBy:bilingual('Approved By','اعتمدها'),
+    companyStamp:bilingual('Company Stamp','ختم الشركة'),
+    authorizedSignature:invoiceUsesArabic(layout)&&layout.signatureLabel==='Authorized Signature'?bilingual('Authorized Signature','التوقيع المعتمد'):layout.signatureLabel,
+    digitalGenerated:bilingual('Digital invoice generated by TaxFlow','تم إنشاء الفاتورة الرقمية بواسطة TaxFlow')
+  };
+}
+
+function getInvoiceLayout(){
+  const base=defaultInvoiceLayout();
+  const value=(id,key)=>document.getElementById(id)?.value||base[key];
+  const checked=(id,key)=>document.getElementById(id)?.checked ?? base[key];
+  return {
+    template:value('inv-layout-template','template'),
+    paper:value('inv-layout-paper','paper'),
+    align:value('inv-layout-align','align'),
+    color:value('inv-layout-color','color'),
+    logo:value('inv-layout-logo','logo'),
+    font:value('inv-layout-font','font'),
+    company:value('inv-layout-company','company'),
+    trnMode:value('inv-layout-trn-mode','trnMode'),
+    taxLabel:value('inv-layout-tax-label','taxLabel'),
+    address:value('inv-layout-address','address'),
+    terms:value('inv-layout-terms','terms'),
+    dueDays:value('inv-layout-due-days','dueDays'),
+    currency:value('inv-layout-currency','currency'),
+    bank:value('inv-layout-bank','bank'),
+    footer:value('inv-layout-footer','footer'),
+    language:value('inv-layout-language','language'),
+    decimals:value('inv-layout-decimals','decimals'),
+    qr:checked('inv-layout-qr','qr'),
+    taxSummary:checked('inv-layout-tax-summary','taxSummary'),
+    signature:checked('inv-layout-signature','signature'),
+    showTrn:checked('inv-layout-show-trn','showTrn'),
+    showCustomerTrn:checked('inv-layout-show-customer-trn','showCustomerTrn'),
+    trnLabel:value('inv-layout-trn-label','trnLabel'),
+    customerTrnLabel:value('inv-layout-customer-trn-label','customerTrnLabel'),
+    showVatRate:checked('inv-layout-show-vat-rate','showVatRate'),
+    showVatAmount:checked('inv-layout-show-vat-amount','showVatAmount'),
+    showTaxableAmount:checked('inv-layout-show-taxable','showTaxableAmount'),
+    vatMode:value('inv-layout-vat-mode','vatMode'),
+    showPoNumber:checked('inv-layout-show-po','showPoNumber'),
+    poLabel:value('inv-layout-po-label','poLabel'),
+    showDeliveryNote:checked('inv-layout-show-delivery','showDeliveryNote'),
+    deliveryLabel:value('inv-layout-delivery-label','deliveryLabel'),
+    showReferenceNo:checked('inv-layout-show-reference','showReferenceNo'),
+    referenceLabel:value('inv-layout-reference-label','referenceLabel'),
+    showPaymentTerms:checked('inv-layout-show-payment-terms','showPaymentTerms'),
+    paymentTermsLabel:value('inv-layout-payment-terms-label','paymentTermsLabel'),
+    showBankDetails:checked('inv-layout-show-bank','showBankDetails'),
+    bankName:value('inv-layout-bank-name','bankName'),
+    accountName:value('inv-layout-account-name','accountName'),
+    accountNumber:value('inv-layout-account-number','accountNumber'),
+    iban:value('inv-layout-iban','iban'),
+    swiftCode:value('inv-layout-swift','swiftCode'),
+    paymentLink:value('inv-layout-payment-link','paymentLink'),
+    enableArabic:checked('inv-layout-enable-arabic','enableArabic'),
+    enableRtl:checked('inv-layout-enable-rtl','enableRtl'),
+    headingLabel:value('inv-layout-heading-label','headingLabel'),
+    productLabel:value('inv-layout-product-label','productLabel'),
+    quantityLabel:value('inv-layout-quantity-label','quantityLabel'),
+    vatLabel:value('inv-layout-vat-label','vatLabel'),
+    totalLabel:value('inv-layout-total-label','totalLabel'),
+    showPreparedBy:checked('inv-layout-show-prepared','showPreparedBy'),
+    showApprovedBy:checked('inv-layout-show-approved','showApprovedBy'),
+    showCompanyStamp:checked('inv-layout-show-stamp','showCompanyStamp'),
+    showAuthorizedSignature:checked('inv-layout-show-authorized','showAuthorizedSignature'),
+    signatureLabel:value('inv-layout-signature-label','signatureLabel'),
+    qrCodeType:value('inv-layout-qr-type','qrCodeType')
   };
 }
 
 function setInvoiceLayoutFields(layout={}){
+  layout=normalizeInvoiceLayout(layout);
   const fields={
     'inv-layout-template':layout.template,
     'inv-layout-paper':layout.paper,
@@ -2636,7 +3144,27 @@ function setInvoiceLayoutFields(layout={}){
     'inv-layout-bank':layout.bank,
     'inv-layout-footer':layout.footer,
     'inv-layout-language':layout.language,
-    'inv-layout-decimals':layout.decimals
+    'inv-layout-decimals':layout.decimals,
+    'inv-layout-trn-label':layout.trnLabel,
+    'inv-layout-customer-trn-label':layout.customerTrnLabel,
+    'inv-layout-vat-mode':layout.vatMode,
+    'inv-layout-po-label':layout.poLabel,
+    'inv-layout-delivery-label':layout.deliveryLabel,
+    'inv-layout-reference-label':layout.referenceLabel,
+    'inv-layout-payment-terms-label':layout.paymentTermsLabel,
+    'inv-layout-bank-name':layout.bankName,
+    'inv-layout-account-name':layout.accountName,
+    'inv-layout-account-number':layout.accountNumber,
+    'inv-layout-iban':layout.iban,
+    'inv-layout-swift':layout.swiftCode,
+    'inv-layout-payment-link':layout.paymentLink,
+    'inv-layout-heading-label':layout.headingLabel,
+    'inv-layout-product-label':layout.productLabel,
+    'inv-layout-quantity-label':layout.quantityLabel,
+    'inv-layout-vat-label':layout.vatLabel,
+    'inv-layout-total-label':layout.totalLabel,
+    'inv-layout-signature-label':layout.signatureLabel,
+    'inv-layout-qr-type':layout.qrCodeType
   };
   Object.entries(fields).forEach(([id,value])=>{
     const field=document.getElementById(id);
@@ -2645,19 +3173,352 @@ function setInvoiceLayoutFields(layout={}){
   [
     ['inv-layout-qr',layout.qr],
     ['inv-layout-tax-summary',layout.taxSummary],
-    ['inv-layout-signature',layout.signature]
+    ['inv-layout-signature',layout.signature],
+    ['inv-layout-show-trn',layout.showTrn],
+    ['inv-layout-show-customer-trn',layout.showCustomerTrn],
+    ['inv-layout-show-vat-rate',layout.showVatRate],
+    ['inv-layout-show-vat-amount',layout.showVatAmount],
+    ['inv-layout-show-taxable',layout.showTaxableAmount],
+    ['inv-layout-show-po',layout.showPoNumber],
+    ['inv-layout-show-delivery',layout.showDeliveryNote],
+    ['inv-layout-show-reference',layout.showReferenceNo],
+    ['inv-layout-show-payment-terms',layout.showPaymentTerms],
+    ['inv-layout-show-bank',layout.showBankDetails],
+    ['inv-layout-enable-arabic',layout.enableArabic],
+    ['inv-layout-enable-rtl',layout.enableRtl],
+    ['inv-layout-show-prepared',layout.showPreparedBy],
+    ['inv-layout-show-approved',layout.showApprovedBy],
+    ['inv-layout-show-stamp',layout.showCompanyStamp],
+    ['inv-layout-show-authorized',layout.showAuthorizedSignature]
   ].forEach(([id,value])=>{
     const field=document.getElementById(id);
     if(field&&value!==undefined)field.checked=Boolean(value);
   });
 }
 
-function saveInvoiceLayout(){
+async function saveInvoiceLayout(){
   const layout=getInvoiceLayout();
-  saveInvoiceLayoutServer(layout);
-  updateInvoiceLayoutPreview();
-  toast('Invoice layout saved ?','ok');
-  audit('Saved invoice layout',layout.template,'Saved');
+  try{
+    await saveInvoiceLayoutServer(layout);
+    updateInvoiceLayoutPreview();
+    if(currentSalesInvoice)renderSalesInvoicePreview(currentSalesInvoice);
+    toast('Invoice layout saved','ok');
+    audit('Saved invoice layout',layout.template,'Saved');
+  }catch(err){
+    console.warn('Invoice layout save failed:',err);
+    toast('Invoice layout could not be saved','err');
+  }
+}
+
+function encodePublicInvoicePayload(payload){
+  try{
+    return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  }catch{
+    return '';
+  }
+}
+
+function publicInvoicePayload(inv=currentSalesInvoice){
+  const layout=getInvoiceLayout();
+  const labels=invoiceLabels(layout);
+  const companyTrn=currentCompany?.trn||document.getElementById('set-company-trn')?.value||'';
+  return {
+    company:{
+      name:layout.company,
+      logo:layout.logo,
+      trn:companyTrn,
+      address:layout.address,
+      bank:layout.bank,
+      bankName:layout.bankName,
+      accountName:layout.accountName,
+      accountNumber:layout.accountNumber,
+      iban:layout.iban,
+      swiftCode:layout.swiftCode,
+      paymentLink:layout.paymentLink,
+      footer:layout.footer,
+      color:layout.color,
+      taxLabel:labels.heading,
+      trnLabel:layout.trnLabel,
+      customerTrnLabel:layout.customerTrnLabel,
+      enableRtl:layout.enableRtl,
+      enableArabic:invoiceUsesArabic(layout),
+      language:layout.language
+    },
+    invoice:{
+      invoice_no:inv?.invoice_no||'Draft',
+      status:inv?.status||'Draft',
+      customer:inv?.customer||'Customer',
+      customer_trn:inv?.customer_trn||'TRN not provided',
+      customer_address:inv?.customer_address||document.getElementById('inv-caddr')?.value||'',
+      po_number:inv?.po_number||'',
+      delivery_note_no:inv?.delivery_note_no||'',
+      reference_no:inv?.reference_no||'',
+      date:inv?.date||'',
+      due_date:inv?.due_date||'',
+      subtotal:Number(inv?.subtotal||0),
+      vat_amount:Number(inv?.vat_amount||0),
+      total:Number(inv?.total||0),
+      terms:layout.terms,
+      labels:{
+        billTo:labels.billTo,
+        issueDate:labels.issueDate,
+        dueDate:labels.dueDate,
+        paymentTerms:labels.paymentTerms,
+        currency:labels.currency,
+        product:labels.product,
+        unit:labels.unit,
+        quantity:labels.quantity,
+        unitPrice:labels.unitPrice,
+        taxable:labels.taxable,
+        vat:labels.vat,
+        vatAmount:labels.vatAmount,
+        amount:labels.amount,
+        subtotal:labels.subtotal,
+        total:labels.total,
+        balanceDue:labels.balanceDue,
+        purchaseOrder:labels.purchaseOrder,
+        deliveryNote:labels.deliveryNote,
+        reference:labels.reference,
+        paymentDetails:labels.paymentDetails,
+        digitalGenerated:labels.digitalGenerated
+      },
+      lines:inv?.lines||[]
+    }
+  };
+}
+
+function publicInvoiceUrl(inv=currentSalesInvoice){
+  const payload=encodePublicInvoicePayload(publicInvoicePayload(inv));
+  const url=new URL('/taxflow/digital-invoice.html',window.location.origin);
+  url.hash='invoice='+payload;
+  return url.toString();
+}
+
+function invoiceQrValue(inv=currentSalesInvoice,layout=getInvoiceLayout()){
+  if(layout.qrCodeType==='uae_vat_qr'){
+    const companyTrn=currentCompany?.trn||document.getElementById('set-company-trn')?.value||'';
+    return [
+      layout.company,
+      companyTrn,
+      inv?.date||new Date().toISOString().slice(0,10),
+      Number(inv?.total||0).toFixed(2),
+      Number(inv?.vat_amount||0).toFixed(2)
+    ].join('|');
+  }
+  return publicInvoiceUrl(inv);
+}
+
+function qrCodeFallbackImageUrl(value){
+  return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=${encodeURIComponent(value)}`;
+}
+
+function renderInvoiceQrCode(value,imgId='public-invoice-qr'){
+  const img=document.getElementById(imgId);
+  if(!img)return;
+  const fallback=qrCodeFallbackImageUrl(value);
+  if(window.TaxFlowQRCode?.toDataURL){
+    window.TaxFlowQRCode.toDataURL(value,{width:180,margin:1,color:{dark:'#172033',light:'#ffffff'}})
+      .then(src=>{img.src=src;})
+      .catch(()=>{img.src=fallback;});
+    return;
+  }
+  img.src=fallback;
+}
+
+function openCurrentPublicInvoice(){
+  const inv=currentSalesInvoice||buildDraftInvoice();
+  window.open(publicInvoiceUrl(inv),'_blank');
+}
+
+function currentInvoiceForShare(){
+  return currentSalesInvoice||buildDraftInvoice();
+}
+
+function invoicePdfHtml(inv=currentInvoiceForShare()){
+  const payload=publicInvoicePayload(inv);
+  const company=payload.company||{};
+  const invoice=payload.invoice||{};
+  const labels=invoice.labels||{};
+  const lines=Array.isArray(invoice.lines)&&invoice.lines.length?invoice.lines:[{description:'Invoice items',unit:'PCS',qty:1,price:invoice.subtotal,amount:invoice.subtotal}];
+  const initials=String(company.logo||company.name||'TF').split(/\s+/).map(part=>part[0]).join('').slice(0,2).toUpperCase()||'TF';
+  const fmt=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const accent=escapeHtml(company.color||'#2563eb');
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(invoice.invoice_no||'Invoice')} - PDF</title>
+    <style>
+      *{box-sizing:border-box}body{margin:0;background:#fff;color:#172033;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.45}.sheet{max-width:900px;margin:0 auto;padding:34px}.bar{height:7px;background:${accent};margin:-34px -34px 28px}.head{display:grid;grid-template-columns:1fr 280px;gap:24px;border-bottom:1px solid #e5eaf2;padding-bottom:22px}.brand{display:flex;gap:14px}.logo{width:58px;height:58px;border-radius:12px;background:${accent};color:#fff;display:grid;place-items:center;font-size:20px;font-weight:800}.company{font-size:22px;font-weight:800}.muted{color:#667085;font-size:12px;margin-top:3px}.right{text-align:right}.label{font-size:30px;font-weight:900;text-transform:uppercase}.badge{display:inline-block;margin-top:8px;border:1px solid #d8e2ff;color:${accent};border-radius:999px;padding:4px 10px;font-size:11px;font-weight:700;text-transform:uppercase}.grid{display:grid;grid-template-columns:1fr 280px;gap:16px;margin:22px 0}.panel{border:1px solid #e5eaf2;border-radius:8px;padding:14px}.kicker{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#667085;font-weight:700;margin-bottom:7px}.party{font-size:17px;font-weight:800}.row{display:flex;justify-content:space-between;gap:12px;color:#667085;padding:4px 0}.row strong{color:#172033;text-align:right}table{width:100%;border-collapse:collapse;border:1px solid #e5eaf2;border-radius:8px;overflow:hidden}th{background:#f3f6fb;color:#667085;text-transform:uppercase;font-size:10px;letter-spacing:.5px;text-align:left;padding:10px}td{padding:11px 10px;border-top:1px solid #e5eaf2}.num{text-align:right;white-space:nowrap}.summary{display:grid;grid-template-columns:1fr 300px;gap:20px;margin-top:22px}.notes{border-left:4px solid ${accent};padding-left:12px;color:#667085}.totals{border:1px solid #e5eaf2;border-radius:8px;padding:14px}.total,.grand{display:flex;justify-content:space-between;gap:14px}.total{color:#667085;padding:4px 0}.grand{border-top:1px solid #e5eaf2;margin-top:8px;padding-top:12px;font-size:19px;font-weight:900}.grand strong{color:${accent}}.link{margin-top:14px;font-size:11px;color:#667085;word-break:break-all}[dir=rtl] .right{text-align:left}[dir=rtl] th{text-align:right}[dir=rtl] .num{text-align:left}[dir=rtl] .notes{border-left:0;border-right:4px solid ${accent};padding-left:0;padding-right:12px}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}.sheet{padding:24px}.bar{margin:-24px -24px 24px}.no-print{display:none}}
+    </style></head><body><main class="sheet"><div class="bar"></div>
+      <section class="head" dir="${company.enableRtl?'rtl':'ltr'}"><div class="brand"><div class="logo">${escapeHtml(initials)}</div><div><div class="company">${escapeHtml(company.name||'TaxFlow')}</div><div class="muted">${escapeHtml(company.address||'')}</div><div class="muted">${escapeHtml(company.trnLabel||'TRN')} ${escapeHtml(company.trn||'not set')}</div></div></div><div class="right"><div class="label">${escapeHtml(company.taxLabel||'Tax Invoice')}</div><div>${escapeHtml(invoice.invoice_no||'Draft')}</div><span class="badge">${escapeHtml(invoice.status||'Draft')}</span></div></section>
+      <section class="grid" dir="${company.enableRtl?'rtl':'ltr'}"><div class="panel"><div class="kicker">${escapeHtml(labels.billTo||'Bill To')}</div><div class="party">${escapeHtml(invoice.customer||'Customer')}</div><div class="muted">${escapeHtml(company.customerTrnLabel||'Customer TRN')} ${escapeHtml(invoice.customer_trn||'not provided')}</div><div class="muted">${escapeHtml(invoice.customer_address||'')}</div></div><div class="panel"><div class="row"><span>${escapeHtml(labels.issueDate||'Issue Date')}</span><strong>${escapeHtml(invoice.date||'-')}</strong></div><div class="row"><span>${escapeHtml(labels.dueDate||'Due Date')}</span><strong>${escapeHtml(invoice.due_date||'-')}</strong></div><div class="row"><span>${escapeHtml(labels.paymentTerms||'Terms')}</span><strong>${escapeHtml(invoice.terms||'Net 30')}</strong></div><div class="row"><span>${escapeHtml(labels.currency||'Currency')}</span><strong>AED</strong></div></div></section>
+      <table dir="${company.enableRtl?'rtl':'ltr'}"><thead><tr><th>#</th><th>${escapeHtml(labels.product||'Product')}</th><th>${escapeHtml(labels.unit||'Unit')}</th><th class="num">${escapeHtml(labels.quantity||'Qty')}</th><th class="num">${escapeHtml(labels.unitPrice||'Unit Price')}</th><th class="num">${escapeHtml(labels.amount||'Amount')}</th></tr></thead><tbody>${lines.map((line,index)=>`<tr><td>${index+1}</td><td><strong>${escapeHtml(line.description||'Item')}</strong></td><td>${escapeHtml(line.unit||'PCS')}</td><td class="num">${escapeHtml(line.qty||1)}</td><td class="num">${fmt(line.price)}</td><td class="num">${fmt(line.amount)}</td></tr>`).join('')}</tbody></table>
+      <section class="summary" dir="${company.enableRtl?'rtl':'ltr'}"><div class="notes"><div class="kicker">${escapeHtml(labels.paymentDetails||'Payment Details')}</div><div style="margin-top:8px">${escapeHtml(company.footer||'')}</div><div class="link">Online view: ${escapeHtml(publicInvoiceUrl(inv))}</div></div><div class="totals"><div class="total"><span>${escapeHtml(labels.subtotal||'Subtotal')}</span><strong>AED ${fmt(invoice.subtotal)}</strong></div><div class="total"><span>${escapeHtml(labels.vat||'VAT')}</span><strong>AED ${fmt(invoice.vat_amount)}</strong></div><div class="grand"><span>${escapeHtml(labels.total||'Total')}</span><strong>AED ${fmt(invoice.total)}</strong></div></div></section>
+    </main><script>window.onload=()=>setTimeout(()=>window.print(),250);<\/script></body></html>`;
+}
+
+function exportCurrentInvoicePdf(){
+  const inv=currentInvoiceForShare();
+  const printWindow=window.open('','_blank','width=980,height=780');
+  if(!printWindow){
+    toast('Allow popups to open the invoice PDF','warn');
+    return;
+  }
+  printWindow.document.open();
+  printWindow.document.write(invoicePdfHtml(inv));
+  printWindow.document.close();
+  toast('PDF print view opened. Choose Save as PDF to download.','ok');
+  audit('Opened invoice PDF',inv.invoice_no||'Draft','Exported');
+}
+
+function pdfSafeText(value){
+  return String(value??'').replace(/[^\x20-\x7E]/g,'?');
+}
+
+function pdfEscape(value){
+  return pdfSafeText(value).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
+}
+
+function wrapPdfLine(value,max=86){
+  const words=pdfSafeText(value).split(/\s+/);
+  const lines=[];
+  let current='';
+  words.forEach(word=>{
+    if(!word)return;
+    if((current+' '+word).trim().length>max){
+      if(current)lines.push(current);
+      current=word;
+    }else{
+      current=(current+' '+word).trim();
+    }
+  });
+  if(current)lines.push(current);
+  return lines.length?lines:[''];
+}
+
+function invoicePdfTextLines(inv){
+  const layout=getInvoiceLayout();
+  const fmt=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const lines=Array.isArray(inv?.lines)&&inv.lines.length?inv.lines:[{description:'Invoice items',unit:'PCS',qty:1,price:inv?.subtotal,amount:inv?.subtotal}];
+  const output=[
+    layout.company||'TaxFlow',
+    layout.address||'',
+    `TRN: ${currentCompany?.trn||document.getElementById('set-company-trn')?.value||'not set'}`,
+    '',
+    `TAX INVOICE: ${inv?.invoice_no||'Draft'}`,
+    `Status: ${inv?.status||'Draft'}`,
+    '',
+    `Customer: ${inv?.customer||'Customer'}`,
+    `Customer TRN: ${inv?.customer_trn||'not provided'}`,
+    `Address: ${inv?.customer_address||''}`,
+    `Issue Date: ${inv?.date||'-'}    Due Date: ${inv?.due_date||'-'}`,
+    '',
+    'Items',
+    'No.  Description                                      Qty      Price       Amount'
+  ];
+  lines.forEach((line,index)=>{
+    const desc=pdfSafeText(line.description||'Item').slice(0,42).padEnd(42,' ');
+    const qty=pdfSafeText(line.qty||1).slice(0,7).padStart(7,' ');
+    const price=fmt(line.price).slice(0,10).padStart(10,' ');
+    const amount=fmt(line.amount).slice(0,11).padStart(11,' ');
+    output.push(`${String(index+1).padEnd(4,' ')} ${desc} ${qty} ${price} ${amount}`);
+  });
+  output.push('');
+  output.push(`Subtotal: AED ${fmt(inv?.subtotal)}`);
+  output.push(`VAT:      AED ${fmt(inv?.vat_amount)}`);
+  output.push(`Total:    AED ${fmt(inv?.total)}`);
+  output.push('');
+  output.push(`Online view: ${publicInvoiceUrl(inv)}`);
+  output.push('');
+  output.push(layout.footer||'');
+  return output.flatMap(line=>wrapPdfLine(line)).slice(0,54);
+}
+
+function makeSimplePdfBlob(lines){
+  const content=`BT\n/F1 11 Tf\n14 TL\n50 790 Td\n${lines.map(line=>`(${pdfEscape(line)}) Tj\nT*`).join('\n')}\nET`;
+  const objects=[
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`
+  ];
+  let pdf='%PDF-1.4\n';
+  const offsets=[0];
+  objects.forEach((obj,index)=>{
+    offsets.push(pdf.length);
+    pdf+=`${index+1} 0 obj\n${obj}\nendobj\n`;
+  });
+  const xrefOffset=pdf.length;
+  pdf+=`xref\n0 ${objects.length+1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach(offset=>{
+    pdf+=`${String(offset).padStart(10,'0')} 00000 n \n`;
+  });
+  pdf+=`trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return new Blob([pdf],{type:'application/pdf'});
+}
+
+function invoicePdfFilename(inv){
+  return `${String(inv?.invoice_no||'invoice').replace(/[^a-z0-9_-]+/gi,'-')}.pdf`;
+}
+
+function downloadInvoicePdf(inv=currentInvoiceForShare()){
+  const blob=makeSimplePdfBlob(invoicePdfTextLines(inv));
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=invoicePdfFilename(inv);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast('Invoice PDF downloaded','ok');
+  audit('Downloaded invoice PDF',inv?.invoice_no||'Draft','Downloaded');
+}
+
+function downloadCurrentInvoicePdf(){
+  downloadInvoicePdf(currentInvoiceForShare());
+}
+
+function downloadSalesInvoiceRowPdf(btn){
+  const inv=invoiceFromSalesRow(btn.closest('tr'));
+  downloadInvoicePdf(inv);
+}
+
+function copyCurrentInvoiceLink(){
+  const inv=currentInvoiceForShare();
+  const link=publicInvoiceUrl(inv);
+  const field=document.getElementById('share-link');
+  if(field)field.value=link;
+  navigator.clipboard?.writeText(link).then(()=>toast('Online invoice link copied','ok')).catch(()=>{
+    field?.select();
+    toast('Select and copy the online invoice link','info');
+  });
+}
+
+function sampleLayoutInvoice(){
+  const layout=getInvoiceLayout();
+  const subtotal=12400;
+  const vat=620;
+  return {
+    invoice_no:'INV-PREVIEW',
+    status:'Draft',
+    customer:'Customer Name LLC',
+    customer_trn:'100348712600001',
+    customer_address:'Business Bay, Dubai, United Arab Emirates',
+    po_number:'PO-1024',
+    delivery_note_no:'DN-7781',
+    reference_no:'REF-DXB-01',
+    date:new Date().toISOString().slice(0,10),
+    due_date:new Date(Date.now()+Number(layout.dueDays||30)*86400000).toISOString().slice(0,10),
+    subtotal,
+    vat_amount:vat,
+    total:subtotal+vat,
+    source:'Manual',
+    lines:[{description:'Steel materials',unit:'PCS',qty:1,price:subtotal,amount:subtotal}]
+  };
+}
+
+function previewLayoutSampleInvoice(){
+  renderSalesInvoicePreview(sampleLayoutInvoice());
+  showM('m-sales-view');
 }
 
 function updateInvoiceLayoutPreview(){
@@ -2665,56 +3526,72 @@ function updateInvoiceLayoutPreview(){
   const preview=document.getElementById('invoice-layout-preview');
   if(!preview)return;
   const trn=currentCompany?.trn||document.getElementById('set-company-trn')?.value||'';
-  const align={left:'flex-start',center:'center',right:'flex-end'}[layout.align]||'flex-start';
   const sampleSubtotal=12400;
   const sampleVat=620;
   const sampleTotal=13020;
+  const sampleInvoice=sampleLayoutInvoice();
+  const digitalUrl=publicInvoiceUrl(sampleInvoice);
+  const initials=(layout.logo||layout.company||'TF').split(/\s+/).map(part=>part[0]).join('').slice(0,2).toUpperCase()||'TF';
+  const textAlign={left:'left',center:'center',right:'right'}[layout.align]||'left';
+  const brandJustify={left:'flex-start',center:'center',right:'flex-end'}[layout.align]||'flex-start';
+  const fontFamily=layout.font==='Classic Serif'?'Georgia,serif':layout.font==='Compact Mono'?'DM Mono,monospace':'Syne,sans-serif';
+  const qrValue=invoiceQrValue(sampleInvoice,layout);
+  const qrType=layout.qrCodeType==='payment_url'?'invoice_url':layout.qrCodeType;
+  const labels=invoiceLabels(layout);
   preview.innerHTML=`
-    <div style="border:1px solid var(--border);background:var(--bg3);border-radius:8px;overflow:hidden">
-      <div style="height:6px;background:${escapeHtml(layout.color)}"></div>
-      <div style="padding:16px">
-        <div class="flx-b mb16" style="align-items:flex-start;gap:14px">
-          <div style="display:flex;flex-direction:column;align-items:${align};text-align:${escapeHtml(layout.align)};min-width:0">
-            <div style="font-family:${layout.font==='Classic Serif'?'Georgia,serif':layout.font==='Compact Mono'?'monospace':'Syne,sans-serif'};font-weight:700;font-size:18px;color:${escapeHtml(layout.color)}">${escapeHtml(layout.logo)}</div>
-            <div class="card-title" style="margin-top:5px">${escapeHtml(layout.company)}</div>
-            <div class="card-sub">${escapeHtml(layout.address)}</div>
-            ${layout.trnMode==='show'?`<div class="mono" style="font-size:11px;color:var(--text3);margin-top:3px">TRN ${escapeHtml(trn||'not set')}</div>`:''}
-          </div>
-          <div style="text-align:right">
-            <div class="b b-b">${escapeHtml(layout.taxLabel)}</div>
-            <div class="mono" style="font-size:11px;color:var(--text3);margin-top:6px">${escapeHtml(layout.paper)}</div>
-            <div class="mono" style="font-size:11px;color:var(--text3)">INV-0849</div>
-          </div>
-        </div>
-        <div class="g2 mb16">
+    <div class="invoice-layout-live" dir="${layout.enableRtl?'rtl':'ltr'}" style="--invoice-accent:${escapeHtml(layout.color)}">
+      <div class="invoice-topbar"></div>
+      <div class="invoice-head invoice-layout-head" style="grid-template-columns:1fr;gap:12px">
+        <div class="invoice-brand" style="justify-content:${brandJustify};text-align:${textAlign}">
+          <div class="invoice-logo">${escapeHtml(initials)}</div>
           <div>
-            <div class="section-hd">Bill To</div>
-            <div style="font-weight:600">Customer Name</div>
-            <div class="mono" style="font-size:11px;color:var(--text3)">TRN 100348712600001</div>
-          </div>
-          <div style="font-size:12px;line-height:1.7">
-            <div class="flx-b"><span>Terms</span><span>${escapeHtml(layout.terms)}</span></div>
-            <div class="flx-b"><span>Due Days</span><span class="mono">${escapeHtml(layout.dueDays)}</span></div>
-            <div class="flx-b"><span>Language</span><span>${escapeHtml(layout.language)}</span></div>
+            <div class="invoice-company" style="font-family:${fontFamily}">${escapeHtml(layout.company)}</div>
+            <div class="invoice-muted">${escapeHtml(layout.address)}</div>
+            ${layout.trnMode==='show'&&layout.showTrn?`<div class="invoice-muted mono">${escapeHtml(layout.trnLabel)} ${escapeHtml(trn||'not set')}</div>`:''}
           </div>
         </div>
-        <table class="tbl" style="min-width:0">
-          <tbody>
-            <tr><td>Steel materials</td><td class="mono" style="text-align:right">${sampleSubtotal.toLocaleString('en-AE',{minimumFractionDigits:2})}</td></tr>
-            ${layout.taxSummary?`<tr><td>VAT 5%</td><td class="mono" style="text-align:right">${sampleVat.toLocaleString('en-AE',{minimumFractionDigits:2})}</td></tr>`:''}
-            <tr><td style="font-weight:700">Total</td><td class="mono" style="text-align:right;font-weight:700;color:${escapeHtml(layout.color)}">${sampleTotal.toLocaleString('en-AE',{minimumFractionDigits:2})} AED</td></tr>
-          </tbody>
-        </table>
-        <div class="flx-b" style="align-items:flex-end;margin-top:14px;gap:12px">
-          <div style="font-size:11.5px;color:var(--text3);line-height:1.6;min-width:0">
-            <div>${escapeHtml(layout.bank)}</div>
-            <div>${escapeHtml(layout.footer)}</div>
-          </div>
-          ${layout.qr?`<div style="width:54px;height:54px;border:1px solid var(--border);display:grid;place-items:center;font-size:10px;color:var(--text3);flex:0 0 auto">QR</div>`:''}
+        <div class="invoice-titlebox" style="align-items:${brandJustify};text-align:${textAlign}">
+          <div class="invoice-label" style="font-size:22px">${escapeHtml(labels.heading)}</div>
+          <div class="invoice-number mono">${escapeHtml(layout.paper)} - INV-PREVIEW</div>
         </div>
-        ${layout.signature?`<div style="margin-top:16px;border-top:1px dashed var(--border);padding-top:8px;font-size:11px;color:var(--text3)">Authorized signature and company stamp</div>`:''}
+      </div>
+      <div class="invoice-info-grid" style="grid-template-columns:1fr;gap:12px;padding:16px">
+        <div class="invoice-panel">
+          <div class="invoice-kicker">${escapeHtml(labels.billTo)}</div>
+          <div class="invoice-party">Customer Name LLC</div>
+          ${layout.showCustomerTrn?`<div class="invoice-muted mono">${escapeHtml(layout.customerTrnLabel)} 100348712600001</div>`:''}
+        </div>
+        <div class="invoice-panel invoice-meta-panel">
+          ${layout.showPaymentTerms?`<div class="invoice-meta-row"><span>${escapeHtml(labels.paymentTerms)}</span><strong>${escapeHtml(layout.terms)}</strong></div>`:''}
+          ${layout.showPoNumber?`<div class="invoice-meta-row"><span>${escapeHtml(layout.poLabel)}</span><strong>PO-1024</strong></div>`:''}
+          ${layout.showDeliveryNote?`<div class="invoice-meta-row"><span>${escapeHtml(layout.deliveryLabel)}</span><strong>DN-7781</strong></div>`:''}
+          ${layout.showReferenceNo?`<div class="invoice-meta-row"><span>${escapeHtml(layout.referenceLabel)}</span><strong>REF-DXB-01</strong></div>`:''}
+          <div class="invoice-meta-row"><span>${escapeHtml(invoiceBilingualLabel(layout,'Due Days','أيام الاستحقاق'))}</span><strong>${escapeHtml(layout.dueDays)}</strong></div>
+          <div class="invoice-meta-row"><span>${escapeHtml(invoiceBilingualLabel(layout,'Language','اللغة'))}</span><strong>${escapeHtml(layout.language)}</strong></div>
+        </div>
+      </div>
+      <table class="invoice-line-table" style="width:calc(100% - 32px);margin:0 16px">
+        <tbody>
+          <tr><td><strong>Steel materials</strong></td><td class="mono num">${sampleSubtotal.toLocaleString('en-AE',{minimumFractionDigits:2})}</td></tr>
+          ${layout.showVatRate?`<tr><td>${escapeHtml(layout.vatLabel)} 5%</td><td class="mono num">${sampleVat.toLocaleString('en-AE',{minimumFractionDigits:2})}</td></tr>`:''}
+          ${layout.taxSummary?`<tr><td>${escapeHtml(invoiceBilingualLabel(layout,'VAT Summary','ملخص الضريبة'))}</td><td class="mono num">${sampleVat.toLocaleString('en-AE',{minimumFractionDigits:2})}</td></tr>`:''}
+          <tr><td style="font-weight:800">${escapeHtml(labels.total)}</td><td class="mono num" style="font-weight:800;color:var(--invoice-accent)">${sampleTotal.toLocaleString('en-AE',{minimumFractionDigits:2})} AED</td></tr>
+        </tbody>
+      </table>
+      <div class="invoice-summary-grid" style="grid-template-columns:1fr;gap:12px;padding:16px">
+        <div class="invoice-notes">
+          <div class="invoice-kicker">${escapeHtml(labels.paymentDetails)}</div>
+          ${layout.showBankDetails?`<div>${escapeHtml(layout.bankName||'Bank Name')}</div><div class="invoice-muted mono">${escapeHtml(layout.iban||'IBAN')}</div>`:''}
+          <div class="invoice-muted">${escapeHtml(layout.footer)}</div>
+          ${layout.qr?`<div class="invoice-qr-row">
+            <a class="invoice-qr" href="${escapeHtml(digitalUrl)}" target="_blank" rel="noopener"><img id="layout-preview-qr" alt="Digital invoice QR"></a>
+            <div><strong>${escapeHtml(labels.scanQr)} (${escapeHtml(qrType)})</strong><span>${escapeHtml(invoiceBilingualLabel(layout,'Dubai default is Invoice URL; ZATCA is disabled for UAE.','الافتراضي في دبي هو رابط الفاتورة؛ رمز ZATCA مخصص للسعودية فقط.'))}</span></div>
+          </div>`:''}
+        </div>
+        ${layout.signature?`<div class="invoice-signatures" style="grid-template-columns:1fr;margin:0;padding-top:14px"><div><span>${escapeHtml(labels.authorizedSignature)}</span><strong>${escapeHtml(labels.companyStamp)}</strong></div></div>`:''}
       </div>
     </div>`;
+  if(layout.qr)renderInvoiceQrCode(qrValue,'layout-preview-qr');
 }
 
 function renderSalesInvoicePreview(inv){
@@ -2730,46 +3607,115 @@ function renderSalesInvoicePreview(inv){
   const total=Number(inv.total||subtotal+vat);
   const lines=(inv.lines&&inv.lines.length?inv.lines:[{description:'Sales invoice items',qty:1,price:subtotal,amount:subtotal}]);
   const fmt=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const status=inv.status||'Draft';
+  const customerAddress=inv.customer_address||document.getElementById('inv-caddr')?.value||'Billing address not provided';
+  const accent=escapeHtml(layout.color||'#2563eb');
+  const initials=(layout.logo||layout.company||'TF').split(/\s+/).map(part=>part[0]).join('').slice(0,2).toUpperCase()||'TF';
+  const vatRate=subtotal>0?Math.round((vat/subtotal)*100):5;
+  const issueDate=inv.date||new Date().toISOString().slice(0,10);
+  const dueDate=inv.due_date||'-';
+  const balanceDue=total;
+  const digitalUrl=publicInvoiceUrl(inv);
+  const textAlign={left:'left',center:'center',right:'right'}[layout.align]||'left';
+  const brandJustify={left:'flex-start',center:'center',right:'flex-end'}[layout.align]||'flex-start';
+  const fontFamily=layout.font==='Classic Serif'?'Georgia,serif':layout.font==='Compact Mono'?'DM Mono,monospace':'Syne,sans-serif';
+  const qrValue=invoiceQrValue(inv,layout);
+  const qrType=layout.qrCodeType==='payment_url'?'invoice_url':layout.qrCodeType;
+  const labels=invoiceLabels(layout);
+  const lineVat=n=>Number(n||0)*(vatRate/100);
+  const invoiceRefs=[
+    layout.showPoNumber&&inv.po_number?[layout.poLabel,inv.po_number]:null,
+    layout.showDeliveryNote&&inv.delivery_note_no?[layout.deliveryLabel,inv.delivery_note_no]:null,
+    layout.showReferenceNo&&inv.reference_no?[layout.referenceLabel,inv.reference_no]:null
+  ].filter(Boolean);
+  const bankRows=[
+    layout.bankName&&['Bank Name',layout.bankName],
+    layout.accountName&&['Account Name',layout.accountName],
+    layout.accountNumber&&['Account Number',layout.accountNumber],
+    layout.iban&&['IBAN',layout.iban],
+    layout.swiftCode&&['SWIFT',layout.swiftCode]
+  ].filter(Boolean);
+  const signatureBlocks=[
+    layout.showPreparedBy&&[labels.preparedBy,'TaxFlow UAE'],
+    layout.showApprovedBy&&[labels.approvedBy,''],
+    layout.showAuthorizedSignature&&[labels.authorizedSignature,''],
+    layout.showCompanyStamp&&[labels.companyStamp,'']
+  ].filter(Boolean);
 
   if(title)title.textContent='Invoice '+(inv.invoice_no||'Draft');
-  if(sub)sub.textContent=(inv.customer||'Customer')+' - '+(inv.status||'Draft');
+  if(sub)sub.textContent=(inv.customer||'Customer')+' - '+status;
 
   body.innerHTML=`
-    <div style="border:1px solid var(--border);border-radius:10px;background:var(--bg3);padding:18px">
-      <div class="flx-b mb16" style="border-top:4px solid ${escapeHtml(layout.color)};padding-top:14px">
-        <div><div class="card-title">${escapeHtml(layout.company)}</div><div class="card-sub">${escapeHtml(layout.template)} - ${escapeHtml(layout.address)}</div>${layout.trnMode==='show'?`<div class="mono" style="color:var(--text3);font-size:11px;margin-top:3px">TRN ${escapeHtml(companyTrn||'not set')}</div>`:''}</div>
-        <span class="b b-b">${escapeHtml(inv.status||'Draft')}</span>
-      </div>
-      <div class="g2 mb16">
-        <div>
-          <div class="section-hd">Bill To</div>
-          <div style="font-size:14px;font-weight:600">${escapeHtml(inv.customer||'Customer')}</div>
-          <div class="mono" style="color:var(--text3);margin-top:4px">${escapeHtml(inv.customer_trn||'TRN not provided')}</div>
+    <div class="invoice-sheet" dir="${layout.enableRtl?'rtl':'ltr'}" style="--invoice-accent:${accent}">
+      <div class="invoice-topbar"></div>
+      <div class="invoice-head">
+        <div class="invoice-brand" style="justify-content:${brandJustify};text-align:${textAlign}">
+          <div class="invoice-logo" aria-label="Invoice logo">${escapeHtml(initials)}</div>
+          <div>
+            <div class="invoice-company" style="font-family:${fontFamily}">${escapeHtml(layout.company)}</div>
+            <div class="invoice-muted">${escapeHtml(layout.address)}</div>
+            ${layout.trnMode==='show'&&layout.showTrn?`<div class="invoice-muted mono">${escapeHtml(layout.trnLabel)} ${escapeHtml(companyTrn||'not set')}</div>`:''}
+          </div>
         </div>
-        <div>
-          <div class="section-hd">Invoice</div>
-          <div class="flx-b"><span style="color:var(--text3)">Invoice No.</span><span class="mono">${escapeHtml(inv.invoice_no||'Draft')}</span></div>
-          <div class="flx-b"><span style="color:var(--text3)">Date</span><span>${escapeHtml(inv.date||'-')}</span></div>
-          <div class="flx-b"><span style="color:var(--text3)">Due Date</span><span>${escapeHtml(inv.due_date||'-')}</span></div>
+        <div class="invoice-titlebox" style="align-items:${brandJustify};text-align:${textAlign}">
+          <div class="invoice-label">${escapeHtml(labels.heading)}</div>
+          <div class="invoice-number mono">${escapeHtml(inv.invoice_no||'Draft')}</div>
+          <span class="invoice-status">${escapeHtml(status)}</span>
         </div>
       </div>
-      <table class="tbl">
-        <thead><tr><th>Description</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Amount</th></tr></thead>
+
+      <div class="invoice-info-grid">
+        <div class="invoice-panel">
+          <div class="invoice-kicker">${escapeHtml(labels.billTo)}</div>
+          <div class="invoice-party">${escapeHtml(inv.customer||'Customer')}</div>
+          ${layout.showCustomerTrn?`<div class="invoice-muted mono">${escapeHtml(layout.customerTrnLabel)} ${escapeHtml(inv.customer_trn||'not provided')}</div>`:''}
+          <div class="invoice-muted">${escapeHtml(customerAddress)}</div>
+        </div>
+        <div class="invoice-panel invoice-meta-panel">
+          <div class="invoice-meta-row"><span>${escapeHtml(labels.issueDate)}</span><strong>${escapeHtml(issueDate)}</strong></div>
+          <div class="invoice-meta-row"><span>${escapeHtml(labels.dueDate)}</span><strong>${escapeHtml(dueDate)}</strong></div>
+          ${layout.showPaymentTerms?`<div class="invoice-meta-row"><span>${escapeHtml(labels.paymentTerms)}</span><strong>${escapeHtml(layout.terms||'Net 30')}</strong></div>`:''}
+          ${invoiceRefs.map(([label,value])=>`<div class="invoice-meta-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}
+          <div class="invoice-meta-row"><span>${escapeHtml(labels.currency)}</span><strong>AED</strong></div>
+        </div>
+      </div>
+
+      <table class="invoice-line-table">
+        <thead><tr><th>#</th><th>${escapeHtml(labels.product)}</th><th>${escapeHtml(labels.unit)}</th><th class="num">${escapeHtml(labels.quantity)}</th><th class="num">${escapeHtml(labels.unitPrice)}</th>${layout.showTaxableAmount?`<th class="num">${escapeHtml(labels.taxable)}</th>`:''}${layout.showVatRate?`<th class="num">${escapeHtml(labels.vat)}</th>`:''}${layout.showVatAmount?`<th class="num">${escapeHtml(labels.vatAmount)}</th>`:''}<th class="num">${escapeHtml(labels.amount)}</th></tr></thead>
         <tbody>
-          ${lines.map(line=>`<tr><td>${escapeHtml(line.description||'Item')}</td><td class="mono" style="text-align:right">${escapeHtml(line.qty||1)}</td><td class="mono" style="text-align:right">${fmt(line.price)}</td><td class="mono" style="text-align:right">${fmt(line.amount)}</td></tr>`).join('')}
+          ${lines.map((line,index)=>`<tr><td class="mono">${index+1}</td><td><strong>${escapeHtml(line.description||'Item')}</strong></td><td>${escapeHtml(line.unit||'PCS')}</td><td class="mono num">${escapeHtml(line.qty||1)}</td><td class="mono num">${fmt(line.price)}</td>${layout.showTaxableAmount?`<td class="mono num">${fmt(line.amount)}</td>`:''}${layout.showVatRate?`<td class="mono num">${vatRate}%</td>`:''}${layout.showVatAmount?`<td class="mono num">${fmt(lineVat(line.amount))}</td>`:''}<td class="mono num">${fmt(line.amount+(layout.vatMode==='inclusive'?0:lineVat(line.amount)))}</td></tr>`).join('')}
         </tbody>
       </table>
-      <div class="inv-total-row">
-        <div class="inv-total-box">
-          <div class="tot-row"><span style="color:var(--text3)">Subtotal</span><span class="mono">AED ${fmt(subtotal)}</span></div>
-          <div class="tot-row"><span style="color:var(--text3)">VAT</span><span class="mono">AED ${fmt(vat)}</span></div>
-          <div class="tot-final"><span>Total</span><span class="mono">AED ${fmt(total)}</span></div>
+
+      <div class="invoice-summary-grid">
+        <div class="invoice-notes">
+          <div class="invoice-kicker">${escapeHtml(labels.paymentDetails)}</div>
+          ${layout.showBankDetails?bankRows.map(([label,value])=>`<div class="invoice-meta-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join(''):''}
+          <div class="invoice-muted">${escapeHtml(layout.footer)}</div>
+          ${layout.qr?`<div class="invoice-qr-row">
+            <a class="invoice-qr" href="${escapeHtml(digitalUrl)}" target="_blank" rel="noopener" title="Open digital invoice">
+              <img id="public-invoice-qr" alt="QR code for digital invoice">
+            </a>
+            <div>
+              <strong>${escapeHtml(labels.scanQr)} (${escapeHtml(qrType)})</strong>
+              <span>${escapeHtml(invoiceBilingualLabel(layout,'Anyone with this QR can open the online invoice format.','يمكن لأي شخص لديه هذا الرمز فتح الفاتورة الرقمية.'))}</span>
+              <a href="${escapeHtml(digitalUrl)}" target="_blank" rel="noopener">${escapeHtml(labels.openDigitalInvoice)}</a>
+            </div>
+          </div>`:''}
+        </div>
+        <div class="invoice-total-card">
+          ${layout.taxSummary?`<div class="invoice-total-row"><span>${escapeHtml(labels.subtotal)}</span><strong class="mono">AED ${fmt(subtotal)}</strong></div>
+          <div class="invoice-total-row"><span>${escapeHtml(labels.vat)} ${vatRate}%</span><strong class="mono">AED ${fmt(vat)}</strong></div>`:''}
+          <div class="invoice-grand"><span>${escapeHtml(labels.total)}</span><strong class="mono">AED ${fmt(total)}</strong></div>
+          <div class="invoice-due"><span>${escapeHtml(labels.balanceDue)}</span><strong class="mono">AED ${fmt(balanceDue)}</strong></div>
         </div>
       </div>
-      <div class="divider"></div>
-      <div style="font-size:12px;color:var(--text2);line-height:1.7">${escapeHtml(layout.bank)}</div>
-      <div style="font-size:12px;color:var(--text3);margin-top:8px">${escapeHtml(layout.footer)}</div>
+
+      ${layout.signature&&signatureBlocks.length?`<div class="invoice-signatures">
+        ${signatureBlocks.map(([label,value])=>`<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}
+      </div>`:''}
     </div>`;
+  renderInvoiceQrCode(qrValue);
 }
 
 let currentSalesInvoice=null;
@@ -2802,26 +3748,84 @@ function normalizeSalesInvoiceActions(){
   if(last)last.dataset.actionCol='1';
 }
 
+function nextSalesInvoiceNumber(){
+  const year=new Date().getFullYear();
+  const suffix=String(Date.now()).slice(-6);
+  return `INV-${year}-${suffix}`;
+}
+
 function buildDraftInvoice(){
+  const invoiceNoField=document.getElementById('inv-no');
+  const invoiceNo=(invoiceNoField?.value||'').trim()||nextSalesInvoiceNumber();
+  if(invoiceNoField&&!invoiceNoField.value.trim())setFieldValue(invoiceNoField,invoiceNo);
   const lines=[...document.querySelectorAll('#inv-lines .inv-item')].map(row=>{
     const qty=parseAmount(row.querySelector('.inv-qty')?.value);
     const price=parseAmount(row.querySelector('.inv-price')?.value);
-    return {description:row.querySelector('.inv-product')?.value||'Item',unit:row.querySelector('.inv-unit')?.value||'',qty,price,amount:qty*price};
-  });
+    const description=(row.querySelector('.inv-product')?.value||'').trim();
+    return {description:description||'Item',unit:row.querySelector('.inv-unit')?.value||'',qty,price,amount:qty*price};
+  }).filter(line=>line.description||line.qty||line.price);
   const subtotal=lines.reduce((sum,line)=>sum+line.amount,0);
   const vat=subtotal*.05;
   return {
-    invoice_no:document.getElementById('inv-no')?.value||'Draft',
-    customer:document.getElementById('inv-cust')?.value||'Customer',
+    invoice_no:invoiceNo,
+    customer:(document.getElementById('inv-cust')?.value||'').trim()||'Customer',
     customer_trn:document.getElementById('inv-ctrn')?.value||'TRN not provided',
+    customer_address:document.getElementById('inv-caddr')?.value||'',
+    po_number:document.getElementById('inv-po')?.value||'',
+    delivery_note_no:document.getElementById('inv-delivery')?.value||'',
+    reference_no:document.getElementById('inv-ref')?.value||'',
     date:document.getElementById('inv-date')?.value||'',
     due_date:document.getElementById('inv-due')?.value||'',
     subtotal,
     vat_amount:vat,
     total:subtotal+vat,
     status:'Draft',
+    source:'Manual',
     lines
   };
+}
+
+function validateDraftInvoice(inv){
+  if(!inv.invoice_no)return 'Invoice number is required';
+  if(!inv.customer||inv.customer==='Customer')return 'Select or enter customer name';
+  const validLine=(inv.lines||[]).some(line=>String(line.description||'').trim()&&Number(line.qty)>0&&Number(line.price)>=0&&Number(line.amount)>0);
+  if(!validLine)return 'Add at least one invoice line with quantity and price';
+  if(Number(inv.total||0)<=0)return 'Invoice total must be greater than zero';
+  return '';
+}
+
+function showSalesInvoiceRegister(){
+  const tab=document.querySelector('#page-sales .tab:nth-child(4)');
+  if(tab)stab(tab,'s-invoices');
+}
+
+function saveDraftInvoice(options={}){
+  const inv={...buildDraftInvoice(),status:options.status||'Draft'};
+  const message=validateDraftInvoice(inv);
+  if(message){
+    toast(message,'warn');
+    return null;
+  }
+  currentSalesInvoice=inv;
+  const saved=addSalesInvoiceRow(inv);
+  if(saved){
+    audit(options.auditAction||'Saved draft sales invoice',inv.invoice_no,'Saved');
+    toast(options.toast||'Invoice saved to register','ok');
+  }else{
+    toast(`Invoice ${inv.invoice_no} is already in the register`,'warn');
+  }
+  if(options.showRegister!==false)showSalesInvoiceRegister();
+  return inv;
+}
+
+function saveAndSendDraftInvoice(){
+  const inv=saveDraftInvoice({
+    status:'Pending',
+    showRegister:false,
+    auditAction:'Saved and sent sales invoice',
+    toast:'Invoice saved. Share options opened'
+  });
+  if(inv)openInvoiceShareModal(inv);
 }
 
 function openDraftInvoicePreview(){
@@ -2832,13 +3836,17 @@ function openDraftInvoicePreview(){
 }
 
 function openDraftInvoiceShare(){
-  currentSalesInvoice=buildDraftInvoice();
-  openInvoiceShareModal(currentSalesInvoice);
+  const inv=saveDraftInvoice({
+    showRegister:false,
+    auditAction:'Saved sales invoice for sharing',
+    toast:'Invoice saved. Share options opened'
+  });
+  if(inv)openInvoiceShareModal(inv);
 }
 
 function invoiceShareMessage(inv=currentSalesInvoice){
   const total=Number(inv?.total||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
-  return `Dear ${inv?.customer||'Customer'}, please find invoice ${inv?.invoice_no||'Draft'} for AED ${total}. Due date: ${inv?.due_date||'-'}.`;
+  return `Dear ${inv?.customer||'Customer'}, please find invoice ${inv?.invoice_no||'Draft'} for AED ${total}. Due date: ${inv?.due_date||'-'}.\n\nView invoice online: ${publicInvoiceUrl(inv)}\nPDF invoice: please attach the PDF opened from TaxFlow.`;
 }
 
 function openInvoiceShareModal(inv=currentSalesInvoice){
@@ -2847,10 +3855,12 @@ function openInvoiceShareModal(inv=currentSalesInvoice){
   const email=document.getElementById('share-email');
   const phone=document.getElementById('share-phone');
   const msg=document.getElementById('share-message');
+  const link=document.getElementById('share-link');
   if(sub)sub.textContent=`${currentSalesInvoice.invoice_no||'Draft'} - ${currentSalesInvoice.customer||'Customer'}`;
   if(email&&!email.value)email.value='accounts@example.com';
   if(phone&&!phone.value)phone.value='+971 50 000 0000';
   if(msg)msg.value=invoiceShareMessage(currentSalesInvoice);
+  if(link)link.value=publicInvoiceUrl(currentSalesInvoice);
   showM('m-invoice-share');
 }
 
@@ -2858,7 +3868,11 @@ function shareCurrentInvoice(channel){
   const inv=currentSalesInvoice||buildDraftInvoice();
   const msg=document.getElementById('share-message')?.value||invoiceShareMessage(inv);
   if(channel==='email'){
-    toast(`Invoice ${inv.invoice_no||'Draft'} queued for email`, 'ok');
+    const email=document.getElementById('share-email')?.value||'';
+    const subject=encodeURIComponent(`Invoice ${inv.invoice_no||'Draft'} from ${getInvoiceLayout().company}`);
+    const body=encodeURIComponent(msg);
+    window.open(`mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`,'_blank');
+    toast(`Email opened with PDF note and online invoice link`, 'ok');
     audit('Shared invoice by email',inv.invoice_no||'Draft','Sent');
     return;
   }
@@ -2868,6 +3882,15 @@ function shareCurrentInvoice(channel){
     const encoded=encodeURIComponent(msg);
     window.open(`https://wa.me/?text=${encoded}`,'_blank');
   }
+}
+
+function shareInvoicePdfAndLink(channel){
+  const inv=currentSalesInvoice||buildDraftInvoice();
+  currentSalesInvoice=inv;
+  copyCurrentInvoiceLink();
+  downloadInvoicePdf(inv);
+  shareCurrentInvoice(channel);
+  toast('PDF downloaded and online invoice link prepared', 'ok');
 }
 
 let customerReturnToInvoice=false;
@@ -2900,7 +3923,9 @@ function saveCustomer(){
   if(tbody&&!exists){
     const row=document.createElement('tr');
     row.innerHTML=`<td>${escapeHtml(name)}</td><td class="mono">${escapeHtml(trn||'Not registered')}</td><td>${escapeHtml(emirate)}</td><td>${escapeHtml(email||phone||'-')}</td><td class="mono" style="color:var(--accent)">AED 0</td><td><button class="btn btn-g btn-sm">View</button></td>`;
+    removeEmptyState(tbody);
     tbody.prepend(row);
+    refreshInvoiceCustomerOptions();
   }
   saveServer('customers',{name,trn,emirate,email,phone});
 
@@ -2995,9 +4020,12 @@ function fmtSize(bytes){if(bytes<1024*1024)return(bytes/1024).toFixed(0)+' KB';r
 
 function renderFileList(){
   const list=document.getElementById('pur-file-list');
-  // keep the starter rows (they have no data-id), then append database rows
-  const realRows=list.querySelectorAll('[data-file-id]');
-  realRows.forEach(r=>r.remove());
+  if(!list)return;
+  list.innerHTML='';
+  if(!uploadedFiles.length){
+    list.innerHTML='<div style="font-size:12px;color:var(--text3);padding:10px 0">No uploaded files in database yet.</div>';
+    return;
+  }
 
   uploadedFiles.forEach(f=>{
     const statusBadge={
@@ -3029,7 +4057,7 @@ function renderFileList(){
 
 function updateFileCount(){
   const badge=document.getElementById('file-count-badge');
-  if(badge) badge.textContent=(3+uploadedFiles.length)+' files';
+  if(badge) badge.textContent=uploadedFiles.length+' files';
 }
 
 function loadPurchaseDocumentsFromServer(records,purchaseRecords=[]){
@@ -4360,11 +5388,14 @@ function setManualPurchaseDefaults(){
   });
   const ref=document.getElementById('mp-ref');
   if(ref&&!ref.value)ref.value=`PUR-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
+  ensureManualPurchaseLine();
+  calcManualPurchase();
+}
+
+function ensureManualPurchaseLine(){
   if(!document.querySelector('#mp-lines tr')&&document.getElementById('mp-lines')){
     addManualPurchaseLine();
-    return;
   }
-  calcManualPurchase();
 }
 
 function bindManualPurchaseCalculator(){
@@ -4411,7 +5442,7 @@ function addManualPurchaseLine(){
   if(!tbody)return;
   refreshPurchaseProductSuggestions();
   const row=document.createElement('tr');
-  row.innerHTML=`<td class="line-no-cell"><span class="line-no">1</span></td><td><input class="fi mp-product" list="purchase-product-options" placeholder="Product name" onfocus="refreshPurchaseProductSuggestions()" onchange="applyPurchaseProductSuggestion(this)"></td><td><input class="fi mono mp-qty" value="1" oninput="calcManualPurchase()"></td><td><select class="fi mp-unit">${unitOptionsHtml('PCS')}</select></td><td><input class="fi mono mp-cost" value="0.00" oninput="calcManualPurchase()"></td><td><input class="fi mono mp-discount-pct" value="0" oninput="calcManualPurchase()"></td><td class="mono mp-before-tax">0.00</td><td class="mono mp-line-total">0.00</td><td><input class="fi mono mp-margin" value="0" oninput="calcManualPurchase()"></td><td class="mono mp-selling">0.00</td><td><button class="icon-btn danger" type="button" onclick="removeManualPurchaseLine(this)" title="Remove line">${deleteIconSvg()}</button></td>`;
+  row.innerHTML=`<td><input class="fi mp-product" list="purchase-product-options" placeholder="Product name" onfocus="refreshPurchaseProductSuggestions()" onchange="applyPurchaseProductSuggestion(this)"></td><td><input class="fi mono mp-qty" value="1" oninput="calcManualPurchase()"></td><td><select class="fi mp-unit">${unitOptionsHtml('PCS')}</select></td><td><input class="fi mono mp-cost" value="0.00" oninput="calcManualPurchase()"></td><td><input class="fi mono mp-discount-pct" value="0" oninput="calcManualPurchase()"></td><td class="mono mp-before-tax">0.00</td><td class="mono mp-line-total">0.00</td><td><input class="fi mono mp-margin" value="0" oninput="calcManualPurchase()"></td><td class="mono mp-selling">0.00</td><td><button class="icon-btn danger" type="button" onclick="removeManualPurchaseLine(this)" title="Remove line">${deleteIconSvg()}</button></td>`;
   tbody.appendChild(row);
   calcManualPurchase();
 }
@@ -4428,6 +5459,7 @@ function importManualPurchaseProducts(){
 
 function removeManualPurchaseLine(btn){
   btn.closest('tr')?.remove();
+  ensureManualPurchaseLine();
   calcManualPurchase();
 }
 
@@ -4554,8 +5586,6 @@ function calcManualPurchase(){
   let net=0;
   let activeItems=0;
   rows.forEach((row,index)=>{
-    const lineNo=row.querySelector('.line-no')||row.children[0];
-    if(lineNo)lineNo.textContent=String(index+1);
     const qty=parseAmount(row.querySelector('.mp-qty')?.value);
     const cost=parseAmount(row.querySelector('.mp-cost')?.value);
     const discountPct=parseAmount(row.querySelector('.mp-discount-pct')?.value);
@@ -4616,20 +5646,23 @@ function resetManualPurchase(){
 
 async function saveManualPurchase(){
   setManualPurchaseDefaults();
-  removeInitialBlankPurchaseLine();
-  const totals=calcManualPurchase();
   const supplier=document.getElementById('mp-supplier')?.value||'';
-  const status=totals.due<=0?'Paid':'Pending Payment';
   if(!supplier){
     toast('Select supplier','warn');
     return;
   }
+  removeInitialBlankPurchaseLine();
+  ensureManualPurchaseLine();
+  const totals=calcManualPurchase();
+  const status=totals.due<=0?'Paid':'Pending Payment';
   if(!document.querySelector('#mp-lines tr')){
+    ensureManualPurchaseLine();
     toast('Add at least one product','warn');
     return;
   }
   const lines=collectManualPurchaseLines();
   if(!lines.length){
+    ensureManualPurchaseLine();
     toast('Add at least one product','warn');
     return;
   }
@@ -4711,6 +5744,205 @@ function purchaseRecordFromRow(row){
   };
 }
 
+function ensurePurchasePreviewModal(){
+  let overlay=document.getElementById('m-purchase-view');
+  if(overlay)return overlay;
+  overlay=document.createElement('div');
+  overlay.className='overlay';
+  overlay.id='m-purchase-view';
+  overlay.onclick=e=>closeOvBg(e,'m-purchase-view');
+  overlay.innerHTML=`
+    <div class="modal modal-xl purchase-edit-modal">
+      <div class="purchase-edit-top">
+        <div>
+          <div class="modal-title" id="purchase-view-title">Purchase Order Preview</div>
+          <div class="modal-sub" id="purchase-view-sub">Purchase record</div>
+        </div>
+        <button class="btn btn-g btn-sm" onclick="closeM('m-purchase-view')">Close</button>
+      </div>
+      <div id="purchase-view-body"></div>
+      <div class="modal-foot">
+        <button class="btn btn-g" onclick="toast('Preparing purchase PDF...','info')">Export PDF</button>
+        <button class="btn btn-p hidden" id="purchase-view-save" onclick="savePurchasePreviewEdit()">Save Changes</button>
+        <button class="btn btn-p" onclick="closeM('m-purchase-view')">Close</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function purchasePreviewLines(purchase){
+  const lines=Array.isArray(purchase?.lines)&&purchase.lines.length
+    ? purchase.lines
+    : [{product:'Purchase items',quantity:purchase?.items||1,unit_cost:Number(purchase?.net_amount||purchase?.total||0)/Math.max(1,Number(purchase?.items||1)),line_total:purchase?.net_amount||purchase?.total||0}];
+  return lines.map(line=>{
+    const qty=parseAmount(line.quantity||line.qty||1)||1;
+    const cost=parseAmount(line.unit_cost||line.cost||line.unitCost||line.unit_cost_before_tax);
+    const total=parseAmount(line.line_total||line.total||line.amount)||(qty*cost);
+    return {
+      product:purchaseAiProductName(line)||line.name||'Purchase item',
+      sku:line.sku||line.code||'',
+      unit:line.unit||line.unit_of_measure||line.uom||'PCS',
+      qty,
+      cost,
+      total
+    };
+  });
+}
+
+function renderPurchaseRecordPreview(purchase,options={}){
+  ensurePurchasePreviewModal();
+  const editable=Boolean(options.editable);
+  currentPurchaseViewRef=purchase.ref||purchase.invoice_no||purchase.reference||'';
+  const title=document.getElementById('purchase-view-title');
+  const sub=document.getElementById('purchase-view-sub');
+  const body=document.getElementById('purchase-view-body');
+  const saveBtn=document.getElementById('purchase-view-save');
+  if(!body)return;
+  const ref=purchase.ref||purchase.invoice_no||purchase.reference||'Purchase';
+  const lines=purchasePreviewLines(purchase);
+  const net=parseAmount(purchase.net_amount||purchase.subtotal)||lines.reduce((sum,line)=>sum+line.total,0);
+  const vat=parseAmount(purchase.tax_amount||purchase.vat);
+  const shipping=parseAmount(purchase.shipping);
+  const paid=parseAmount(purchase.paid);
+  const total=parseAmount(purchase.total)||net+vat+shipping;
+  const due=Number.isFinite(Number(purchase.due))?parseAmount(purchase.due):Math.max(0,total-paid);
+  const fmt=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(title)title.textContent=(editable?'Edit Purchase Order ':'Purchase Order ')+ref;
+  if(sub)sub.textContent=`${purchase.supplier||'Supplier'} - ${purchase.status||'Draft'}`;
+  if(saveBtn)saveBtn.classList.toggle('hidden',!editable);
+  body.innerHTML=`
+    <div class="purchase-invoice-sheet">
+      <div class="purchase-invoice-head">
+        <div>
+          <div class="purchase-invoice-kicker">Purchase Order</div>
+          <input class="purchase-invoice-title" id="pv-ref" value="${escapeHtml(ref)}" ${editable?'readonly':'readonly'}>
+          <div class="card-sub">${escapeHtml(purchase.source||'Manual')} purchase record</div>
+        </div>
+        <div class="purchase-invoice-meta">
+          <label>Supplier<input class="fi" id="pv-supplier" value="${escapeHtml(purchase.supplier||'')}" ${editable?'':'readonly'}></label>
+          <label>Status<select class="fi" id="pv-status" ${editable?'':'disabled'}><option${(purchase.status||'Draft')==='Draft'?' selected':''}>Draft</option><option${(purchase.status||'')==='Pending Payment'?' selected':''}>Pending Payment</option><option${(purchase.status||'')==='Paid'?' selected':''}>Paid</option><option${(purchase.status||'')==='Valid'?' selected':''}>Valid</option><option${(purchase.status||'')==='Received'?' selected':''}>Received</option></select></label>
+          <label>Date<input class="fi" id="pv-date" value="${escapeHtml(purchase.date||'')}" ${editable?'':'readonly'}></label>
+          <label>Location<input class="fi" id="pv-location" value="${escapeHtml(purchase.location||'Main Store')}" ${editable?'':'readonly'}></label>
+        </div>
+      </div>
+      <div class="purchase-party-grid">
+        <div class="purchase-party-box">
+          <div class="section-hd">Supplier</div>
+          <input class="fi" id="pv-address" value="${escapeHtml(purchase.address||purchase.shipping_details||'')}" placeholder="Supplier address" ${editable?'':'readonly'}>
+        </div>
+        <div class="purchase-party-box">
+          <div class="section-hd">Payment</div>
+          <div class="fr2"><input class="fi" id="pv-pay-term" value="${escapeHtml(purchase.pay_term||'')}" placeholder="Pay term" ${editable?'':'readonly'}><input class="fi" id="pv-pay-method" value="${escapeHtml(purchase.payment_method||'')}" placeholder="Payment method" ${editable?'':'readonly'}></div>
+          <input class="fi mt12" id="pv-pay-account" value="${escapeHtml(purchase.payment_account||'')}" placeholder="Payment account" ${editable?'':'readonly'}>
+        </div>
+      </div>
+      <div class="purchase-edit-table-wrap">
+        <table class="tbl purchase-edit-lines">
+          <thead><tr><th>#</th><th>Product</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit Cost</th><th>Line Total</th></tr></thead>
+          <tbody>
+            ${lines.map((line,index)=>`<tr class="pv-line"><td>${index+1}</td><td><input class="fi pv-product" value="${escapeHtml(line.product)}" ${editable?'':'readonly'}></td><td><input class="fi mono pv-sku" value="${escapeHtml(line.sku||'')}" ${editable?'':'readonly'}></td><td><input class="fi mono pv-qty" value="${fmt(line.qty)}" oninput="calcPurchasePreviewEdit()" ${editable?'':'readonly'}></td><td><input class="fi pv-unit" value="${escapeHtml(line.unit)}" ${editable?'':'readonly'}></td><td><input class="fi mono pv-cost" value="${fmt(line.cost)}" oninput="calcPurchasePreviewEdit()" ${editable?'':'readonly'}></td><td><input class="fi mono pv-line-total" value="${fmt(line.total)}" readonly></td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="purchase-invoice-bottom">
+        <div class="purchase-party-box">
+          <div class="section-hd">Notes</div>
+          <textarea class="fi" id="pv-notes" rows="4" ${editable?'':'readonly'}>${escapeHtml(purchase.notes||purchase.payment_note||'')}</textarea>
+        </div>
+        <div class="purchase-summary-box">
+          <div class="tot-row"><span>Net Amount</span><input class="fi mono" id="pv-net" value="${fmt(net)}" readonly></div>
+          <div class="tot-row"><span>VAT</span><input class="fi mono" id="pv-vat" value="${fmt(vat)}" oninput="calcPurchasePreviewEdit()" ${editable?'':'readonly'}></div>
+          <div class="tot-row"><span>Shipping</span><input class="fi mono" id="pv-shipping" value="${fmt(shipping)}" oninput="calcPurchasePreviewEdit()" ${editable?'':'readonly'}></div>
+          <div class="tot-final"><span>Total</span><input class="fi mono" id="pv-total" value="${fmt(total)}" readonly></div>
+          <div class="tot-row"><span>Paid</span><input class="fi mono" id="pv-paid" value="${fmt(paid)}" oninput="calcPurchasePreviewEdit()" ${editable?'':'readonly'}></div>
+          <div class="tot-row"><span>Due</span><input class="fi mono" id="pv-due" value="${fmt(due)}" readonly></div>
+        </div>
+      </div>
+    </div>`;
+  calcPurchasePreviewEdit();
+}
+
+function openPurchaseRecordPreview(btn){
+  const purchase=purchaseRecordFromRow(btn.closest('tr'));
+  if(!purchase?.ref){
+    toast('Purchase record not found','warn');
+    return;
+  }
+  renderPurchaseRecordPreview(purchase);
+  showM('m-purchase-view');
+  audit('Viewed purchase order',purchase.ref,'Viewed');
+}
+
+function calcPurchasePreviewEdit(){
+  let net=0;
+  document.querySelectorAll('#purchase-view-body .pv-line').forEach(row=>{
+    const qty=parseAmount(row.querySelector('.pv-qty')?.value);
+    const cost=parseAmount(row.querySelector('.pv-cost')?.value);
+    const total=qty*cost;
+    net+=total;
+    const lineTotal=row.querySelector('.pv-line-total');
+    if(lineTotal)lineTotal.value=total.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  });
+  const vat=parseAmount(document.getElementById('pv-vat')?.value);
+  const shipping=parseAmount(document.getElementById('pv-shipping')?.value);
+  const paid=parseAmount(document.getElementById('pv-paid')?.value);
+  const total=net+vat+shipping;
+  const due=Math.max(0,total-paid);
+  setFieldValue(document.getElementById('pv-net'),net.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  setFieldValue(document.getElementById('pv-total'),total.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  setFieldValue(document.getElementById('pv-due'),due.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  return {net,vat,shipping,paid,total,due};
+}
+
+function collectPurchasePreviewLines(){
+  return [...document.querySelectorAll('#purchase-view-body .pv-line')].map(row=>({
+    product:row.querySelector('.pv-product')?.value?.trim()||'Purchase item',
+    sku:row.querySelector('.pv-sku')?.value?.trim()||'',
+    quantity:parseAmount(row.querySelector('.pv-qty')?.value),
+    unit:row.querySelector('.pv-unit')?.value?.trim()||'PCS',
+    unit_cost:parseAmount(row.querySelector('.pv-cost')?.value),
+    line_total:parseAmount(row.querySelector('.pv-line-total')?.value)
+  })).filter(line=>line.product||line.quantity||line.unit_cost);
+}
+
+function savePurchasePreviewEdit(){
+  const existing=purchaseRecordCache.get(currentPurchaseViewRef)||{};
+  const totals=calcPurchasePreviewEdit();
+  const ref=document.getElementById('pv-ref')?.value?.trim()||currentPurchaseViewRef||`PUR-${Date.now()}`;
+  const lines=collectPurchasePreviewLines();
+  const record={
+    ...existing,
+    ref,
+    supplier:document.getElementById('pv-supplier')?.value?.trim()||'Supplier',
+    date:document.getElementById('pv-date')?.value||'',
+    location:document.getElementById('pv-location')?.value||'Main Store',
+    address:document.getElementById('pv-address')?.value||'',
+    status:document.getElementById('pv-status')?.value||'Draft',
+    pay_term:document.getElementById('pv-pay-term')?.value||'',
+    payment_method:document.getElementById('pv-pay-method')?.value||'',
+    payment_account:document.getElementById('pv-pay-account')?.value||'',
+    notes:document.getElementById('pv-notes')?.value||'',
+    items:lines.length,
+    net_amount:totals.net,
+    tax_amount:totals.vat,
+    shipping:totals.shipping,
+    total:totals.total,
+    paid:totals.paid,
+    due:totals.due,
+    lines
+  };
+  if(currentPurchaseViewRef&&currentPurchaseViewRef!==ref)purchaseRecordCache.delete(currentPurchaseViewRef);
+  purchaseRecordCache.set(ref,record);
+  renderPurchaseRecordWindow();
+  syncStockLevelsFromProducts();
+  saveServer('purchaseRecords',record);
+  currentPurchaseViewRef=ref;
+  renderPurchaseRecordPreview(record,{editable:true});
+  toast('Purchase updated','ok');
+  audit('Updated purchase order',ref,'Saved');
+}
+
 function addManualPurchaseLineFromData(line={}){
   addManualPurchaseLine();
   const row=document.querySelector('#mp-lines tr:last-child');
@@ -4730,6 +5962,10 @@ function editPurchaseRecord(btn){
     toast('Purchase record not found','warn');
     return;
   }
+  renderPurchaseRecordPreview(purchase,{editable:true});
+  showM('m-purchase-view');
+  audit('Editing purchase order',purchase.ref,'Opened');
+  return;
   resetManualPurchase();
   manualPurchaseEditingRef=purchase.ref;
   setSelectValue(document.getElementById('mp-supplier'),purchase.supplier);
@@ -4809,7 +6045,7 @@ function invoiceProductRecords(){
       code,
       name,
       unit:(isItemMasterRow?cells[4]?.textContent.trim():cells[3]?.textContent.trim())||'PCS',
-      price:isItemMasterRow?0:parseAmount(cells[4]?.textContent)
+      price:isItemMasterRow?Number(row.dataset.price||row.dataset.cost||0):parseAmount(cells[4]?.textContent)
     });
   });
   document.querySelectorAll('#stock-map-tbody tr:not([data-empty-state])').forEach(row=>{
@@ -4841,6 +6077,49 @@ function applyInvoiceProductSuggestion(input){
   if(unit)unit.value=match.unit||'PCS';
   if(price&&match.price)price.value=Number(match.price).toFixed(2);
   calcLine(price||input);
+}
+
+function quotationProductRecords(){
+  return invoiceProductRecords();
+}
+
+function quotationProductOptionsHtml(selected=''){
+  const records=quotationProductRecords();
+  const current=String(selected||'');
+  if(!records.length)return '<option value="">No items in item table</option>';
+  return '<option value="">Select item...</option>'+records.map(item=>{
+    const label=[item.code,item.unit,Number(item.price||0)>0?formatAed(item.price):''].filter(Boolean).join(' - ');
+    const chosen=item.name===current||item.code===current?' selected':'';
+    return `<option value="${escapeHtml(item.name)}"${chosen}>${escapeHtml(item.name)}${label?` (${escapeHtml(label)})`:''}</option>`;
+  }).join('');
+}
+
+function refreshQuotationProductOptions(){
+  document.querySelectorAll('#quote-lines .quote-item').forEach(select=>{
+    const current=select.value;
+    select.innerHTML=quotationProductOptionsHtml(current);
+    if(current&&![...select.options].some(option=>option.value===current)){
+      select.appendChild(new Option(current,current));
+      select.value=current;
+    }
+  });
+}
+
+function selectQuotationItem(select){
+  const value=(select?.value||'').trim().toLowerCase();
+  if(!value){
+    calcQuotationTotals();
+    return;
+  }
+  const match=quotationProductRecords().find(item=>[item.name,item.code].some(text=>String(text||'').toLowerCase()===value));
+  if(!match){
+    calcQuotationTotals();
+    return;
+  }
+  const row=select.closest('.quote-line');
+  const price=row?.querySelector('.quote-price');
+  if(price&&Number(match.price||0)>0)price.value=Number(match.price).toFixed(2);
+  calcQuotationTotals();
 }
 
 function editProd(code){
@@ -4900,6 +6179,7 @@ function openAddProductFromInvoice(){
   const currentPrice=productTargetLine?.querySelector('.inv-price')?.value||'';
   document.getElementById('prod-name').value=currentName;
   document.getElementById('prod-price').value=currentPrice;
+  document.getElementById('prod-cost').value=currentPrice;
   showM('m-product');
 }
 
@@ -4910,8 +6190,13 @@ function saveProd(){
   const name=(document.getElementById('prod-name')?.value||'').trim();
   const category=document.getElementById('prod-category')?.value||'Materials';
   const unit=document.getElementById('prod-unit')?.value||'Each';
-  const price=parseFloat(String(document.getElementById('prod-price')?.value||'0').replace(/,/g,''))||0;
+  const cost=parseFloat(String(document.getElementById('prod-cost')?.value||'0').replace(/,/g,''))||0;
+  const price=parseFloat(String(document.getElementById('prod-price')?.value||document.getElementById('prod-cost')?.value||'0').replace(/,/g,''))||0;
   const vat=document.getElementById('prod-vat')?.value||'Standard 5%';
+  const tracking=document.getElementById('prod-tracking')?.value||'Yes';
+  const reorderLevel=parseAmount(document.getElementById('prod-reorder')?.value);
+  const supplier=document.getElementById('prod-supplier')?.value||'';
+  const status=document.getElementById('prod-status')?.value||'Active';
 
   if(!name){
     toast('Enter product or service name','warn');
@@ -4923,12 +6208,21 @@ function saveProd(){
   const row=document.createElement('tr');
   const vatText=vat.includes('0')&&!vat.includes('5')?'0% Zero':vat.includes('Exempt')?'Exempt':'5%';
   const vatClass=vatText==='5%'?'b-b':'b-t';
-  row.dataset.cost=String(price);
-  row.innerHTML=`<td class="mono">${escapeHtml(code)}</td><td>${escapeHtml(name)}</td><td>Stock Item</td><td>${escapeHtml(category)}</td><td>${escapeHtml(unit)}</td><td>Main Store</td><td><span class="b b-g">Yes</span></td><td><span class="b ${vatClass}">${escapeHtml(vatText)}</span></td><td><span class="b b-g">Active</span></td>`;
+  row.dataset.reorderLevel=reorderLevel;
+  row.dataset.available=0;
+  row.dataset.reserved=0;
+  row.dataset.cost=String(cost);
+  row.dataset.price=String(price);
+  row.dataset.unit=unit;
+  row.dataset.supplier=supplier;
+  row.innerHTML=`<td class="mono">${escapeHtml(code)}</td><td>${escapeHtml(name)}</td><td>Stock Item</td><td>${escapeHtml(category)}</td><td>${escapeHtml(unit)}</td><td>Main Store</td><td><span class="b ${tracking==='No'?'b-gray':'b-g'}">${escapeHtml(tracking)}</span></td><td><span class="b ${vatClass}">${escapeHtml(vatText)}</span></td><td><span class="b ${status==='Active'?'b-g':'b-gray'}">${escapeHtml(status)}</span></td>`;
   tbody.prepend(row);
-  saveServer('products',{code,name,category,unit,price,vat});
+  saveServer('products',{code,name,category,unit,cost,price,vat,supplier_name:supplier,reorder_level:reorderLevel,status});
+  syncStockLevelsFromProducts();
+  syncStockMappingFromItems();
   refreshInvoiceProductSuggestions();
   refreshPurchaseProductSuggestions();
+  refreshQuotationProductOptions();
 
   closeM('m-product');
   if(shouldFillInvoice&&targetLine){
@@ -4941,7 +6235,7 @@ function saveProd(){
     calcLine(priceInput||null);
   }
 
-  ['prod-code','prod-name','prod-price','prod-desc'].forEach(id=>{
+  ['prod-code','prod-name','prod-cost','prod-price','prod-reorder','prod-min','prod-max','prod-opening-date','prod-desc'].forEach(id=>{
     const field=document.getElementById(id);
     if(field)field.value='';
   });
@@ -5940,11 +7234,14 @@ function editIconSvg(){
 function tableActionButtonsHtml(table){
   const collection=inferCollectionFromContext(table);
   if(collection==='salesInvoices')return salesInvoiceActionsHtml();
+  const viewAction=collection==='purchaseRecords'
+    ? "openPurchaseRecordPreview(this)"
+    : "openRowDetail(this,'Record Detail',document.getElementById('ptitle')?.textContent||'Detail')";
   const editAction=collection==='purchaseRecords'
     ? 'editPurchaseRecord(this)'
     : "openGenericEditRow(this,'Edit '+(document.getElementById('ptitle')?.textContent||'Record'),'Update selected row')";
   return `<div class="row-actions">
-    <button class="icon-btn view" type="button" title="View" aria-label="View row" onclick="openRowDetail(this,'Record Detail',document.getElementById('ptitle')?.textContent||'Detail')">${viewIconSvg()}</button>
+    <button class="icon-btn view" type="button" title="View" aria-label="View row" onclick="${viewAction}">${viewIconSvg()}</button>
     <button class="icon-btn edit" type="button" title="Edit" aria-label="Edit row" onclick="${editAction}">${editIconSvg()}</button>
     <button class="icon-btn danger row-delete-btn" type="button" title="Delete" aria-label="Delete row" onclick="deleteTableRow(this)">${deleteIconSvg()}</button>
   </div>`;
@@ -6277,6 +7574,10 @@ function patchViewButtonsInPage(pageId,title){
     table.querySelectorAll('button').forEach(button=>{
       const text=button.textContent.trim().toLowerCase();
       if(text==='view'){
+        if(pageId==='page-purchase'&&button.closest('#purchase-record-tbody')){
+          button.onclick=()=>openPurchaseRecordPreview(button);
+          return;
+        }
         button.onclick=()=>openRowDetail(button,title,document.getElementById('ptitle')?.textContent||title);
       }
     });
@@ -6634,7 +7935,7 @@ function runBackup(){
 }
 
 function quotationNumber(){
-  return document.getElementById('quote-no')?.value?.trim()||'QTN-2024-0063';
+  return document.getElementById('quote-no')?.value?.trim()||`QTN-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
 }
 
 function calcQuotationTotals(){
@@ -6661,12 +7962,16 @@ function calcQuotationLine(input){
   calcQuotationTotals();
 }
 
+function quotationLineHtml(selected=''){
+  return `<select class="fi quote-item" onchange="selectQuotationItem(this)" onfocus="refreshQuotationProductOptions()">${quotationProductOptionsHtml(selected)}</select><input class="fi quote-qty" value="1" oninput="calcQuotationLine(this)"><input class="fi quote-price" value="0.00" oninput="calcQuotationLine(this)"><input class="fi mono quote-amount" value="0.00" readonly style="background:var(--bg)"><button class="btn btn-g" style="padding:4px 8px" onclick="removeQuotationLine(this)">x</button>`;
+}
+
 function addQuotationLine(){
   const box=document.getElementById('quote-lines');
   if(!box)return;
   const row=document.createElement('div');
   row.className='inv-item quote-line';
-  row.innerHTML=`<input class="fi" placeholder="Description"><input class="fi quote-qty" value="1" oninput="calcQuotationLine(this)"><input class="fi quote-price" value="0.00" oninput="calcQuotationLine(this)"><input class="fi mono quote-amount" value="0.00" readonly style="background:var(--bg)"><button class="btn btn-g" style="padding:4px 8px" onclick="removeQuotationLine(this)">x</button>`;
+  row.innerHTML=quotationLineHtml();
   box.appendChild(row);
   calcQuotationTotals();
 }
@@ -6676,9 +7981,119 @@ function removeQuotationLine(btn){
   calcQuotationTotals();
 }
 
+function quotationLinesFromForm(){
+  return [...document.querySelectorAll('#quote-lines .quote-line')].map(row=>{
+    const qty=parseAmount(row.querySelector('.quote-qty')?.value);
+    const price=parseAmount(row.querySelector('.quote-price')?.value);
+    return {
+      description:row.querySelector('.quote-item')?.value||row.querySelector('input:not(.quote-qty):not(.quote-price):not(.quote-amount)')?.value||'Item',
+      qty,
+      price,
+      amount:qty*price
+    };
+  }).filter(line=>line.description||line.qty||line.price);
+}
+
+function quotationLinesFromRecord(quote){
+  if(Array.isArray(quote?.lines)&&quote.lines.length)return quote.lines;
+  const subtotal=parseAmount(quote?.subtotal);
+  return [{description:quote?.subject||'Quotation items',qty:1,price:subtotal,amount:subtotal}];
+}
+
+function ensureQuotationPreviewModal(){
+  let overlay=document.getElementById('m-quotation-view');
+  if(overlay)return overlay;
+  overlay=document.createElement('div');
+  overlay.className='overlay';
+  overlay.id='m-quotation-view';
+  overlay.onclick=e=>closeOvBg(e,'m-quotation-view');
+  overlay.innerHTML=`
+    <div class="modal modal-lg">
+      <div class="modal-title" id="quotation-view-title">Quotation Preview</div>
+      <div class="modal-sub" id="quotation-view-sub">Sales quotation</div>
+      <div id="quotation-view-body"></div>
+      <div class="modal-foot">
+        <button class="btn btn-g" onclick="toast('Preparing quotation PDF...','info')">Export PDF</button>
+        <button class="btn btn-g" onclick="toast('Quotation email prepared','ok')">Email</button>
+        <button class="btn btn-success" onclick="toast('WhatsApp share prepared','ok')">WhatsApp</button>
+        <button class="btn btn-p" onclick="closeM('m-quotation-view')">Close</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function renderQuotationPreview(quote){
+  ensureQuotationPreviewModal();
+  const title=document.getElementById('quotation-view-title');
+  const sub=document.getElementById('quotation-view-sub');
+  const body=document.getElementById('quotation-view-body');
+  if(!body)return;
+  const layout=getInvoiceLayout();
+  const companyTrn=currentCompany?.trn||document.getElementById('set-company-trn')?.value||'';
+  const subtotal=parseAmount(quote.subtotal);
+  const vat=parseAmount(quote.vat_amount);
+  const total=parseAmount(quote.total)||subtotal+vat;
+  const lines=quotationLinesFromRecord(quote);
+  const fmt=n=>Number(n||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  if(title)title.textContent='Quotation '+(quote.quote_no||'Draft');
+  if(sub)sub.textContent=(quote.customer||'Customer')+' - '+(quote.status||'Draft');
+
+  body.innerHTML=`
+    <div class="quotation-preview-sheet">
+      <div class="quotation-preview-top" style="border-top-color:${escapeHtml(layout.color)}">
+        <div>
+          <div class="card-title">${escapeHtml(layout.company)}</div>
+          <div class="card-sub">${escapeHtml(layout.address)}</div>
+          ${layout.trnMode==='show'?`<div class="mono" style="color:var(--text3);font-size:11px;margin-top:3px">TRN ${escapeHtml(companyTrn||'not set')}</div>`:''}
+        </div>
+        <div style="text-align:right">
+          <span class="b ${quotationStatusClass(quote.status)}">${escapeHtml(quote.status||'Draft')}</span>
+          <div class="mono" style="font-size:22px;font-weight:700;margin-top:10px;color:${escapeHtml(layout.color)}">QUOTATION</div>
+          <div class="mono" style="font-size:12px;color:var(--text3)">${escapeHtml(quote.quote_no||'Draft')}</div>
+        </div>
+      </div>
+      <div class="g2 mb16">
+        <div>
+          <div class="section-hd">Quote To</div>
+          <div style="font-size:14px;font-weight:600">${escapeHtml(quote.customer||'Customer')}</div>
+          ${quote.subject?`<div style="font-size:12px;color:var(--text3);margin-top:6px">${escapeHtml(quote.subject)}</div>`:''}
+        </div>
+        <div>
+          <div class="section-hd">Quotation</div>
+          <div class="flx-b"><span style="color:var(--text3)">Quotation No.</span><span class="mono">${escapeHtml(quote.quote_no||'Draft')}</span></div>
+          <div class="flx-b"><span style="color:var(--text3)">Date</span><span>${escapeHtml(quote.date||'-')}</span></div>
+          <div class="flx-b"><span style="color:var(--text3)">Valid Until</span><span>${escapeHtml(quote.valid_until||'-')}</span></div>
+        </div>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Amount</th></tr></thead>
+        <tbody>
+          ${lines.map(line=>`<tr><td>${escapeHtml(line.description||line.item||'Item')}</td><td class="mono" style="text-align:right">${escapeHtml(line.qty||line.quantity||1)}</td><td class="mono" style="text-align:right">${fmt(line.price||line.unit_price)}</td><td class="mono" style="text-align:right">${fmt(line.amount)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="inv-total-row">
+        <div class="inv-total-box">
+          <div class="tot-row"><span style="color:var(--text3)">Subtotal</span><span class="mono">AED ${fmt(subtotal)}</span></div>
+          <div class="tot-row"><span style="color:var(--text3)">VAT 5%</span><span class="mono">AED ${fmt(vat)}</span></div>
+          <div class="tot-final"><span>Total</span><span class="mono">AED ${fmt(total)}</span></div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.7">${escapeHtml(layout.bank)}</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:8px">${escapeHtml(layout.footer)}</div>
+    </div>`;
+}
+
+function openQuotationPreview(quote){
+  renderQuotationPreview(quote);
+  showM('m-quotation-view');
+}
+
 function previewQuotation(btn){
   const quote=quotationRecordFromRow(btn.closest('tr'));
-  openRowDetail(btn,'Quotation Preview',quote.quote_no||'Quotation');
+  openQuotationPreview(quote);
   audit('Viewed quotation',quote.quote_no||'Quotation','Opened');
 }
 
@@ -6711,7 +8126,8 @@ function convertQuotation(btn){
     total:parseAmount(quote.total),
     source:'Quotation',
     status:'Draft',
-    quotation_no:quote.quote_no||''
+    quotation_no:quote.quote_no||'',
+    lines:quotationLinesFromRecord(quote)
   };
   addSalesInvoiceRow(invoice,{persist:false});
   saveServer('salesInvoices',invoice);
@@ -6726,6 +8142,7 @@ function saveQuotationDraft(){
 
 function previewDraftQuotation(){
   calcQuotationTotals();
+  openQuotationPreview(buildDraftQuotationRecord('Draft'));
   toast(`Preview opened for ${quotationNumber()}`,'info');
 }
 
@@ -6746,7 +8163,8 @@ function buildDraftQuotationRecord(status='Sent'){
     total:document.getElementById('quote-total')?.textContent?.replace('AED ','')||'0.00',
     status,
     owner:'Sales Team',
-    subject:document.getElementById('quote-subject')?.value?.trim()||''
+    subject:document.getElementById('quote-subject')?.value?.trim()||'',
+    lines:quotationLinesFromForm()
   };
 }
 

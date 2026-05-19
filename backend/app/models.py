@@ -59,6 +59,7 @@ class User(Base, TimestampMixin):
 
 class Invoice(Base, TimestampMixin):
     __tablename__ = "invoices"
+    __table_args__ = (UniqueConstraint("company_id", "invoice_number", name="uq_invoice_company_number"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid)
     company_id: Mapped[str] = mapped_column(ForeignKey("companies.id"), index=True, nullable=False)
